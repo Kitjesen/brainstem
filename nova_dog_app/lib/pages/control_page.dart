@@ -35,12 +35,14 @@ class _ControlPageState extends State<ControlPage> {
   }
 
   void _onGrpcData() {
+    // grpc_service 内部已 16ms 节流，此处直接 rebuild 即可（力矩条每帧刷新）
     if (mounted) setState(() {});
   }
 
   void _startWalking() {
     _walkTimer?.cancel();
     _walkTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (!widget.grpc.connected) return;
       if (_joyX != 0 || _joyY != 0 || _rotZ != 0) {
         widget.grpc.walk(_joyY, _joyX, _rotZ); // x=forward, y=lateral, z=rotation
       }
@@ -52,7 +54,8 @@ class _ControlPageState extends State<ControlPage> {
     _walkTimer = null;
     _joyX = 0;
     _joyY = 0;
-    widget.grpc.walk(0, 0, 0);
+    _rotZ = 0;
+    if (widget.grpc.connected) widget.grpc.walk(0, 0, 0);
     setState(() {});
   }
 
@@ -197,10 +200,9 @@ class _ControlPageState extends State<ControlPage> {
                             ? () async {
                                 _stopWalking();
                                 await grpc.disable();
+                                if (!context.mounted) return;
                                 setState(() => _isEnabled = false);
-                                if (mounted) {
-                                  AppToast.showError(context, '紧急停止已触发');
-                                }
+                                AppToast.showError(context, '紧急停止已触发');
                               }
                             : null,
                       ),
@@ -219,7 +221,7 @@ class _ControlPageState extends State<ControlPage> {
               children: [
                 MetricTile(label: 'CMS 状态', value: grpc.cmsState),
                 const SizedBox(width: 32),
-                MetricTile(label: '推理频率', value: '${grpc.historyHz.toStringAsFixed(1)}', unit: 'Hz'),
+                MetricTile(label: '推理频率', value: grpc.historyHz.toStringAsFixed(1), unit: 'Hz'),
               ],
             ),
           ),
@@ -292,8 +294,9 @@ class _VirtualJoystickState extends State<_VirtualJoystick> {
     final center = Offset(radius, radius);
     var delta = local - center;
     final maxR = radius - 28;
-    if (delta.distance > maxR) {
-      delta = delta / delta.distance * maxR;
+    final dist = delta.distance;
+    if (dist > maxR && dist > 0) {
+      delta = delta / dist * maxR;
     }
     setState(() => _pos = delta);
 
@@ -405,7 +408,7 @@ class _ControlToggle extends StatelessWidget {
         Switch.adaptive(
           value: value,
           onChanged: onChanged,
-          activeColor: activeColor,
+          activeThumbColor: activeColor,
         ),
       ],
     );
@@ -502,7 +505,7 @@ class _EmergencyStopButtonState extends State<_EmergencyStopButton> {
           duration: const Duration(milliseconds: 150),
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 20),
-          transform: _pressed ? (Matrix4.identity()..scale(0.95)) : Matrix4.identity(),
+          transform: _pressed ? Matrix4.diagonal3Values(0.95, 0.95, 1.0) : Matrix4.identity(),
           transformAlignment: Alignment.center,
           decoration: BoxDecoration(
             color: enabled

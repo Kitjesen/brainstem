@@ -161,7 +161,7 @@ class _JoystickPanelState extends State<JoystickPanel> {
             const SizedBox(width: 8),
             ValueListenableBuilder<Set<String>>(
               valueListenable: widget.keysNotifier!,
-              builder: (_, keys, __) => Row(mainAxisSize: MainAxisSize.min, children: [
+              builder: (context, keys, child) => Row(mainAxisSize: MainAxisSize.min, children: [
                 for (final k in ['W', 'A', 'S', 'D', 'Q', 'E'])
                   _KeyPill(label: k, active: keys.contains(k)),
               ]),

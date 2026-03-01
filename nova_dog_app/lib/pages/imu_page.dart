@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +25,13 @@ class _ImuPageState extends State<ImuPage> {
   static const int _maxPreview = 300;
   final List<List<double>> _previewJoints = List.generate(3, (_) => []); // FR hip/thigh/calf
 
+  /// 节流 rebuild：合并 16ms 内多次数据到单次 setState
+  Timer? _rebuildTimer;
+
+  /// RPY 缓存：四元数指针未变时复用上次计算结果
+  Object? _lastQ;
+  (double, double, double) _cachedRpy = (0, 0, 0);
+
   @override
   void initState() {
     super.initState();
@@ -33,6 +41,7 @@ class _ImuPageState extends State<ImuPage> {
 
   @override
   void dispose() {
+    _rebuildTimer?.cancel();
     widget.grpc.removeListener(_onData);
     widget.recorder.removeListener(_onRecorderChanged);
     super.dispose();
@@ -153,18 +162,24 @@ class _ImuPageState extends State<ImuPage> {
         }
       }
     }
-    if (mounted) setState(() {});
+    if (_rebuildTimer?.isActive ?? false) return;
+    _rebuildTimer = Timer(const Duration(milliseconds: 16), () {
+      if (mounted) setState(() {});
+    });
   }
 
-  /// Derive roll/pitch/yaw in degrees from quaternion.
+  /// Derive roll/pitch/yaw in degrees from quaternion（结果按四元数对象缓存）。
   (double, double, double) _rpy() {
     final q = widget.grpc.latestImu?.quaternion;
     if (q == null) return (0, 0, 0);
+    if (identical(q, _lastQ)) return _cachedRpy;
+    _lastQ = q;
     final roll = math.atan2(2 * (q.w * q.x + q.y * q.z), 1 - 2 * (q.x * q.x + q.y * q.y)) * 180 / math.pi;
     final sp = 2 * (q.w * q.y - q.z * q.x);
     final pitch = (sp.abs() >= 1 ? (math.pi / 2) * sp.sign : math.asin(sp)) * 180 / math.pi;
     final yaw = math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) * 180 / math.pi;
-    return (roll, pitch, yaw);
+    _cachedRpy = (roll, pitch, yaw);
+    return _cachedRpy;
   }
 
   @override
@@ -222,9 +237,9 @@ class _ImuPageState extends State<ImuPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _AttitudeGauge(label: 'Roll', value: roll, color: AppTheme.teal),
-                      _AttitudeGauge(label: 'Pitch', value: pitch, color: AppTheme.orange),
-                      _AttitudeGauge(label: 'Yaw', value: yaw, color: AppTheme.yellow),
+                      _AttitudeGauge(label: '横滚', value: roll, color: AppTheme.teal),
+                      _AttitudeGauge(label: '俯仰', value: pitch, color: AppTheme.orange),
+                      _AttitudeGauge(label: '偏航', value: yaw, color: AppTheme.yellow),
                     ],
                   ),
                 ),
@@ -386,8 +401,9 @@ class _AttitudeGauge extends StatelessWidget {
   final double value; // degrees
   final Color color;
 
-  static const double _warnAt = 20.0; // |value| threshold for orange
-  static const double _critAt = 35.0; // |value| threshold for red
+  static const double _warnAt = 20.0;  // |value| threshold for orange
+  static const double _critAt = 35.0;  // |value| threshold for red
+  static const double _gaugeSize = 110.0;
 
   const _AttitudeGauge({required this.label, required this.value, required this.color});
 
@@ -405,8 +421,8 @@ class _AttitudeGauge extends StatelessWidget {
     final isWarning = value.abs() >= _warnAt;
 
     return SizedBox(
-      width: 110,
-      height: 110,
+      width: _gaugeSize,
+      height: _gaugeSize,
       child: CustomPaint(
         painter: _GaugePainter(value: value, color: activeColor, cs: cs),
         child: Center(
@@ -599,6 +615,9 @@ class _HorizonPainter extends CustomPainter {
 
   const _HorizonPainter({required this.roll, required this.pitch, required this.cs});
 
+  static const _skyColor    = Color(0xFF1E40AF); // 深蓝：天空
+  static const _groundColor = Color(0xFF78350F); // 深棕：地面
+
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
@@ -613,11 +632,11 @@ class _HorizonPainter extends CustomPainter {
     canvas.translate(-cx, -cy);
 
     // Sky (top half, shifted by pitch)
-    final skyPaint = Paint()..color = const Color(0xFF1E40AF).withValues(alpha: 0.25);
+    final skyPaint = Paint()..color = _skyColor.withValues(alpha: 0.25);
     canvas.drawRect(Rect.fromLTWH(0, 0, w, cy + pitchOffset), skyPaint);
 
     // Ground (bottom half, shifted by pitch)
-    final groundPaint = Paint()..color = const Color(0xFF78350F).withValues(alpha: 0.25);
+    final groundPaint = Paint()..color = _groundColor.withValues(alpha: 0.25);
     canvas.drawRect(Rect.fromLTWH(0, cy + pitchOffset, w, h - (cy + pitchOffset)), groundPaint);
 
     // Horizon line

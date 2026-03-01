@@ -53,24 +53,21 @@ class DataRecorder extends ChangeNotifier {
     final ts = DateTime.now().millisecondsSinceEpoch;
 
     // IMU fields
-    final qw = imu?.hasQuaternion() == true ? imu!.quaternion.w : 0.0;
-    final qx = imu?.hasQuaternion() == true ? imu!.quaternion.x : 0.0;
-    final qy = imu?.hasQuaternion() == true ? imu!.quaternion.y : 0.0;
-    final qz = imu?.hasQuaternion() == true ? imu!.quaternion.z : 0.0;
-    final gx = imu?.hasGyroscope() == true ? imu!.gyroscope.x : 0.0;
-    final gy = imu?.hasGyroscope() == true ? imu!.gyroscope.y : 0.0;
-    final gz = imu?.hasGyroscope() == true ? imu!.gyroscope.z : 0.0;
+    final q = imu?.hasQuaternion() == true ? imu!.quaternion : null;
+    final qw = q?.w ?? 0.0, qx = q?.x ?? 0.0, qy = q?.y ?? 0.0, qz = q?.z ?? 0.0;
+    final gyro = imu?.hasGyroscope() == true ? imu!.gyroscope : null;
+    final gx = gyro?.x ?? 0.0, gy = gyro?.y ?? 0.0, gz = gyro?.z ?? 0.0;
     // projectedGravity is in History, not Imu; record zeros here
     const pgx = 0.0, pgy = 0.0, pgz = 0.0;
 
     // Joint fields (16 joints each)
-    String _jointsStr(List<double> vals) =>
+    String jointsStr(List<double> vals) =>
         List.generate(16, (i) => i < vals.length ? vals[i].toStringAsFixed(4) : '0')
             .join(',');
 
-    final pos = _jointsStr(joints?.position.values ?? []);
-    final vel = _jointsStr(joints?.velocity.values ?? []);
-    final trq = _jointsStr(joints?.torque.values ?? []);
+    final pos = jointsStr(joints?.position.values ?? []);
+    final vel = jointsStr(joints?.velocity.values ?? []);
+    final trq = jointsStr(joints?.torque.values ?? []);
 
     _lines.add('$ts,'
         '${qw.toStringAsFixed(4)},${qx.toStringAsFixed(4)},${qy.toStringAsFixed(4)},${qz.toStringAsFixed(4)},'

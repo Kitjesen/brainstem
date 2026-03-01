@@ -64,8 +64,14 @@ class RunHistoryService {
 
   Future<void> _save() async {
     // Keep max 100
-    while (entries.length > 100) entries.removeLast();
-    await _file.writeAsString(const JsonEncoder.withIndent('  ').convert(entries.map((e) => e.toJson()).toList()));
+    while (entries.length > 100) { entries.removeLast(); }
+    try {
+      await _file.writeAsString(
+          const JsonEncoder.withIndent('  ')
+              .convert(entries.map((e) => e.toJson()).toList()));
+    } catch (_) {
+      // 磁盘写入失败（权限/空间不足），静默忽略；历史记录在内存中仍可用
+    }
   }
 
   /// Call when robot connects.

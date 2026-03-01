@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/grpc_service.dart';
@@ -17,7 +19,7 @@ class _BrainPageState extends State<BrainPage> {
   String? _switchingTo;
   static const int _maxHzPts = 120;
   final List<double> _hzHistory = [];
-  double _lastHz = 0;
+  Timer? _rebuildTimer;
 
   @override
   void initState() {
@@ -27,19 +29,21 @@ class _BrainPageState extends State<BrainPage> {
 
   @override
   void dispose() {
+    _rebuildTimer?.cancel();
     widget.grpc.removeListener(_onData);
     super.dispose();
   }
 
   void _onData() {
-    if (!mounted) return;
     final hz = widget.grpc.historyHz;
-    if (hz > 0 && hz != _lastHz) {
-      _lastHz = hz;
+    if (hz > 0) {
       _hzHistory.add(hz);
       if (_hzHistory.length > _maxHzPts) _hzHistory.removeAt(0);
     }
-    setState(() {});
+    if (_rebuildTimer?.isActive ?? false) return;
+    _rebuildTimer = Timer(const Duration(milliseconds: 16), () {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _switchProfile(String name) async {
@@ -88,9 +92,9 @@ class _BrainPageState extends State<BrainPage> {
         Text('策略管理与实时推理状态', style: TextStyle(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.35))),
         const SizedBox(height: 16),
 
-        Expanded(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(child: Row(children: [
           // ── Left column ──
-          Expanded(child: Column(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             // FSM 节点图
             StatusCard(
               title: 'FSM 状态流',
@@ -107,6 +111,7 @@ class _BrainPageState extends State<BrainPage> {
             Expanded(
               child: StatusCard(
                 title: '状态输入（实时观测）',
+                fillChildHeight: true,
                 child: _ObservationContent(grpc: g),
               ),
             ),
@@ -118,6 +123,7 @@ class _BrainPageState extends State<BrainPage> {
             width: 320,
             child: StatusCard(
               title: '策略管理',
+              fillChildHeight: true,
               trailing: g.connected && !g.hasProfiles
                   ? Text('未配置', style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.4)))
                   : null,
@@ -179,11 +185,11 @@ class _RunStatusContent extends StatelessWidget {
         ]),
         const SizedBox(height: 6),
         SizedBox(
-          height: 48,
+          height: 36,
           child: LineChart(
             LineChartData(
               minY: 0,
-              maxY: (hzHistory.reduce((a, b) => a > b ? a : b) * 1.2).clamp(10.0, 80.0),
+              maxY: (hzHistory.fold<double>(0, (m, v) => v > m ? v : m) * 1.2).clamp(10.0, 80.0),
               gridData: const FlGridData(show: false),
               borderData: FlBorderData(show: false),
               titlesData: const FlTitlesData(show: false),
@@ -286,10 +292,12 @@ class _ObsRow extends StatelessWidget {
   final ColorScheme cs;
   const _ObsRow(this.label, this.value, this.cs);
 
+  static const _rowPadding = EdgeInsets.only(bottom: 6);
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: _rowPadding,
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
         SizedBox(width: 64, child: Text(label, style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.45)))),
         Expanded(child: Text(value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: cs.onSurface,
@@ -298,6 +306,9 @@ class _ObsRow extends StatelessWidget {
     );
   }
 }
+
+/// 矩阵格子宽度（_MatrixGrid 与 _ErrorMatrixGrid 共用）
+const double _kMatrixCellWidth = 52.0;
 
 class _MatrixGrid extends StatelessWidget {
   final List<double> values;
@@ -310,7 +321,7 @@ class _MatrixGrid extends StatelessWidget {
       spacing: 6,
       runSpacing: 4,
       children: List.generate(values.length, (i) => SizedBox(
-        width: 52,
+        width: _kMatrixCellWidth,
         child: Text(
           values[i].toStringAsFixed(2),
           style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.6),
@@ -332,7 +343,7 @@ class _ErrorMatrixGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final len = positions.length < actions.length ? positions.length : actions.length;
+    final len = math.min(positions.length, actions.length);
     return Wrap(
       spacing: 6,
       runSpacing: 4,
@@ -340,7 +351,7 @@ class _ErrorMatrixGrid extends StatelessWidget {
         final err = actions[i] - positions[i];
         final isWarn = err.abs() > _warnThreshold;
         return SizedBox(
-          width: 52,
+          width: _kMatrixCellWidth,
           child: Text(
             err.toStringAsFixed(2),
             style: TextStyle(

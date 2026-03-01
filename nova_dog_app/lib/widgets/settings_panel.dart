@@ -179,7 +179,7 @@ class _SettingsPanelState extends State<SettingsPanel> with SingleTickerProvider
                     trailing: Switch.adaptive(
                       value: widget.isDark,
                       onChanged: (_) => widget.onToggleTheme(),
-                      activeColor: cs.primary,
+                      activeThumbColor: cs.primary,
                     ),
                   ),
 

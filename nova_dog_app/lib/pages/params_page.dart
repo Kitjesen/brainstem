@@ -488,7 +488,7 @@ class _ParamsPageState extends State<ParamsPage> {
                   Icon(Icons.check_circle_outline_rounded, size: 11, color: AppTheme.green),
                   const SizedBox(width: 4),
                   Text(
-                    '上次保存：${_lastSaved!.hour.toString().padLeft(2, '0')}:${_lastSaved!.minute.toString().padLeft(2, '0')}:${_lastSaved!.second.toString().padLeft(2, '0')}',
+                    '上次保存：${_fmtHms(_lastSaved!)}',
                     style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.4),
                         fontFeatures: const [FontFeature.tabularFigures()]),
                   ),
@@ -513,7 +513,12 @@ class _ParamsPageState extends State<ParamsPage> {
     );
   }
 
-  String _timeAgo(DateTime dt) {
+  static String _fmtHms(DateTime dt) =>
+      '${dt.hour.toString().padLeft(2, '0')}:'
+      '${dt.minute.toString().padLeft(2, '0')}:'
+      '${dt.second.toString().padLeft(2, '0')}';
+
+  static String _timeAgo(DateTime dt) {
     final diff = DateTime.now().difference(dt);
     if (diff.inMinutes < 1) return '刚刚';
     if (diff.inHours < 1) return '${diff.inMinutes}分钟前';
@@ -521,8 +526,7 @@ class _ParamsPageState extends State<ParamsPage> {
     return '${diff.inDays}天前';
   }
 
-  String _formatDateTime(DateTime dt) => '${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-
+  static String _formatDateTime(DateTime dt) => '${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
 
   // --- Gains Tab (reference: LOCOMOTION INFERENCE, 4 leg cards 2x2, sensitivity chart) ---
   Widget _buildGainsTab(TextTheme tt, ColorScheme cs) {
@@ -543,7 +547,7 @@ class _ParamsPageState extends State<ParamsPage> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: cs.primary.withValues(alpha: 0.3)),
                 ),
-                child: Text('MODE: TROT_WALK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.primary)),
+                child: Text('模式：TROT_WALK', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.primary)),
               ),
               const SizedBox(width: 12),
               TextButton.icon(
@@ -653,7 +657,7 @@ class _ParamsPageState extends State<ParamsPage> {
       builder: (ctx) => _PasteImportDialog(),
     );
     if (result != null && result.length == 16) {
-      setState(() { for (int i = 0; i < 16; i++) target[i] = result[i]; });
+      setState(() { for (int i = 0; i < 16; i++) { target[i] = result[i]; } });
       _markModified();
       if (mounted) AppToast.showSuccess(context, '已导入 16 个关节值');
     }
@@ -1329,7 +1333,7 @@ class _ParamCardState extends State<_ParamCard> {
         onTapCancel: () => setState(() => _pressed = false),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          transform: _pressed ? (Matrix4.identity()..scale(0.995)) : Matrix4.identity(),
+          transform: _pressed ? Matrix4.diagonal3Values(0.995, 0.995, 1.0) : Matrix4.identity(),
           transformAlignment: Alignment.center,
           decoration: BoxDecoration(
             color: dark ? const Color(0xFF111C44) : Colors.white,
@@ -1463,7 +1467,7 @@ class _PasteImportDialogState extends State<_PasteImportDialog> {
     final matches = RegExp(r'-?\d+\.?\d*').allMatches(text);
     final values = matches.map((m) => double.tryParse(m.group(0)!) ?? 0.0).toList();
     // Pad to 16 or truncate
-    while (values.length < 16) values.add(0.0);
+    while (values.length < 16) { values.add(0.0); }
     setState(() => _parsed = values.sublist(0, 16));
   }
 
@@ -1783,6 +1787,7 @@ class _RemoteUploadPanelState extends State<_RemoteUploadPanel> {
           Text('选择模型:', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.6))),
           const SizedBox(height: 6),
           DropdownButtonFormField<int>(
+            // ignore: deprecated_member_use  — initialValue 不支持外部 setState 同步，保留 value
             value: _selectedModelIndex < models.length ? _selectedModelIndex : 0,
             decoration: InputDecoration(isDense: true, contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
             items: models.asMap().entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value.name, style: const TextStyle(fontSize: 11)))).toList(),

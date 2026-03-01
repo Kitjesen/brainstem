@@ -4,6 +4,10 @@ import '../theme/app_theme.dart';
 import '../utils/app_toast.dart';
 import '../widgets/status_card.dart';
 
+/// 截断设备 ID 为最多 [maxLen] 个字符，不足则原样返回。
+String _truncateId(String id, {int maxLen = 12}) =>
+    id.length <= maxLen ? id : id.substring(0, maxLen);
+
 class OtaPage extends StatefulWidget {
   const OtaPage({super.key});
 
@@ -331,7 +335,7 @@ class _ActiveStrip extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            tasks.map((t) => '${t.deviceId.length > 12 ? t.deviceId.substring(0, 12) : t.deviceId}…${t.progress}%').join(' · '),
+            tasks.map((t) => '${_truncateId(t.deviceId)}…${t.progress}%').join(' · '),
             style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.5)),
             overflow: TextOverflow.ellipsis,
           ),
@@ -466,7 +470,7 @@ class _PushBar extends StatelessWidget {
         ? '在「设备」选择目标设备'
         : selectedRelease == null
             ? '在「发布」选择目标版本'
-            : '${selectedDeviceId!.substring(0, selectedDeviceId!.length.clamp(0, 16))}  →  v${selectedRelease!.version}  (${selectedRelease!.channel})';
+            : '${_truncateId(selectedDeviceId!, maxLen: 16)}  →  v${selectedRelease!.version}  (${selectedRelease!.channel})';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -886,7 +890,7 @@ class _TaskRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              t.deviceId.length > 24 ? '${t.deviceId.substring(0, 24)}…' : t.deviceId,
+              _truncateId(t.deviceId, maxLen: 24),
               style: tt.bodySmall?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),

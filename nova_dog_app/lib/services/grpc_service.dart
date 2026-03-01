@@ -43,7 +43,7 @@ class GrpcService extends ChangeNotifier {
   Imu? _latestImu;
   AllJoints? _latestJoints;
   Params? _params;
-  String _cmsState = 'Unknown';
+  String _cmsState = '';
 
   // Profile
   String _currentProfile = '';
@@ -139,7 +139,9 @@ class GrpcService extends ChangeNotifier {
 
   // Session statistics getters
   int get walkCmdCount => _walkCmdCount;
-  int get walkActiveMs => _walkActiveMs + (_walkStart != null ? DateTime.now().difference(_walkStart!).inMilliseconds : 0);
+  int get _walkElapsedMs =>
+      _walkStart != null ? DateTime.now().difference(_walkStart!).inMilliseconds : 0;
+  int get walkActiveMs => _walkActiveMs + _walkElapsedMs;
   double get maxTorqueEver => _maxTorqueEver;
 
   // Health getters
@@ -165,8 +167,9 @@ class GrpcService extends ChangeNotifier {
     if (!_connected) return 'F';
     if (_stale) return 'D';
     if (rttHistory.isEmpty) return '—';
-    final avg = rttHistory.reduce((a, b) => a + b) / rttHistory.length;
-    final max = rttHistory.reduce((a, b) => a > b ? a : b);
+    var sum = 0.0, max = 0.0;
+    for (final v in rttHistory) { sum += v; if (v > max) max = v; }
+    final avg = sum / rttHistory.length;
     // Penalty for reconnects this session
     final penalty = _reconnectAttempts * 5.0;
     final score = (avg + max / 3 + penalty).clamp(0.0, 200.0);
@@ -177,16 +180,12 @@ class GrpcService extends ChangeNotifier {
     return 'F';
   }
 
-  /// Quality grade color
-  String get qualityDescription {
-    final g = qualityGrade;
-    if (g == 'A') return '极佳';
-    if (g == 'B') return '良好';
-    if (g == 'C') return '一般';
-    if (g == 'D') return '较差';
-    if (g == 'F') return '不可用';
-    return '--';
-  }
+  static const _gradeDesc = {
+    'A': '极佳', 'B': '良好', 'C': '一般', 'D': '较差', 'F': '不可用',
+  };
+
+  /// Quality grade description
+  String get qualityDescription => _gradeDesc[qualityGrade] ?? '--';
 
   /// 合并 16ms 内的多次数据更新为单次 [notifyListeners()]，避免过度重建。
   /// 仅用于高频数据流回调；连接状态变更应直接调用 [notifyListeners()]。
@@ -242,7 +241,7 @@ class GrpcService extends ChangeNotifier {
           now.difference(_lastDataTime!).inMilliseconds > _staleThresholdMs) {
         if (!_stale) {
           _stale = true;
-          _log('⚠', 'Health', 'No data received for >5s — connection may be stale');
+          _log('⚠', 'Health', '超过 5s 未收到数据，连接可能已中断');
           notifyListeners();
         }
       }
@@ -320,15 +319,7 @@ class GrpcService extends ChangeNotifier {
     _healthTimer = null;
     _rttTimer?.cancel();
     _rttTimer = null;
-    _historySub?.cancel();
-    _imuSub?.cancel();
-    _jointSub?.cancel();
-    _historySub = null;
-    _imuSub = null;
-    _jointSub = null;
-    _channel?.shutdown();
-    _channel = null;
-    _client = null;
+    _teardownConnection();
     _connected = false;
     _reconnecting = false;
     _reconnectAttempts = 0;
@@ -349,16 +340,19 @@ class GrpcService extends ChangeNotifier {
     _currentProfileDescription = '';
     _availableProfiles = [];
     _profileDescriptions = [];
+    _cmsState = '';
     // Reset session statistics
     _walkCmdCount = 0;
     _walkActiveMs = 0;
     _walkStart = null;
     _maxTorqueEver = 0;
-    // Reset joint aggregation
-    _jointPositions.fillRange(0, 16, 0.0);
-    _jointVelocities.fillRange(0, 16, 0.0);
-    _jointTorques.fillRange(0, 16, 0.0);
-    _jointStatuses.fillRange(0, 16, 0);
+    _resetJointArrays();
+    // Reset RTT and torque history so qualityGrade starts fresh on next connection
+    rttHistory.clear();
+    _lastRttMs = 0;
+    for (final leg in torqueHistory) {
+      leg.clear();
+    }
     notifyListeners();
   }
 
@@ -384,15 +378,7 @@ class GrpcService extends ChangeNotifier {
 
     _reconnecting = true;
 
-    // Exponential backoff with jitter
-    final backoffMs = math.min(
-      _initialBackoffMs * math.pow(2, _reconnectAttempts - 1).toInt(),
-      _maxBackoffMs,
-    );
-    // Add ±20% jitter to avoid thundering herd
-    final jitter = (backoffMs * 0.2 * (math.Random().nextDouble() * 2 - 1)).toInt();
-    final delayMs = backoffMs + jitter;
-
+    final delayMs = _calcBackoff(_reconnectAttempts);
     _log('⟳', 'Reconnect', 'attempt #$_reconnectAttempts in ${delayMs}ms');
     notifyListeners();
 
@@ -402,12 +388,26 @@ class GrpcService extends ChangeNotifier {
     });
   }
 
-  Future<void> _performReconnect() async {
-    if (_intentionalDisconnect) return;
+  /// 将 16 路关节本地数组归零（断连 / 初始化时调用）。
+  void _resetJointArrays() {
+    _jointPositions.fillRange(0, 16, 0.0);
+    _jointVelocities.fillRange(0, 16, 0.0);
+    _jointTorques.fillRange(0, 16, 0.0);
+    _jointStatuses.fillRange(0, 16, 0);
+  }
 
-    _log('⟳', 'Reconnect', 'attempting reconnection...');
+  /// 计算第 [attempt] 次重连的等待毫秒数（指数退避 + ±20% jitter）。
+  int _calcBackoff(int attempt) {
+    final base = math.min(
+      _initialBackoffMs * math.pow(2, attempt - 1).toInt(),
+      _maxBackoffMs,
+    );
+    final jitter = (base * 0.2 * (math.Random().nextDouble() * 2 - 1)).toInt();
+    return base + jitter;
+  }
 
-    // Clean up old resources without resetting reconnect state
+  /// 取消流订阅并关闭 channel/client（不重置重连状态）。
+  void _teardownConnection() {
     _historySub?.cancel();
     _imuSub?.cancel();
     _jointSub?.cancel();
@@ -417,6 +417,15 @@ class GrpcService extends ChangeNotifier {
     _channel?.shutdown();
     _channel = null;
     _client = null;
+  }
+
+  Future<void> _performReconnect() async {
+    if (_intentionalDisconnect) return;
+
+    _log('⟳', 'Reconnect', 'attempting reconnection...');
+
+    // Clean up old resources without resetting reconnect state
+    _teardownConnection();
 
     try {
       _channel = ClientChannel(
@@ -460,17 +469,22 @@ class GrpcService extends ChangeNotifier {
     }
   }
 
+  /// 将 ProfileInfo 响应写入本地字段并触发 notifyListeners。
+  void _applyProfileInfo(ProfileInfo info) {
+    _currentProfile = info.current;
+    _currentProfileDescription = info.currentDescription;
+    _availableProfiles = List<String>.from(info.available);
+    _profileDescriptions = List<String>.from(info.descriptions);
+    notifyListeners();
+  }
+
   Future<void> _fetchProfile() async {
     if (_client == null) return;
     try {
       _log('→', 'GetProfile');
       final info = await _client!.getProfile(Empty());
-      _currentProfile = info.current;
-      _currentProfileDescription = info.currentDescription;
-      _availableProfiles = List<String>.from(info.available);
-      _profileDescriptions = List<String>.from(info.descriptions);
+      _applyProfileInfo(info);
       _log('←', 'GetProfile', 'current=${info.current}, ${info.available.length}个策略');
-      notifyListeners();
     } catch (e) {
       _log('✕', 'GetProfile', e.toString());
       // 非致命错误，服务端可能未配置策略
@@ -482,12 +496,8 @@ class GrpcService extends ChangeNotifier {
     try {
       _log('→', 'SwitchProfile', name);
       final info = await _client!.switchProfile(ProfileRequest(name: name));
-      _currentProfile = info.current;
-      _currentProfileDescription = info.currentDescription;
-      _availableProfiles = List<String>.from(info.available);
-      _profileDescriptions = List<String>.from(info.descriptions);
+      _applyProfileInfo(info);
       _log('←', 'SwitchProfile', '已切换至 ${info.current}');
-      notifyListeners();
       return true;
     } catch (e) {
       _log('✕', 'SwitchProfile', e.toString());
@@ -524,12 +534,12 @@ class GrpcService extends ChangeNotifier {
         _touchData();
         _scheduleNotify();
       },
-      onError: (e) {
+      onError: (Object e, StackTrace st) {
         _log('✕', 'ListenHistory', e.toString());
         _handleStreamError('History', e);
       },
       onDone: () {
-        _log('⚠', 'ListenHistory', 'stream closed by server');
+        _log('⚠', 'ListenHistory', '服务端关闭了 History 流');
         _handleStreamDone('History');
       },
     );
@@ -543,12 +553,12 @@ class GrpcService extends ChangeNotifier {
         _touchData();
         _scheduleNotify();
       },
-      onError: (e) {
+      onError: (Object e, StackTrace st) {
         _log('✕', 'ListenImu', e.toString());
         _handleStreamError('IMU', e);
       },
       onDone: () {
-        _log('⚠', 'ListenImu', 'stream closed by server');
+        _log('⚠', 'ListenImu', '服务端关闭了 IMU 流');
         _handleStreamDone('IMU');
       },
     );
@@ -568,46 +578,44 @@ class GrpcService extends ChangeNotifier {
           _handleAllJoints(joint.allJoints);
         }
       },
-      onError: (e) {
+      onError: (Object e, StackTrace st) {
         _log('✕', 'ListenJoint', e.toString());
         _handleStreamError('Joint', e);
       },
       onDone: () {
-        _log('⚠', 'ListenJoint', 'stream closed by server');
+        _log('⚠', 'ListenJoint', '服务端关闭了 Joint 流');
         _handleStreamDone('Joint');
       },
     );
   }
 
-  /// Handle stream error — trigger auto-reconnect if still supposed to be connected.
-  void _handleStreamError(String streamName, dynamic error) {
+  /// Common reconnect trigger: guard intentional disconnect, then schedule.
+  void _triggerReconnect() {
     if (_intentionalDisconnect) return;
-    onErrorNotify?.call('$streamName 流异常: $error');
     if (_connected) {
       _connected = false;
       _scheduleReconnect();
     }
   }
 
-  /// Handle stream done (server closed) — trigger auto-reconnect.
-  void _handleStreamDone(String streamName) {
-    if (_intentionalDisconnect) return;
-    if (_connected) {
-      _connected = false;
-      _scheduleReconnect();
-    }
+  /// Handle stream error — trigger auto-reconnect if still supposed to be connected.
+  void _handleStreamError(String streamName, dynamic error) {
+    if (!_intentionalDisconnect) onErrorNotify?.call('$streamName 流异常: $error');
+    _triggerReconnect();
   }
+
+  /// Handle stream done (server closed) — trigger auto-reconnect.
+  void _handleStreamDone(String streamName) => _triggerReconnect();
 
   /// Handle individual motor report from real hardware.
   /// Aggregates into local arrays and periodically builds AllJoints for UI.
   void _handleSingleJoint(SingleJoint sj) {
     final id = sj.id;
-    if (id >= 0 && id < 16) {
-      _jointPositions[id] = sj.position;
-      _jointVelocities[id] = sj.velocity;
-      _jointTorques[id] = sj.torque;
-      _jointStatuses[id] = sj.status;
-    }
+    if (id < 0 || id >= 16) return; // 忽略越界 ID
+    _jointPositions[id] = sj.position;
+    _jointVelocities[id] = sj.velocity;
+    _jointTorques[id] = sj.torque;
+    _jointStatuses[id] = sj.status;
 
     // Throttle UI updates: build AllJoints and notify at most every _jointThrottleMs
     final now = DateTime.now();
@@ -624,16 +632,13 @@ class GrpcService extends ChangeNotifier {
   void _handleAllJoints(AllJoints allJoints) {
     _latestJoints = allJoints;
 
-    // Also sync local arrays for consistency
-    for (int i = 0; i < 16 && i < allJoints.position.values.length; i++) {
-      _jointPositions[i] = allJoints.position.values[i];
-    }
-    for (int i = 0; i < 16 && i < allJoints.velocity.values.length; i++) {
-      _jointVelocities[i] = allJoints.velocity.values[i];
-    }
-    for (int i = 0; i < 16 && i < allJoints.torque.values.length; i++) {
-      _jointTorques[i] = allJoints.torque.values[i];
-    }
+    // Sync local arrays for consistency (guard against empty payload)
+    final pos = allJoints.position.values;
+    final vel = allJoints.velocity.values;
+    final trq = allJoints.torque.values;
+    for (int i = 0; i < 16 && i < pos.length; i++) { _jointPositions[i] = pos[i]; }
+    for (int i = 0; i < 16 && i < vel.length; i++) { _jointVelocities[i] = vel[i]; }
+    for (int i = 0; i < 16 && i < trq.length; i++) { _jointTorques[i] = trq[i]; }
 
     _updateTorqueHistory(allJoints);
     _scheduleNotify();
@@ -846,11 +851,12 @@ class GrpcService extends ChangeNotifier {
 
   @override
   void dispose() {
+    // 设置标志后再 disconnect，确保不触发重连逻辑
     _intentionalDisconnect = true;
     _reconnectTimer?.cancel();
     _healthTimer?.cancel();
     _pendingNotify?.cancel();
-    disconnect();
+    disconnect(); // 内部调用 _teardownConnection() + 状态重置 + notifyListeners
     super.dispose();
   }
 }

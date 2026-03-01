@@ -43,6 +43,12 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override void dispose() { _hC.dispose(); _pC.dispose(); super.dispose(); }
 
+  static Color _dotColor(GrpcService g, ColorScheme cs) {
+    if (g.isReconnecting || (g.connected && g.isStale)) return AppTheme.orange;
+    if (g.connected) return AppTheme.green;
+    return cs.onSurface.withValues(alpha: 0.12);
+  }
+
   Future<void> _connect() async {
     final host = _hC.text.trim();
     final portStr = _pC.text.trim();
@@ -144,17 +150,7 @@ class _DashboardPageState extends State<DashboardPage> {
   // ── Connection bar ──
   Widget _connBar(BuildContext c, GrpcService g) {
     final cs = Theme.of(c).colorScheme;
-    // Determine connection indicator color based on health
-    Color dotColor;
-    if (g.isReconnecting) {
-      dotColor = AppTheme.orange;
-    } else if (g.connected && g.isStale) {
-      dotColor = AppTheme.orange;
-    } else if (g.connected) {
-      dotColor = AppTheme.green;
-    } else {
-      dotColor = cs.onSurface.withValues(alpha: 0.12);
-    }
+    final dotColor = _dotColor(g, cs);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
@@ -289,7 +285,7 @@ class _HoverCardState extends State<_HoverCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        transform: _hov ? (Matrix4.identity()..translate(0.0, -2.0)) : Matrix4.identity(),
+        transform: _hov ? Matrix4.translationValues(0.0, -2.0, 0.0) : Matrix4.identity(),
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius: BorderRadius.circular(16),
@@ -321,7 +317,7 @@ class _StatCardState extends State<_StatCard> {
       onExit: (_) => setState(() => _hov = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        transform: _hov ? (Matrix4.identity()..translate(0.0, -2.0)) : Matrix4.identity(),
+        transform: _hov ? Matrix4.translationValues(0.0, -2.0, 0.0) : Matrix4.identity(),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: cs.surface,
@@ -368,7 +364,7 @@ class _LegCardState extends State<_LegCard> {
       onExit: (_) => setState(() => _hov = false),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        transform: _hov ? (Matrix4.identity()..translate(0.0, -2.0)) : Matrix4.identity(),
+        transform: _hov ? Matrix4.translationValues(0.0, -2.0, 0.0) : Matrix4.identity(),
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: cs.surface,
@@ -406,8 +402,8 @@ class _LegCardState extends State<_LegCard> {
             return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(children: [
               SizedBox(width: 50, child: Text(joints[ji], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: cs.onSurface))),
               Expanded(child: Text(pos.toStringAsFixed(2), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: cs.onSurface, fontFeatures: const [FontFeature.tabularFigures()]), textAlign: TextAlign.center)),
-              Expanded(child: Text('${vel.toStringAsFixed(1)}', style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.5), fontFeatures: const [FontFeature.tabularFigures()]), textAlign: TextAlign.center)),
-              Expanded(child: Text('${trq.toStringAsFixed(1)}', style: TextStyle(fontSize: 10, color: trq.abs() > 5 ? AppTheme.red : cs.onSurface.withValues(alpha: 0.5), fontWeight: trq.abs() > 5 ? FontWeight.w600 : FontWeight.w400, fontFeatures: const [FontFeature.tabularFigures()]), textAlign: TextAlign.center)),
+              Expanded(child: Text(vel.toStringAsFixed(1), style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.5), fontFeatures: const [FontFeature.tabularFigures()]), textAlign: TextAlign.center)),
+              Expanded(child: Text(trq.toStringAsFixed(1), style: TextStyle(fontSize: 10, color: trq.abs() > 5 ? AppTheme.red : cs.onSurface.withValues(alpha: 0.5), fontWeight: trq.abs() > 5 ? FontWeight.w600 : FontWeight.w400, fontFeatures: const [FontFeature.tabularFigures()]), textAlign: TextAlign.center)),
               SizedBox(width: 40, child: ClipRRect(borderRadius: BorderRadius.circular(2), child: LinearProgressIndicator(value: (trq.abs() / 10.0).clamp(0.0, 1.0), minHeight: 6, backgroundColor: cs.onSurface.withValues(alpha: 0.04), valueColor: AlwaysStoppedAnimation(trq.abs() > 5 ? AppTheme.red : cs.onSurface.withValues(alpha: 0.3))))),
             ]));
           }),
@@ -444,7 +440,7 @@ class _ActBtnState extends State<_ActBtn> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 100),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          transform: _press ? (Matrix4.identity()..scale(0.95)) : Matrix4.identity(),
+          transform: _press ? Matrix4.diagonal3Values(0.95, 0.95, 1.0) : Matrix4.identity(),
           transformAlignment: Alignment.center,
           decoration: BoxDecoration(
             color: _hov ? widget.color.withValues(alpha: 0.08) : cs.onSurface.withValues(alpha: 0.02),
@@ -1430,7 +1426,7 @@ class _ConnBtnState extends State<_ConnBtn> {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 100),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          transform: _press ? (Matrix4.identity()..scale(0.95)) : Matrix4.identity(),
+          transform: _press ? Matrix4.diagonal3Values(0.95, 0.95, 1.0) : Matrix4.identity(),
           transformAlignment: Alignment.center,
           decoration: BoxDecoration(
             color: widget.filled ? (_hov ? AppTheme.brand.withValues(alpha: 0.85) : AppTheme.brand) : (_hov ? cs.onSurface.withValues(alpha: 0.06) : cs.onSurface.withValues(alpha: 0.03)),

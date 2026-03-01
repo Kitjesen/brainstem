@@ -18,14 +18,18 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
+  /// 工具栏按钮内边距（导出、清空）
+  static const _btnPadding = EdgeInsets.symmetric(horizontal: 12, vertical: 6);
   Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
-    // Refresh every second to update duration of the current (live) session
+    // Refresh every second only while a live session is active (last entry has no disconnect time)
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      final entries = widget.runHistory.entries;
+      if (entries.isNotEmpty && entries.last.disconnectedAt == null) setState(() {});
     });
   }
 
@@ -93,7 +97,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 opacity: entries.isEmpty ? 0.3 : 1.0,
                 duration: const Duration(milliseconds: 150),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: _btnPadding,
                   decoration: BoxDecoration(
                     color: AppTheme.brand.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
@@ -115,7 +119,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 opacity: entries.isEmpty ? 0.3 : 1.0,
                 duration: const Duration(milliseconds: 150),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: _btnPadding,
                   decoration: BoxDecoration(
                     color: AppTheme.red.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
@@ -192,7 +196,7 @@ class _StatsSummaryCard extends StatelessWidget {
   final List<RunEntry> entries;
   const _StatsSummaryCard({required this.entries});
 
-  String _fmtDuration(Duration d) {
+  static String _fmtDuration(Duration d) {
     final h = d.inHours;
     final m = d.inMinutes.remainder(60);
     final s = d.inSeconds.remainder(60);
@@ -207,7 +211,7 @@ class _StatsSummaryCard extends StatelessWidget {
 
     final completed = entries.where((e) => e.disconnectedAt != null).toList();
     final totalDuration = entries.fold<Duration>(Duration.zero, (s, e) => s + e.duration);
-    final longest = entries.isEmpty ? Duration.zero : entries.map((e) => e.duration).reduce((a, b) => a > b ? a : b);
+    final longest = entries.fold<Duration>(Duration.zero, (m, e) => e.duration > m ? e.duration : m);
     final avgDuration = completed.isEmpty ? Duration.zero
         : Duration(seconds: (completed.fold<int>(0, (s, e) => s + e.duration.inSeconds) / completed.length).round());
 
@@ -252,11 +256,14 @@ class _DurationBarChart extends StatelessWidget {
 
   const _DurationBarChart({required this.entries});
 
+  /// 将最新在前的列表反转为"旧→新"顺序（oldest on left）。
+  /// StatelessWidget，entries 稳定时 Flutter 会复用，无需手动缓存。
+  List<RunEntry> get _chronological => entries.reversed.toList();
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // Reverse so oldest is left
-    final reversed = entries.reversed.toList();
+    final reversed = _chronological;
     final maxSecs = reversed.fold<double>(1.0, (m, e) => math.max(m, e.duration.inSeconds.toDouble()));
 
     return BarChart(
@@ -333,14 +340,15 @@ class _SessionTile extends StatelessWidget {
   final RunEntry entry;
   const _SessionTile({required this.entry});
 
+  static String _fmtConnTime(DateTime dt) =>
+      '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
+      '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isLive = entry.disconnectedAt == null;
-    final connTime = entry.connectedAt;
-    final dateStr =
-        '${connTime.year}-${connTime.month.toString().padLeft(2, '0')}-${connTime.day.toString().padLeft(2, '0')} '
-        '${connTime.hour.toString().padLeft(2, '0')}:${connTime.minute.toString().padLeft(2, '0')}';
+    final dateStr = _fmtConnTime(entry.connectedAt);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

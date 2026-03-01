@@ -127,6 +127,10 @@ class OtaService extends ChangeNotifier {
 
   OtaService({this.baseUrl = 'https://ota.inovxio.com/api'});
 
+  static const _getTimeout  = Duration(seconds: 10);
+  static const _postTimeout = Duration(seconds: 15);
+
+  bool _isDisposed = false;
   bool _loading = false;
   String? _error;
   List<OtaDevice> _devices = [];
@@ -162,7 +166,7 @@ class OtaService extends ChangeNotifier {
   Future<dynamic> _get(String path) async {
     final req = await _client.getUrl(Uri.parse('$_base$path'));
     if (apiKey != null) req.headers.add('X-API-Key', apiKey!);
-    final res = await req.close().timeout(const Duration(seconds: 10));
+    final res = await req.close().timeout(_getTimeout);
     final body = await res.transform(utf8.decoder).join();
     if (res.statusCode >= 400) throw Exception('HTTP ${res.statusCode}');
     return jsonDecode(body);
@@ -173,7 +177,7 @@ class OtaService extends ChangeNotifier {
     if (apiKey != null) req.headers.add('X-API-Key', apiKey!);
     req.headers.contentType = ContentType.json;
     req.write(jsonEncode(body));
-    final res = await req.close().timeout(const Duration(seconds: 15));
+    final res = await req.close().timeout(_postTimeout);
     final resBody = await res.transform(utf8.decoder).join();
     if (res.statusCode >= 400) throw Exception('HTTP ${res.statusCode}: $resBody');
     return jsonDecode(resBody);
@@ -194,6 +198,7 @@ class OtaService extends ChangeNotifier {
     } catch (e) {
       _error = '无法连接 OTA 服务器：$e';
     }
+    if (_isDisposed) return;
     _loading = false;
     notifyListeners();
   }
@@ -237,6 +242,7 @@ class OtaService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _client.close();
     super.dispose();
   }

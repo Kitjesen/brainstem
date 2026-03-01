@@ -11,7 +11,8 @@ class NavItem {
   const NavItem(this.icon, this.activeIcon, this.labelBuilder);
 }
 
-List<NavItem> getNavItems() => [
+/// 导航项列表（仅在进程生命周期内创建一次）。
+final List<NavItem> _kNavItems = [
   NavItem(Icons.space_dashboard_outlined, Icons.space_dashboard_rounded, (ctx) => AppLocalizations.of(ctx).navDashboard),
   NavItem(Icons.monitor_heart_outlined, Icons.monitor_heart_rounded, (ctx) => AppLocalizations.of(ctx).navMonitor),
   NavItem(Icons.gamepad_outlined, Icons.gamepad_rounded, (ctx) => AppLocalizations.of(ctx).navControl),
@@ -23,7 +24,12 @@ List<NavItem> getNavItems() => [
   NavItem(Icons.system_update_outlined, Icons.system_update_rounded, (ctx) => AppLocalizations.of(ctx).navOta),
 ];
 
+/// 已废弃：请直接使用 [_kNavItems]（保留此函数供外部兼容）
+List<NavItem> getNavItems() => _kNavItems;
+
 class Sidebar extends StatelessWidget {
+  static const double _collapsedWidth = 48;
+  static const double _expandedWidth = 72;
   final int selectedIndex; final ValueChanged<int> onSelect;
   final bool isDark; final VoidCallback onToggleTheme;
   final bool isConnected; final String connectionInfo;
@@ -46,7 +52,7 @@ class Sidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final brand = brandColor.color;
-    final navItems = getNavItems();
+    final navItems = _kNavItems;
 
     const borderRadius = BorderRadius.only(
       topRight: Radius.circular(20),
@@ -55,7 +61,7 @@ class Sidebar extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       curve: Curves.easeInOut,
-      width: collapsed ? 48 : 72,
+      width: collapsed ? _collapsedWidth : _expandedWidth,
       child: ClipRRect(
       borderRadius: borderRadius,
       child: BackdropFilter(
@@ -78,9 +84,22 @@ class Sidebar extends StatelessWidget {
           ),
           child: Column(children: [
             const SizedBox(height: 16),
-            ...List.generate(navItems.length, (i) => _NavItem(item: navItems[i], sel: i == selectedIndex, onTap: () => onSelect(i), brand: brand, context: context, collapsed: collapsed, badge: badges[i] ?? 0)),
-            const Spacer(),
+            // 导航项：可滚动，避免窗口较小时溢出
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                child: Column(
+                  children: List.generate(navItems.length, (i) => _NavItem(
+                    item: navItems[i], sel: i == selectedIndex,
+                    onTap: () => onSelect(i), brand: brand,
+                    context: context, collapsed: collapsed, badge: badges[i] ?? 0,
+                  )),
+                ),
+              ),
+            ),
+            // 设置区固定在底部
             if (!collapsed) ...[
+              const SizedBox(height: 8),
               // Settings button (includes theme, language, text size)
               _HoverIcon(
                 icon: Icons.settings_outlined,
@@ -97,7 +116,7 @@ class Sidebar extends StatelessWidget {
                 },
                 brand: brand,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               // Color picker button
               _ColorPickerButton(current: brandColor, onSelect: onChangeBrandColor, brand: brand),
               const SizedBox(height: 6),
@@ -110,6 +129,7 @@ class Sidebar extends StatelessWidget {
               ),
             ] else ...[
               // Collapsed: just the connected dot
+              const Spacer(),
               Container(
                 width: 8, height: 8,
                 decoration: BoxDecoration(
@@ -227,6 +247,9 @@ class _NavItem extends StatefulWidget {
   final int badge;
   const _NavItem({required this.item, required this.sel, required this.onTap, required this.brand, required this.context, this.collapsed = false, this.badge = 0});
   @override State<_NavItem> createState() => _NavItemState();
+
+  static const double _collapsedItemW = 36, _collapsedItemH = 36;
+  static const double _expandedItemW = 56, _expandedItemH = 52;
 }
 class _NavItemState extends State<_NavItem> {
   bool _hov = false; bool _press = false;
@@ -255,9 +278,9 @@ class _NavItemState extends State<_NavItem> {
               children: [
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 120),
-                  width: widget.collapsed ? 36 : 56,
-                  height: widget.collapsed ? 36 : 52,
-                  transform: _press ? (Matrix4.identity()..scale(0.92)) : Matrix4.identity(),
+                  width: widget.collapsed ? _NavItem._collapsedItemW : _NavItem._expandedItemW,
+                  height: widget.collapsed ? _NavItem._collapsedItemH : _NavItem._expandedItemH,
+                  transform: _press ? Matrix4.diagonal3Values(0.92, 0.92, 1.0) : Matrix4.identity(),
                   transformAlignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: s ? b.withValues(alpha: 0.12) : _hov ? cs.onSurface.withValues(alpha: 0.06) : Colors.transparent,
@@ -296,52 +319,6 @@ class _NavItemState extends State<_NavItem> {
                   ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LanguageToggle extends StatefulWidget {
-  final VoidCallback onTap;
-  final Color brand;
-  const _LanguageToggle({required this.onTap, required this.brand});
-
-  @override
-  State<_LanguageToggle> createState() => _LanguageToggleState();
-}
-
-class _LanguageToggleState extends State<_LanguageToggle> {
-  bool _hov = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final locale = Localizations.localeOf(context);
-    final isChinese = locale.languageCode == 'zh';
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hov = true),
-      onExit: (_) => setState(() => _hov = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          decoration: BoxDecoration(
-            color: _hov ? cs.onSurface.withValues(alpha: 0.06) : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            isChinese ? 'EN' : '中',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: _hov ? widget.brand : cs.onSurface.withValues(alpha: 0.25),
-              letterSpacing: 0.5,
-            ),
-            textAlign: TextAlign.center,
           ),
         ),
       ),

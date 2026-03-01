@@ -19,9 +19,16 @@ class _MonitorPageState extends State<MonitorPage> {
   DateTime? _lastUiUpdate;
 
   @override
-  void initState() { super.initState(); widget.grpc.addListener(_onData); }
+  void initState() {
+    super.initState();
+    widget.grpc.addListener(_onData);
+  }
+
   @override
-  void dispose() { widget.grpc.removeListener(_onData); super.dispose(); }
+  void dispose() {
+    widget.grpc.removeListener(_onData);
+    super.dispose();
+  }
 
   void _onData() {
     final h = widget.grpc.latestHistory;
@@ -41,7 +48,7 @@ class _MonitorPageState extends State<MonitorPage> {
 
   // Count joints whose absolute position exceeds the safe range (1.5 rad ≈ 86°)
   static const _posLimit = 1.5;
-  int _overLimitCount(GrpcService g) {
+  static int _overLimitCount(GrpcService g) {
     final pos = g.latestHistory?.jointPosition.values;
     if (pos == null) return 0;
     int count = 0;
@@ -106,13 +113,13 @@ class _MonitorPageState extends State<MonitorPage> {
           SizedBox(width: 320, child: SingleChildScrollView(child: Column(children: [
             _heatmapCard(context, g),
             const SizedBox(height: 10),
-            _legCard(context, g, 'FR Leg', 0, const Color(0xFF3B82F6)),
+            _legCard(context, g, 'FR 腿', 0, _legColors[0]),
             const SizedBox(height: 10),
-            _legCard(context, g, 'FL Leg', 3, const Color(0xFF10B981)),
+            _legCard(context, g, 'FL 腿', 3, _legColors[1]),
             const SizedBox(height: 10),
-            _legCard(context, g, 'RR Leg', 6, const Color(0xFFF59E0B)),
+            _legCard(context, g, 'RR 腿', 6, _legColors[2]),
             const SizedBox(height: 10),
-            _legCard(context, g, 'RL Leg', 9, const Color(0xFF8B5CF6)),
+            _legCard(context, g, 'RL 腿', 9, _legColors[3]),
           ]))),
         ])),
       ]),
@@ -126,6 +133,12 @@ class _MonitorPageState extends State<MonitorPage> {
   // Indices: FR[0,1,2,12] FL[3,4,5,13] RR[6,7,8,14] RL[9,10,11,15]
   static const _hmLeg = ['FR', 'FL', 'RR', 'RL'];
   static const _hmJoint = ['髋', '大腿', '小腿', '足'];
+  static const _legColors = [
+    Color(0xFF3B82F6), // FR 蓝
+    Color(0xFF10B981), // FL 绿
+    Color(0xFFF59E0B), // RR 橙
+    Color(0xFF8B5CF6), // RL 紫
+  ];
   static const _hmIdx = [
     [0, 1, 2, 12],
     [3, 4, 5, 13],
@@ -133,7 +146,7 @@ class _MonitorPageState extends State<MonitorPage> {
     [9, 10, 11, 15],
   ];
 
-  Color _heatColor(double trqAbs) {
+  static Color _heatColor(double trqAbs) {
     // 0→green, 5→yellow, 10+→red
     if (trqAbs <= 0) return AppTheme.green.withValues(alpha: 0.15);
     final t = (trqAbs / 10.0).clamp(0.0, 1.0);
@@ -474,9 +487,9 @@ class _MonitorPageState extends State<MonitorPage> {
   static String _logLevel(ProtocolLogEntry e) {
     final combined = '${e.direction} ${e.method} ${e.summary}'.toLowerCase();
     if (combined.contains('error') || combined.contains('fault') ||
-        combined.contains('fail') || e.direction == '⚠') return 'error';
+        combined.contains('fail') || e.direction == '⚠') { return 'error'; }
     if (combined.contains('warn') || combined.contains('stale') ||
-        combined.contains('reconnect')) return 'warn';
+        combined.contains('reconnect')) { return 'warn'; }
     return 'info';
   }
 
@@ -493,8 +506,12 @@ class _MonitorPageState extends State<MonitorPage> {
         ? allLog
         : allLog.where((e) => _logLevel(e) == _logFilter).toList();
 
-    final errorCount = allLog.where((e) => _logLevel(e) == 'error').length;
-    final warnCount = allLog.where((e) => _logLevel(e) == 'warn').length;
+    // 单次遍历同时统计 error 和 warn
+    var errorCount = 0, warnCount = 0;
+    for (final e in allLog) {
+      final lvl = _logLevel(e);
+      if (lvl == 'error') { errorCount++; } else if (lvl == 'warn') { warnCount++; }
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -562,7 +579,7 @@ class _MonitorPageState extends State<MonitorPage> {
   Widget _legCard(BuildContext ctx, GrpcService g, String title, int baseIdx, Color accent) {
     final cs = Theme.of(ctx).colorScheme;
     final j = g.latestJoints;
-    const joints = ['Hip', 'Thigh', 'Calf'];
+    const joints = ['髋', '大腿', '小腿'];
 
     return Container(
       clipBehavior: Clip.antiAlias,
@@ -697,7 +714,7 @@ class _SparkPainter extends CustomPainter {
     for (int i = 0; i < data.length; i++) {
       final x = i / (data.length - 1) * size.width;
       final y = size.height - ((data[i] - mn) / range * size.height);
-      if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+      if (i == 0) { path.moveTo(x, y); } else { path.lineTo(x, y); }
     }
     canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 1.5..strokeCap = StrokeCap.round);
   }

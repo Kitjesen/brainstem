@@ -7,6 +7,13 @@ import '../theme/app_theme.dart';
 import '../utils/app_toast.dart';
 import '../widgets/status_card.dart';
 
+/// 将 DateTime 格式化为 HH:mm:ss.mmm（供日志列表和导出共用）
+String _fmtTime(DateTime t) =>
+    '${t.hour.toString().padLeft(2, '0')}:'
+    '${t.minute.toString().padLeft(2, '0')}:'
+    '${t.second.toString().padLeft(2, '0')}.'
+    '${t.millisecond.toString().padLeft(3, '0')}';
+
 class ProtocolPage extends StatefulWidget {
   final GrpcService grpc;
   const ProtocolPage({super.key, required this.grpc});
@@ -18,6 +25,14 @@ class ProtocolPage extends StatefulWidget {
 class _ProtocolPageState extends State<ProtocolPage> {
   final _scrollController = ScrollController();
   String _filter = '';
+
+  // 状态机节点顺序（每次 build 无需重建）
+  static const _cmsStates = ['Idle', 'StandUp', 'SitDown', 'Walking'];
+
+  /// 过滤后日志缓存，仅在 filter 或日志长度变化时重算
+  List<ProtocolLogEntry>? _cachedLog;
+  String _lastFilter = '';
+  int _lastLogLen = -1;
 
   @override
   void initState() {
@@ -53,19 +68,30 @@ class _ProtocolPageState extends State<ProtocolPage> {
     );
     if (path == null || !mounted) return;
     final lines = log.reversed.map((e) {
-      final t = e.time;
-      final tStr = '${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}:${t.second.toString().padLeft(2,'0')}.${t.millisecond.toString().padLeft(3,'0')}';
-      return '$tStr  ${e.direction}  ${e.method.padRight(20)}  ${e.summary}';
+      return '${_fmtTime(e.time)}  ${e.direction}  ${e.method.padRight(20)}  ${e.summary}';
     }).join('\n');
     await File(path).writeAsString('# nova_dog gRPC 协议日志\n# 导出时间: ${DateTime.now()}\n\n$lines\n');
     if (mounted) AppToast.showSuccess(context, '日志已导出');
   }
 
   List<ProtocolLogEntry> get _filteredLog {
-    if (_filter.isEmpty) return widget.grpc.protocolLog;
-    return widget.grpc.protocolLog
-        .where((e) => e.method.toLowerCase().contains(_filter.toLowerCase()) || e.summary.toLowerCase().contains(_filter.toLowerCase()))
-        .toList();
+    final rawLog = widget.grpc.protocolLog;
+    if (_filter == _lastFilter && rawLog.length == _lastLogLen && _cachedLog != null) {
+      return _cachedLog!;
+    }
+    _lastFilter = _filter;
+    _lastLogLen = rawLog.length;
+    if (_filter.isEmpty) {
+      _cachedLog = rawLog;
+    } else {
+      final lowerFilter = _filter.toLowerCase();
+      _cachedLog = rawLog
+          .where((e) =>
+              e.method.toLowerCase().contains(lowerFilter) ||
+              e.summary.toLowerCase().contains(lowerFilter))
+          .toList();
+    }
+    return _cachedLog!;
   }
 
   @override
@@ -187,15 +213,18 @@ class _ProtocolPageState extends State<ProtocolPage> {
     );
   }
 
+  // 状态颜色映射（每次 build 无需重建）
+  static const _stateColors = {
+    'Idle': AppTheme.yellow,
+    'StandUp': AppTheme.teal,
+    'SitDown': AppTheme.orange,
+    'Walking': AppTheme.green,
+    'Unknown': AppTheme.red,
+  };
+
   Widget _buildStateMachine(TextTheme tt, ColorScheme cs, GrpcService grpc) {
-    final states = ['Idle', 'StandUp', 'SitDown', 'Walking'];
-    final colors = {
-      'Idle': AppTheme.yellow,
-      'StandUp': AppTheme.teal,
-      'SitDown': AppTheme.orange,
-      'Walking': AppTheme.green,
-      'Unknown': AppTheme.red,
-    };
+    const states = _cmsStates;
+    const colors = _stateColors;
 
     return StatusCard(
       title: 'CMS 状态机',
@@ -290,11 +319,7 @@ class _LogRowState extends State<_LogRow> {
       default:  dirColor = AppTheme.red;
     }
 
-    final timeStr =
-        '${entry.time.hour.toString().padLeft(2, '0')}:'
-        '${entry.time.minute.toString().padLeft(2, '0')}:'
-        '${entry.time.second.toString().padLeft(2, '0')}.'
-        '${entry.time.millisecond.toString().padLeft(3, '0')}';
+    final timeStr = _fmtTime(entry.time);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hov = true),
