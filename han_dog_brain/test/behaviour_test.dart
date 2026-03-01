@@ -52,7 +52,7 @@ void main() {
 
       clock.add(null);
       clock.add(null);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       expect(results, hasLength(2));
       expect(results[0].command, isA<IdleCommand>());
@@ -85,7 +85,7 @@ void main() {
       final sub = idle.doing.listen(results.add);
 
       clock.add(null);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       expect(results.first.nextAction, knownAction);
       await sub.cancel();
@@ -115,7 +115,7 @@ void main() {
       // Pump 5 ticks (only first 4 should produce output)
       for (var i = 0; i < 5; i++) {
         clock.add(null);
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
       }
 
       expect(results, hasLength(4));
@@ -147,7 +147,7 @@ void main() {
       // Pump 5 ticks: 4 frames emitted, 5th tick ensures generator fully flushes
       for (var i = 0; i < 5; i++) {
         clock.add(null);
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
       }
 
       expect(results, hasLength(4));
@@ -191,9 +191,9 @@ void main() {
       );
 
       clock.add(null);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
       clock.add(null);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       expect(results, hasLength(1));
       expect(completed, isTrue);
@@ -229,7 +229,7 @@ void main() {
 
       for (var i = 0; i < 5; i++) {
         clock.add(null);
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
       }
 
       expect(results, hasLength(4));
@@ -261,7 +261,7 @@ void main() {
       // Pump 5 ticks: 4 frames emitted, 5th tick ensures generator fully flushes
       for (var i = 0; i < 5; i++) {
         clock.add(null);
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
       }
 
       expect(results, hasLength(4));

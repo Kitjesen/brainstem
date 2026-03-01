@@ -15,13 +15,15 @@ class ProfileManager {
   final RealControlDog? controlDog;
   String _current;
 
+  bool _switching = false;
+
   ProfileManager({
     required Map<String, RobotProfile> profiles,
     required this.brain,
     this.gains,
     this.controlDog,
     required String initial,
-  })  : _profiles = Map.unmodifiable(profiles),
+  })  : _profiles = Map.of(profiles),
         _current = initial;
 
   /// 当前策略名称。
@@ -37,7 +39,13 @@ class ProfileManager {
   List<String> get descriptions => _profiles.values.map((p) => p.description).toList();
 
   /// 切换到指定策略。机器人必须在 Grounded 状态（由调用方保证）。
+  ///
+  /// 若切换失败（如模型加载错误），自动回滚增益到切换前的策略。
+  /// 若上一次切换尚未完成，抛出 [StateError]。
   Future<void> switchTo(String name) async {
+    if (_switching) {
+      throw StateError('Profile switch already in progress (current: $_current)');
+    }
     if (name == _current) {
       _log.fine('Already on profile: $name');
       return;
@@ -48,27 +56,54 @@ class ProfileManager {
           '(available: ${_profiles.keys.join(", ")})');
     }
 
-    _log.info('Switching profile: $_current → $name');
+    final prevName = _current;
+    final prevProfile = _profiles[prevName]!;
+    _log.info('Switching profile: $prevName → $name');
 
-    // 1. Brain：替换行为 + 加载模型
-    await brain.switchProfile(
-      observationBuilder: p.toObservationBuilder(),
-      standingPose: p.standingPose,
-      sittingPose: p.sittingPose,
-      modelPath: p.modelPath,
-      standUpCounts: p.standUpCounts,
-      sitDownCounts: p.sitDownCounts,
-    );
+    _switching = true;
+    try {
+      // 1. Brain：替换行为 + 加载模型
+      await brain.switchProfile(
+        observationBuilder: p.toObservationBuilder(),
+        standingPose: p.standingPose,
+        sittingPose: p.sittingPose,
+        modelPath: p.modelPath,
+        standUpCounts: p.standUpCounts,
+        sitDownCounts: p.sitDownCounts,
+      );
 
-    // 2. GestureLibrary
-    brain.gestureLibrary = GestureLibrary(standingPose: p.standingPose)
-      ..registerDefaults();
+      // 2. GestureLibrary
+      brain.gestureLibrary = GestureLibrary(standingPose: p.standingPose)
+        ..registerDefaults();
 
-    // 3. GainManager（gRPC 服务用）
-    _switchGains(p);
+      // 3. GainManager（gRPC 服务用）
+      _switchGains(p);
 
-    _current = name;
-    _log.info('Switched to profile: $name (model=${p.modelPath})');
+      _current = name;
+      _log.info('Switched to profile: $name (model=${p.modelPath})');
+    } catch (e, st) {
+      _log.warning(
+          'Profile switch failed ($prevName → $name): $e; attempting gain rollback',
+          e, st);
+      try {
+        _switchGains(prevProfile);
+        _log.info('Gain rollback to "$prevName" succeeded');
+      } catch (rollbackE, rollbackSt) {
+        // Rollback failed: log as SEVERE and continue with rethrow of original.
+        // _current is NOT updated, so the name stays consistent, but gains
+        // may be in an indeterminate state — operator must intervene.
+        _log.severe(
+          'CRITICAL: gain rollback to "$prevName" also failed after '
+          'profile switch error — robot gains may be indeterminate. '
+          'Original error was: $e',
+          rollbackE,
+          rollbackSt,
+        );
+      }
+      rethrow;
+    } finally {
+      _switching = false;
+    }
   }
 
   void _switchGains(RobotProfile p) {
@@ -97,5 +132,32 @@ class ProfileManager {
     final idx = keys.indexOf(_current);
     final next = keys[(idx + 1) % keys.length];
     await switchTo(next);
+  }
+
+  /// 热加载：重新扫描 [profileDir]，添加新策略、更新非当前策略。
+  ///
+  /// 当前正在运行的策略不会被替换（以免中断运行中的推理）。
+  /// 切换进行中时跳过本次扫描，避免数据竞争。
+  Future<void> reload(String profileDir) async {
+    if (_switching) {
+      _log.fine('Profile reload skipped: switch in progress');
+      return;
+    }
+    final fresh = await loadProfiles(profileDir);
+    int added = 0;
+    int updated = 0;
+    for (final entry in fresh.entries) {
+      if (entry.key == _current) continue; // 不替换运行中的策略
+      if (_profiles.containsKey(entry.key)) {
+        _profiles[entry.key] = entry.value;
+        updated++;
+      } else {
+        _profiles[entry.key] = entry.value;
+        added++;
+      }
+    }
+    if (added > 0 || updated > 0) {
+      _log.info('Profile hot-reload: +$added 新, ~$updated 更新 (current=$_current)');
+    }
   }
 }

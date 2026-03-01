@@ -118,7 +118,7 @@ void main() {
 
       for (var i = 0; i < 5; i++) {
         clock.add(null);
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
       }
 
       expect(results, hasLength(4)); // counts=3 → frames at t=0, 1/3, 2/3, 1.0
@@ -154,7 +154,7 @@ void main() {
 
       for (var i = 0; i < 5; i++) {
         clock.add(null);
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
       }
 
       expect(results, hasLength(4));
@@ -203,7 +203,7 @@ void main() {
 
       for (var i = 0; i < 6; i++) {
         clock.add(null);
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
       }
 
       // Keyframe 1: 2 frames (t=0→0.0, t=1→1.0)
@@ -249,13 +249,20 @@ void main() {
 
       for (var i = 0; i < 5; i++) {
         clock.add(null);
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
       }
 
-      // counts=0: (0/0).clamp→NaN, but we check the result
-      // Keyframe 2: 2 frames
-      expect(results.length, greaterThanOrEqualTo(2));
+      // counts=0: steps==0 → t=1.0，立即到达 pose1，发出 1 帧后结束
+      // counts=1: i=0(t=0) + i=1(t=1) → 2 帧，共 3 帧
+      expect(results.length, 3);
       expect(completed, isTrue);
+      // 第 1 帧：counts=0 → t=1.0 → nextAction = pose1（全 5.0），无 NaN
+      expect(results[0].nextAction.values[0], closeTo(5.0, 1e-6));
+      expect(results[0].nextAction.values.any((v) => v.isNaN), isFalse);
+      // 第 2 帧：counts=1，i=0 → t=0.0 → nextAction = pose1（上一关键帧终点）
+      expect(results[1].nextAction.values[0], closeTo(5.0, 1e-6));
+      // 第 3 帧：counts=1，i=1 → t=1.0 → nextAction = pose2（全 10.0）
+      expect(results[2].nextAction.values[0], closeTo(10.0, 1e-6));
 
       await sub.cancel();
     });
@@ -501,10 +508,10 @@ void main() {
       },
       act: (m) async {
         m.add(Init());
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
         m.add(const CmdStandUp());
-        await Future.delayed(Duration.zero);
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
         // Now in Standing; add gesture
         m.add(const CmdGesture('bow'));
       },
@@ -533,10 +540,10 @@ void main() {
       },
       act: (m) async {
         m.add(Init());
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
         m.add(const CmdStandUp());
-        await Future.delayed(Duration.zero);
-        await Future.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
+        await Future<void>.delayed(Duration.zero);
         // Try unknown gesture
         m.add(const CmdGesture('unknown'));
       },

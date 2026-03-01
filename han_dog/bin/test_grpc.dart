@@ -124,7 +124,7 @@ void main() async {
     print('    ✓ 命令已接受');
     // 等待过渡完成（~3秒, 150 steps × 20ms）
     print('    等待过渡完成...');
-    await Future.delayed(const Duration(seconds: 4));
+    await Future<void>.delayed(const Duration(seconds: 4));
     // 验证状态：检查 History 流的 command
     final h = await client.listenHistory(Empty()).first;
     final cmd = h.command;
@@ -137,7 +137,7 @@ void main() async {
   await _test('Walk (Standing → Walking)', () async {
     await client.walk(Vector3(x: 0.5, y: 0.0, z: 0.0));
     print('    ✓ walk(0.5, 0, 0) 命令已接受');
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future<void>.delayed(const Duration(milliseconds: 500));
     // 验证 History 的 command 应为 walk
     final h = await client.listenHistory(Empty()).first;
     final cmd = h.command;
@@ -149,7 +149,7 @@ void main() async {
   await _test('Walk 方向更新 (Walking 中)', () async {
     await client.walk(Vector3(x: 0.0, y: 0.3, z: 0.1));
     print('    ✓ walk(0, 0.3, 0.1) 方向更新');
-    await Future.delayed(const Duration(milliseconds: 200));
+    await Future<void>.delayed(const Duration(milliseconds: 200));
     final h = await client.listenHistory(Empty()).first;
     final cmd = h.command;
     if (cmd.hasWalk()) {
@@ -161,7 +161,7 @@ void main() async {
     await client.standUp(Empty());
     print('    ✓ 命令已接受');
     print('    等待过渡完成...');
-    await Future.delayed(const Duration(seconds: 4));
+    await Future<void>.delayed(const Duration(seconds: 4));
     final h = await client.listenHistory(Empty()).first;
     print('    过渡后 command=${h.command.hasIdle() ? "idle (Standing)" : "其他"}');
   });
@@ -170,7 +170,7 @@ void main() async {
     await client.sitDown(Empty());
     print('    ✓ 命令已接受');
     print('    等待过渡完成...');
-    await Future.delayed(const Duration(seconds: 4));
+    await Future<void>.delayed(const Duration(seconds: 4));
     // Grounded 后 listenHistory 只发一帧（我们的修改已恢复，现在是全速）
     final h = await client.listenHistory(Empty()).first;
     print('    过渡后 command=${h.command.hasIdle() ? "idle (Grounded)" : "其他"}');

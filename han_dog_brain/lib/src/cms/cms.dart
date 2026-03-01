@@ -19,13 +19,21 @@ class M extends Cms<S, A> {
 
   M(this._brain) : super(const Zero());
 
-  /// Listen to the idle behaviour (infinite stream, no onDone).
+  /// Listen to the idle behaviour (infinite stream driven by clock).
+  /// onDone should never fire under normal operation; if it does the clock
+  /// stream was interrupted and we force a fault so the FSM stays coherent.
   StreamSubscription<History> _listenIdle() {
     return _brain.idle.doing.listen(
       _brain.memory.add,
       onError: (Object error, StackTrace st) {
         _log.severe('Idle stream error', error, st);
         Future.microtask(() => add(A.fault('Idle error: $error')));
+      },
+      onDone: () {
+        _log.severe('Idle stream closed unexpectedly — clock interrupted?');
+        Future.microtask(
+          () => add(A.fault('Idle stream closed unexpectedly')),
+        );
       },
     );
   }
@@ -79,7 +87,15 @@ class M extends Cms<S, A> {
   }
 
   @override
-  Future<S?> kernel(S s, A a) async => switch ((s, a)) {
+  Future<S?> kernel(S s, A a) async {
+    final next = await _kernelImpl(s, a);
+    if (next != null) {
+      _log.info('FSM ${s.runtimeType} + ${a.runtimeType} → ${next.runtimeType}');
+    }
+    return next;
+  }
+
+  Future<S?> _kernelImpl(S s, A a) async => switch ((s, a)) {
     // ── Zero ────────────────────────────────────────────────
     (Zero(), Init()) => Grounded(_listenIdle()),
     (Zero(), _) => () {
@@ -183,8 +199,8 @@ class M extends Cms<S, A> {
     (Walking(), _) => null,
 
     // ── Transitioning (protected) ───────────────────────────
-    (Transitioning(), CmdStandUp() || CmdSitDown() || CmdWalk() || CmdIdle()) => () {
-      _log.fine('Command rejected: transition in progress');
+    (Transitioning(:final target), CmdStandUp() || CmdSitDown() || CmdWalk() || CmdIdle()) => () {
+      _log.warning('${a.runtimeType} rejected: transition in progress (${target.runtimeType})');
       return null;
     }(),
 

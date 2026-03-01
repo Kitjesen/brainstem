@@ -8,6 +8,9 @@ import 'package:vector_math/vector_math.dart';
 
 final _log = Logger('han_dog.control');
 
+/// 摇杆归零后触发 Idle 命令的等待时长。
+const _idleTimeout = Duration(seconds: 5);
+
 class RealControlDog {
   final Brain brain;
   final ControlArbiter arbiter;
@@ -24,7 +27,7 @@ class RealControlDog {
   /// 策略切换回调（由外部 ProfileManager 设置）。
   void Function()? onProfileSwitch;
 
-  final List<StreamSubscription> _subscriptions = [];
+  final List<StreamSubscription<Object?>> _subscriptions = [];
   Timer? _idleTimer;
 
   RealControlDog({
@@ -79,7 +82,7 @@ class RealControlDog {
     _subscriptions.add(controller.direction.listen(
       (direction) {
         if (direction.x == 0 && direction.y == 0 && direction.z == 0) {
-          _idleTimer ??= Timer(const Duration(seconds: 5), () {
+          _idleTimer ??= Timer(_idleTimeout, () {
             _idleTimer = null;
             sendCommand(const A.idle(), 'idle(timeout)');
           });
@@ -98,7 +101,7 @@ class RealControlDog {
       (_) {
         _idleTimer?.cancel();
         _idleTimer = null;
-        _log.fine('L1 → standUp');
+        _log.info('L1 → standUp');
         sendCommand(const A.standUp(), 'standUp');
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'standup'),
@@ -107,7 +110,7 @@ class RealControlDog {
       (_) {
         _idleTimer?.cancel();
         _idleTimer = null;
-        _log.fine('L2 → sitDown');
+        _log.info('L2 → sitDown');
         sendCommand(const A.sitDown(), 'sitDown');
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'sitdown'),
@@ -136,7 +139,7 @@ class RealControlDog {
       (_) {
         _idleTimer?.cancel();
         _idleTimer = null;
-        _log.fine('R1 → standUp');
+        _log.info('R1 → standUp');
         sendCommand(const A.standUp(), 'standUp(R1)');
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'idle(R1)'),
@@ -167,6 +170,9 @@ class RealControlDog {
   }
 
   /// 切换策略时更新全部增益参数。
+  ///
+  /// 只在机器人处于 Grounded 状态（由调用方保证）时调用。
+  /// 下一帧 arbiter.stateStream 事件到来时新增益自动生效。
   void switchGains({
     required JointsMatrix inferKp,
     required JointsMatrix inferKd,
@@ -183,7 +189,11 @@ class RealControlDog {
     this.sitDownKd = sitDownKd;
   }
 
+  bool _disposed = false;
+
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _idleTimer?.cancel();
     _idleTimer = null;
     for (final sub in _subscriptions) {

@@ -1,13 +1,17 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:logging/logging.dart';
 import 'package:robo_device/robo_device.dart';
 import 'package:robo_device_proto/robo_device_proto.dart';
 import 'package:vector_math/vector_math.dart';
 import 'package:frequency_watch/frequency_watch.dart';
 import 'package:han_dog_brain/han_dog_brain.dart';
 
+final _log = Logger('han_dog.real_imu');
+
 class RealImu implements ImuService {
+  final String portName;
   final SerialPortController<Hi91Event, Hi91State> port;
 
   @override
@@ -30,27 +34,46 @@ class RealImu implements ImuService {
   /// 广播流：支持多个订阅者（gRPC 客户端、App 断线重连等）
   Stream<Iterable<Hi91State>> get stateStream => _broadcastController.stream;
 
-  RealImu([String portName = '/dev/ttyUSB0']) : port = .new(portName) {
-    subs = port.state.listen((data) {
-      // 转发到广播流（在过滤之前，保证所有数据对外可见）
-      _broadcastController.add(data);
-      if (data.isEmpty) return;
-      final imuData = data.last;
-      hz.add(data.length);
-      gyroscope = .new(
-        _degreeToRadius(imuData.gyroscope.x),
-        _degreeToRadius(imuData.gyroscope.y),
-        _degreeToRadius(imuData.gyroscope.z),
-      );
-      projectedGravity = imuData.quaternion.rotate(.new(0, 0, -1));
-    });
+  RealImu([this.portName = '/dev/ttyUSB0']) : port = .new(portName) {
+    subs = port.state.listen(
+      (data) {
+        // 转发到广播流（在过滤之前，保证所有数据对外可见）
+        _broadcastController.add(data);
+        if (data.isEmpty) return;
+        final imuData = data.last;
+        hz.add(data.length);
+        gyroscope = .new(
+          _degreeToRadius(imuData.gyroscope.x),
+          _degreeToRadius(imuData.gyroscope.y),
+          _degreeToRadius(imuData.gyroscope.z),
+        );
+        projectedGravity = imuData.quaternion.rotate(.new(0, 0, -1));
+      },
+      onError: (Object error, StackTrace st) {
+        _log.severe('IMU port stream error', error, st);
+      },
+      onDone: () {
+        _log.warning('IMU port stream closed unexpectedly');
+      },
+    );
   }
 
   bool open() {
-    return port.open();
+    final ok = port.open();
+    if (ok) {
+      _log.info('IMU opened: $portName');
+    } else {
+      _log.severe('IMU open failed: $portName');
+    }
+    return ok;
   }
 
+  bool _disposed = false;
+
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _log.info('IMU disposing: $portName');
     subs.cancel();
     _broadcastController.close();
     port.dispose();

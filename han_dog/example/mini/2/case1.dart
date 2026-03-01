@@ -56,7 +56,7 @@ void main() async {
   final M m = M(brain)..add(Init());
   m.stream.listen(print);
   m.add(.walk(.new(0, 0, -0.8)));
-  await Future.delayed(.zero); // !!! 完成 Init()
+  await Future<void>.delayed(.zero); // !!! 完成 Init()
   final file = File('sample/case1_real.json');
   file.writeAsStringSync(''); // clear
   brain.walk.observationStream.listen((obs) {
@@ -86,7 +86,7 @@ void main() async {
 
 class SimpleBlocObserver extends BlocObserver {
   @override
-  void onChange(BlocBase bloc, Change change) {
+  void onChange(BlocBase<dynamic> bloc, Change<dynamic> change) {
     super.onChange(bloc, change);
     print('${bloc.runtimeType} $change');
   }

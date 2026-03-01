@@ -6,6 +6,9 @@ import 'package:logging/logging.dart';
 /// 控制源标识
 enum ControlSource { yunzhuo, grpc }
 
+/// 一次控制权变更记录。
+typedef OwnershipEvent = ({DateTime at, ControlSource? owner, String reason});
+
 /// 控制权仲裁器
 ///
 /// 多个控制端（YUNZHUO 遥控器、gRPC 客户端）共享一个 CMS，
@@ -26,6 +29,10 @@ class ControlArbiter {
   Timer? _releaseTimer;
   final _ownerController = StreamController<ControlSource?>.broadcast();
 
+  static const _historyMaxLen = 20;
+  final _history = <OwnershipEvent>[];
+  bool _disposed = false;
+
   ControlArbiter(this._m, {this.timeout = const Duration(seconds: 3)});
 
   // ─── 只读访问 ─────────────────────────────────────────
@@ -35,6 +42,9 @@ class ControlArbiter {
 
   /// 控制权变更流
   Stream<ControlSource?> get ownerStream => _ownerController.stream;
+
+  /// 最近 20 次控制权变更历史（最新在最后）。
+  List<OwnershipEvent> get ownershipHistory => List.unmodifiable(_history);
 
   /// CMS 当前状态（透传）
   S get state => _m.state;
@@ -66,7 +76,7 @@ class ControlArbiter {
   /// 主动释放控制权（例如 gRPC 客户端断开时）。
   void release(ControlSource source) {
     if (_owner == source) {
-      _doRelease();
+      _doRelease('manual release by $source');
     }
   }
 
@@ -83,23 +93,33 @@ class ControlArbiter {
     final changed = _owner != source;
     _owner = source;
     if (changed) {
+      const reason = 'acquired';
       _log.info('Control acquired by $source');
+      _addHistory(source, '$reason by $source');
       _ownerController.add(source);
     }
     _releaseTimer?.cancel();
-    _releaseTimer = Timer(timeout, _doRelease);
+    _releaseTimer = Timer(timeout, () => _doRelease('timeout'));
   }
 
-  void _doRelease() {
+  void _doRelease(String reason) {
     if (_owner != null) {
-      _log.info('Control released (was $_owner)');
+      _log.info('Control released (was $_owner, reason: $reason)');
+      _addHistory(null, 'released: $reason (was $_owner)');
       _owner = null;
       _releaseTimer?.cancel();
       _ownerController.add(null);
     }
   }
 
+  void _addHistory(ControlSource? owner, String reason) {
+    _history.add((at: DateTime.now(), owner: owner, reason: reason));
+    if (_history.length > _historyMaxLen) _history.removeAt(0);
+  }
+
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _releaseTimer?.cancel();
     _ownerController.close();
   }

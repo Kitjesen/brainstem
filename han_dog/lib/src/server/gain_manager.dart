@@ -1,5 +1,8 @@
 import 'package:han_dog_brain/han_dog_brain.dart';
+import 'package:logging/logging.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
+
+final _log = Logger('han_dog.gains');
 
 /// 增益管理器：根据指令自动切换 PD 增益，并追踪当前增益。
 ///
@@ -39,7 +42,7 @@ class GainManager {
   })  : kp = inferKp,
         kd = inferKd;
 
-  /// 切换策略时更新全部增益参数。
+  /// 切换策略时更新全部增益参数（profile 级别，非逐指令切换）。
   void switchGains({
     required JointsMatrix inferKp,
     required JointsMatrix inferKd,
@@ -54,27 +57,35 @@ class GainManager {
     this.standUpKd = standUpKd;
     this.sitDownKp = sitDownKp;
     this.sitDownKd = sitDownKd;
+    _log.fine('Gains profile updated (full set switched)');
   }
 
-  /// 根据指令切换增益。
+  /// 根据指令切换增益；增益未变时不触发 [onChanged]。
   void applyCommand(A action) {
+    JointsMatrix? newKp;
+    JointsMatrix? newKd;
     switch (action) {
       case CmdWalk():
-        kp = inferKp;
-        kd = inferKd;
+        newKp = inferKp;
+        newKd = inferKd;
       case CmdStandUp():
-        kp = standUpKp;
-        kd = standUpKd;
+        newKp = standUpKp;
+        newKd = standUpKd;
       case CmdSitDown():
-        kp = sitDownKp;
-        kd = sitDownKd;
+        newKp = sitDownKp;
+        newKd = sitDownKd;
       case CmdGesture():
         // 动作使用 standUp 增益（站立状态下的低速运动）
-        kp = standUpKp;
-        kd = standUpKd;
+        newKp = standUpKp;
+        newKd = standUpKd;
       default:
         return; // Idle/Init/Fault/Done 不切换增益
     }
+    if (identical(kp, newKp) && identical(kd, newKd)) return;
+    // flow analysis guarantees newKp/newKd non-null here (default: return above)
+    kp = newKp; // ignore: unnecessary_non_null_assertion
+    kd = newKd;
+    _log.fine('增益切换 → ${action.runtimeType}');
     onChanged?.call(kp, kd);
   }
 }

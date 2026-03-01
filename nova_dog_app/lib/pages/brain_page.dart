@@ -263,6 +263,16 @@ class _ObservationContent extends StatelessWidget {
           const SizedBox(height: 4),
           _MatrixGrid(values: h.action.values, cs: cs),
         ],
+        if (h.hasAction() && h.hasJointPosition()) ...[
+          const SizedBox(height: 8),
+          Row(children: [
+            Text('动作误差 (action − pos)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: cs.onSurface.withValues(alpha: 0.4))),
+            const SizedBox(width: 6),
+            Text('|误差| > 0.3 rad 高亮', style: TextStyle(fontSize: 9, color: AppTheme.orange.withValues(alpha: 0.7))),
+          ]),
+          const SizedBox(height: 4),
+          _ErrorMatrixGrid(positions: h.jointPosition.values, actions: h.action.values, cs: cs),
+        ],
       ]),
     );
   }
@@ -306,6 +316,41 @@ class _MatrixGrid extends StatelessWidget {
           textAlign: TextAlign.right,
         ),
       )),
+    );
+  }
+}
+
+class _ErrorMatrixGrid extends StatelessWidget {
+  final List<double> positions;
+  final List<double> actions;
+  final ColorScheme cs;
+  static const _warnThreshold = 0.3;
+
+  const _ErrorMatrixGrid({required this.positions, required this.actions, required this.cs});
+
+  @override
+  Widget build(BuildContext context) {
+    final len = positions.length < actions.length ? positions.length : actions.length;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: List.generate(len, (i) {
+        final err = actions[i] - positions[i];
+        final isWarn = err.abs() > _warnThreshold;
+        return SizedBox(
+          width: 52,
+          child: Text(
+            err.toStringAsFixed(2),
+            style: TextStyle(
+              fontSize: 10,
+              color: isWarn ? AppTheme.orange : cs.onSurface.withValues(alpha: 0.6),
+              fontWeight: isWarn ? FontWeight.w700 : FontWeight.w400,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+            textAlign: TextAlign.right,
+          ),
+        );
+      }),
     );
   }
 }

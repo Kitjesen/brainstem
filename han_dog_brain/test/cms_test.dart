@@ -159,7 +159,7 @@ void main() {
       build: () => TestM(),
       seed: () => Standing(Stream<History>.empty().listen((_) {})),
       act: (m) => m.add(const A.standUp()),
-      expect: () => [],
+      expect: () => <S>[],
     );
   }();
 
@@ -169,7 +169,7 @@ void main() {
     'zero + non-Init command → ignored',
     build: () => TestM(),
     act: (m) => m.add(const A.standUp()),
-    expect: () => [],
+    expect: () => <S>[],
   );
 
   // ── Init 重入 ─────────────────────────────────────────────
@@ -179,7 +179,7 @@ void main() {
     build: () => TestM(),
     seed: () => Standing(Stream<History>.empty().listen((_) {})),
     act: (m) => m.add(const A.init()),
-    expect: () => [],
+    expect: () => <S>[],
   );
 
   // ── Fault 安全路径 ────────────────────────────────────────
@@ -189,7 +189,7 @@ void main() {
     build: () => TestM(),
     seed: () => Grounded(Stream<History>.empty().listen((_) {})),
     act: (m) => m.add(A.fault('test error')),
-    expect: () => [],
+    expect: () => <S>[],
   );
 
   blocTest(
@@ -197,7 +197,7 @@ void main() {
     build: () => TestM(),
     seed: () => Standing(Stream<History>.empty().listen((_) {})),
     act: (m) => m.add(A.fault('test error')),
-    expect: () => [],
+    expect: () => <S>[],
   );
 
   // ── Standing → SitDown ───────────────────────────────────
@@ -296,6 +296,42 @@ void main() {
       expect: () => [
         predicate((S s) => s is Transitioning && s.target is SitDownCommand),
         predicate((S s) => s is Grounded),
+      ],
+    );
+  }();
+
+  // ── Idle 流意外关闭 ────────────────────────────────────────
+
+  () {
+    final standUpSequence = <JointsMatrix>[
+      .fromList(.filled(16, 1.0)),
+    ].map(fakeStandUp).toList();
+
+    blocTest(
+      'idle stream closes after standUp → fault → standing stays (safe)',
+      build: () {
+        final m = TestM();
+        final mockBrain = m.mockBrain;
+        when(() => mockBrain.standUp).thenReturn(mockBrain.mockStandUp);
+        when(() => mockBrain.idle).thenReturn(mockBrain.mockIdle);
+        when(() => mockBrain.memory).thenReturn(mockBrain.mockMemory);
+        when(() => mockBrain.mockStandUp.doing)
+            .thenAnswer((_) => Stream.fromIterable(standUpSequence));
+        // Idle stream closes immediately — simulates clock stream interruption
+        when(() => mockBrain.mockIdle.doing)
+            .thenAnswer((_) => Stream.empty());
+        return m;
+      },
+      seed: () => Grounded(Stream<History>.empty().listen((_) {})),
+      act: (m) async {
+        m.add(const A.standUp());
+        // Allow standUp to complete and idle's onDone fault to be processed
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      expect: () => [
+        predicate((S s) => s is Transitioning && s.target is StandUpCommand),
+        predicate((S s) => s is Standing),
+        // fault from idle onDone arrives → Standing + fault = no state change
       ],
     );
   }();

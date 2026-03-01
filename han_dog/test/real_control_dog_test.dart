@@ -118,7 +118,7 @@ void main() {
     test('Walking → inferKp/inferKd', () async {
       buildDog();
       stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.kpExt = inferKp).called(1);
       verify(() => joint.kdExt = inferKd).called(1);
@@ -131,7 +131,7 @@ void main() {
         Stream<History>.empty().listen((_) {}),
         null,
       ));
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.kpExt = standUpKp).called(1);
       verify(() => joint.kdExt = standUpKd).called(1);
@@ -144,7 +144,7 @@ void main() {
         Stream<History>.empty().listen((_) {}),
         null,
       ));
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.kpExt = sitDownKp).called(1);
       verify(() => joint.kdExt = sitDownKd).called(1);
@@ -153,7 +153,7 @@ void main() {
     test('Standing/Grounded/Zero → no kp/kd change', () async {
       buildDog();
       stateCtrl.add(Standing(Stream<History>.empty().listen((_) {})));
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verifyNever(() => joint.kpExt = any());
       verifyNever(() => joint.kdExt = any());
@@ -164,7 +164,7 @@ void main() {
     test('non-zero direction → arbiter.command(A.walk, yunzhuo)', () async {
       buildDog();
       directionCtrl.add(Vector3(1, 0, 0));
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(
         () => arbiter.command(
@@ -223,7 +223,7 @@ void main() {
     test('L1 → standUp', () async {
       buildDog();
       standupCtrl.add(true);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(
         () => arbiter.command(
@@ -236,7 +236,7 @@ void main() {
     test('L2 → sitDown', () async {
       buildDog();
       sitdownCtrl.add(true);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(
         () => arbiter.command(
@@ -249,7 +249,7 @@ void main() {
     test('R1 → standUp', () async {
       buildDog();
       idleCtrl.add(true);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(
         () => arbiter.command(
@@ -262,7 +262,7 @@ void main() {
     test('red → joint.disable()', () async {
       buildDog();
       redCtrl.add(true);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.disable()).called(1);
     });
@@ -270,7 +270,7 @@ void main() {
     test('enabled true → joint.enable()', () async {
       buildDog();
       enabledCtrl.add(true);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.enable()).called(1);
     });
@@ -278,7 +278,7 @@ void main() {
     test('enabled false → joint.disable()', () async {
       buildDog();
       enabledCtrl.add(false);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.disable()).called(1);
     });
@@ -292,7 +292,7 @@ void main() {
 
       buildDog();
       calibrateCtrl.add(null);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.setZeroPosition()).called(1);
       verify(() => joint.setZeroSigned()).called(1);
@@ -306,7 +306,7 @@ void main() {
 
       buildDog();
       calibrateCtrl.add(null);
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verifyNever(() => joint.setZeroPosition());
       verifyNever(() => joint.setZeroSigned());
@@ -318,7 +318,7 @@ void main() {
     test('direction stream error → arbiter.fault', () async {
       buildDog();
       directionCtrl.addError(Exception('serial disconnect'));
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(() => arbiter.fault(any())).called(1);
     });
@@ -326,7 +326,7 @@ void main() {
     test('standup stream error → arbiter.fault', () async {
       buildDog();
       standupCtrl.addError(Exception('hardware error'));
-      await Future.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
 
       verify(() => arbiter.fault(any())).called(1);
     });

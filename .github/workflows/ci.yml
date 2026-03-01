@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Dart 包：analyze + test ─────────────────────────────────
+  dart:
+    name: Dart (analyze + test)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Install dependencies
+        run: dart pub get
+        working-directory: brainstem
+
+      - name: Analyze han_dog_brain
+        run: dart analyze han_dog_brain/
+        working-directory: brainstem
+
+      - name: Analyze han_dog
+        run: dart analyze han_dog/
+        working-directory: brainstem
+
+      - name: Analyze frequency_watch
+        run: dart analyze frequency_watch/
+        working-directory: brainstem
+
+      - name: Analyze skinny_dog_algebra
+        run: dart analyze skinny_dog_algebra/
+        working-directory: brainstem
+
+      - name: Test han_dog_brain
+        run: dart test han_dog_brain/
+        working-directory: brainstem
+
+      - name: Test han_dog
+        run: dart test han_dog/
+        working-directory: brainstem
+
+      - name: Test frequency_watch
+        run: dart test frequency_watch/
+        working-directory: brainstem
+
+      - name: Test skinny_dog_algebra
+        run: dart test skinny_dog_algebra/
+        working-directory: brainstem
+
+  # ── Flutter App：analyze + build ───────────────────────────
+  flutter:
+    name: Flutter (analyze + build Windows)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+        working-directory: brainstem/nova_dog_app
+
+      - name: Analyze nova_dog_app
+        run: flutter analyze lib/
+        working-directory: brainstem/nova_dog_app
+
+      - name: Build nova_dog_app (Windows)
+        run: flutter build windows --release
+        working-directory: brainstem/nova_dog_app
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nova_dog_app-windows
+          path: brainstem/nova_dog_app/build/windows/x64/runner/Release/
+          retention-days: 7

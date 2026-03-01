@@ -113,18 +113,23 @@ class RealJoint implements JointService, MotorService {
   }
 
   StreamSubscription<RSState> _listenLeg(int legId) {
-    return pcans[legId].state.listen((state) {
-      switch (state) {
-        case RSStateReport(canId: final targetId)
-            when targetId >= 1 && targetId <= 4:
-          status[legId][targetId - 1] = state;
-          _cachedThetas = null;
-          _cachedOmegas = null;
-          frequencyWatches[legId * 4 + targetId - 1].add(1);
-          _reportController.add((legId * 4 + targetId - 1, state));
-        default:
-      }
-    });
+    return pcans[legId].state.listen(
+      (state) {
+        switch (state) {
+          case RSStateReport(canId: final targetId)
+              when targetId >= 1 && targetId <= 4:
+            status[legId][targetId - 1] = state;
+            _cachedThetas = null;
+            _cachedOmegas = null;
+            frequencyWatches[legId * 4 + targetId - 1].add(1);
+            _reportController.add((legId * 4 + targetId - 1, state));
+          default:
+        }
+      },
+      onError: (Object error, StackTrace st) {
+        _log.severe('PCAN leg $legId stream error', error, st);
+      },
+    );
   }
 
   bool open() {
@@ -134,6 +139,9 @@ class RealJoint implements JointService, MotorService {
         _log.severe('PCAN leg $i open failed');
         allOpened = false;
       }
+    }
+    if (allOpened) {
+      _log.info('All ${pcans.length} PCAN channels opened');
     }
     return allOpened;
   }
@@ -201,7 +209,12 @@ class RealJoint implements JointService, MotorService {
     rl.add(.control(4, velocity: a.rlFoot, kd: kd.rlFoot));
   }
 
+  bool _disposed = false;
+
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _log.info('RealJoint disposing');
     for (final sub in subscriptions) {
       sub.cancel();
     }

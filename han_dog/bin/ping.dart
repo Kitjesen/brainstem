@@ -30,7 +30,7 @@ void main(List<String> args) async {
   // 记录发现的电机: { "FR-1": mcuId, ... }
   final found = <String, BigInt>{};
   final pcans = <String, PcanController<RSEvent, RSState>>{};
-  final subscriptions = <StreamSubscription>[];
+  final subscriptions = <StreamSubscription<Object?>>[];
 
   // ── 1. 打开所有 PCAN 通道 ──
   print('[1/3] 打开 PCAN 通道...');
@@ -86,7 +86,7 @@ void main(List<String> args) async {
   final stopwatch = Stopwatch()..start();
 
   while (stopwatch.elapsed < timeout && found.length < expected) {
-    await Future.delayed(const Duration(milliseconds: 100));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
   }
   stopwatch.stop();
 
@@ -102,7 +102,7 @@ void main(List<String> args) async {
 
   // 记录每个关节收到的上报帧数
   final reportCount = <String, int>{};
-  final reportSubs = <StreamSubscription>[];
+  final reportSubs = <StreamSubscription<Object?>>[];
 
   // 监听上报帧
   for (final entry in pcans.entries) {
@@ -123,11 +123,11 @@ void main(List<String> args) async {
         pcan.add(RSEvent.setReporting(id, enable: true));
       }
     }
-    await Future.delayed(const Duration(milliseconds: 100));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
   }
   print('  已发送 setReporting(enable: true) x3');
   print('  等待上报帧 (2s)...');
-  await Future.delayed(const Duration(seconds: 2));
+  await Future<void>.delayed(const Duration(seconds: 2));
 
   // 输出结果
   final legNames = ['FR', 'FL', 'RR', 'RL'];
@@ -177,7 +177,7 @@ void main(List<String> args) async {
 
     // 收集 getter 响应
     final getterResults = <String, RSState>{};
-    final diagSubs = <StreamSubscription>[];
+    final diagSubs = <StreamSubscription<Object?>>[];
     for (final entry in pcans.entries) {
       final legName = entry.key;
       diagSubs.add(entry.value.state.listen((state) {
@@ -200,7 +200,7 @@ void main(List<String> args) async {
       // 读 epscanTime (主动上报周期)
       getterResults.clear();
       pcan.add(RSEvent.get(canId, key: RSKey.epscanTime));
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
       var result = getterResults[joint];
       if (result is RSStateGetter && result.getter != null) {
         print('    epscanTime (上报周期): ${result.getter}');
@@ -211,7 +211,7 @@ void main(List<String> args) async {
       // 读 runMode
       getterResults.clear();
       pcan.add(RSEvent.get(canId, key: RSKey.runMode));
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
       result = getterResults[joint];
       if (result is RSStateGetter && result.getter != null) {
         print('    runMode (运行模式): ${result.getter}');
@@ -222,7 +222,7 @@ void main(List<String> args) async {
       // 读 mechPos
       getterResults.clear();
       pcan.add(RSEvent.get(canId, key: RSKey.mechPos));
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
       result = getterResults[joint];
       if (result is RSStateGetter && result.getter != null) {
         print('    mechPos (位置): ${result.getter}');
@@ -233,7 +233,7 @@ void main(List<String> args) async {
       // 读 vbus
       getterResults.clear();
       pcan.add(RSEvent.get(canId, key: RSKey.vbus));
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
       result = getterResults[joint];
       if (result is RSStateGetter && result.getter != null) {
         print('    vbus (总线电压): ${result.getter}');
@@ -261,7 +261,7 @@ void main(List<String> args) async {
       pcan.add(RSEvent.setReporting(id, enable: false));
     }
   }
-  await Future.delayed(const Duration(milliseconds: 200));
+  await Future<void>.delayed(const Duration(milliseconds: 200));
 
   // ── 清理 ──
   for (final sub in reportSubs) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:han_dog/han_dog.dart';
 import 'package:han_dog_brain/han_dog_brain.dart';
 import 'package:mocktail/mocktail.dart';
@@ -202,6 +204,69 @@ void main() {
 
     await pm.toggle();
     expect(pm.currentName, 'alpha');
+  });
+
+  test('switchTo brain failure rolls back gains and keeps currentName', () async {
+    when(() => brain.switchProfile(
+          observationBuilder: any(named: 'observationBuilder'),
+          standingPose: any(named: 'standingPose'),
+          sittingPose: any(named: 'sittingPose'),
+          modelPath: any(named: 'modelPath'),
+          standUpCounts: any(named: 'standUpCounts'),
+          sitDownCounts: any(named: 'sitDownCounts'),
+        )).thenThrow(Exception('model file not found'));
+
+    final pm = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      gains: gains,
+      controlDog: controlDog,
+      initial: 'alpha',
+    );
+
+    await expectLater(() => pm.switchTo('beta'), throwsException);
+
+    // Name must not change — partial switch was rolled back
+    expect(pm.currentName, 'alpha');
+
+    // Gains must be rolled back to alpha
+    verify(() => gains.switchGains(
+          inferKp: _kp1,
+          inferKd: _kd1,
+          standUpKp: _kp1,
+          standUpKd: _kd1,
+          sitDownKp: _kp1,
+          sitDownKd: _kd1,
+        )).called(1);
+  });
+
+  test('switchTo while already switching throws StateError', () async {
+    // brain.switchProfile hangs until we release the completer
+    final completer = Completer<void>();
+    when(() => brain.switchProfile(
+          observationBuilder: any(named: 'observationBuilder'),
+          standingPose: any(named: 'standingPose'),
+          sittingPose: any(named: 'sittingPose'),
+          modelPath: any(named: 'modelPath'),
+          standUpCounts: any(named: 'standUpCounts'),
+          sitDownCounts: any(named: 'sitDownCounts'),
+        )).thenAnswer((_) => completer.future);
+
+    final pm = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      initial: 'alpha',
+    );
+
+    // Start first switch (will hang)
+    final firstSwitch = pm.switchTo('beta');
+
+    // Concurrent second switch → StateError
+    await expectLater(() => pm.switchTo('beta'), throwsStateError);
+
+    // Unblock first switch
+    completer.complete();
+    await firstSwitch;
   });
 
   test('toggle with single profile is a no-op', () async {

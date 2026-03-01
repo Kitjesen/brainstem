@@ -20,19 +20,29 @@ class RealController {
 
   Stream<YunZhuoState> get stateStream => _stateController.stream;
 
-  // TODO: CH1 右摇杆左右 (rightStick.x) 未使用
-  // TODO: CH2 右摇杆上下 (rightStick.y) 未使用
-  // TODO: CH8 LT 两档 未使用
-  // TODO: CH12 RT 两档 未使用
-  // CH16 R2 两档 → 策略切换
+  // CH1  右摇杆左右 (rightStick.x) → 叠加到旋转轴（yaw 精细控制）
+  // CH2  右摇杆上下 (rightStick.y) → 保留，待步态/姿态扩展
+  // CH8  LT 两档    → 精确模式（速度 × 0.5）
+  // CH12 RT 两档    → 冲刺模式（速度 × 1.5）
+  // CH16 R2 两档    → 策略切换
 
+  /// 行走方向流：(x=侧移, y=前进, z=旋转)。
+  ///
+  /// 速度缩放规则：LT=精确(0.5×)，RT=冲刺(1.5×)，默认 1.0×。
+  /// rightStick.x 以 0.5 权重叠加到旋转轴，实现双手协同偏航控制。
   Stream<Vector3> get direction => watchdogDecay(
-    stateStream.map(
-      (data) => .new(data.leftStick.x, data.leftStick.y, data.knob),
-    ),
-    timeout: Duration(milliseconds: 50),
+    stateStream.map((data) {
+      final scale = data.LT ? 0.5 : (data.RT ? 1.5 : 1.0);
+      final yaw = (data.knob + data.rightStick.x * 0.5).clamp(-1.0, 1.0);
+      return Vector3(
+        data.leftStick.x * scale,
+        data.leftStick.y * scale,
+        yaw,
+      );
+    }),
+    timeout: const Duration(milliseconds: 50),
     steps: 100,
-    stepPeriod: Duration(milliseconds: 20),
+    stepPeriod: const Duration(milliseconds: 20),
     decayCurve: (s0, t) => s0 * t,
   );
 
@@ -87,22 +97,33 @@ class RealController {
   }
 
   bool open() {
-    if (!port.open()) return false;
+    if (!port.open()) {
+      _log.severe('Controller open failed: $portName');
+      return false;
+    }
     _listen();
+    _log.info('Controller opened: $portName');
     return true;
   }
 
   /// 断连后尝试重新打开串口，数据自动流入已有的 stateStream。
   /// 新建 SerialPortController，避免原 port.state 单次订阅导致的 "Stream has already been listened to"。
   bool reopen() {
+    _log.info('Controller reopening: $portName');
     _portSub?.cancel();
     try {
       port.close();
       port.dispose();
-    } catch (_) {}
+    } catch (e, st) {
+      _log.warning('Error closing port during reopen: $portName', e, st);
+    }
     port = SerialPortController<Never, YunZhuoState>(portName);
-    if (!port.open()) return false;
+    if (!port.open()) {
+      _log.severe('Controller reopen failed: $portName');
+      return false;
+    }
     _listen();
+    _log.info('Controller reopened: $portName');
     return true;
   }
 
@@ -124,7 +145,12 @@ class RealController {
     );
   }
 
+  bool _disposed = false;
+
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _log.info('Controller disposing: $portName');
     _portSub?.cancel();
     _stateController.close();
     port.dispose();

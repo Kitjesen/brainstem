@@ -109,8 +109,10 @@ class GrpcService extends ChangeNotifier {
   // ── Auto-reconnect ──
   static const _maxBackoffMs = 30000; // 30 seconds max backoff
   static const _initialBackoffMs = 1000; // 1 second initial backoff
+  static const _maxReconnectAttempts = 20; // give up after 20 attempts
   Timer? _reconnectTimer;
   bool _intentionalDisconnect = false;
+  bool _reconnectLimitReached = false;
 
   // Getters
   String get host => _host;
@@ -142,10 +144,12 @@ class GrpcService extends ChangeNotifier {
   int get reconnectAttempts => _reconnectAttempts;
   DateTime? get lastDataTime => _lastDataTime;
   bool get isStale => _stale;
+  bool get reconnectLimitReached => _reconnectLimitReached;
   double get lastRttMs => _lastRttMs;
 
   /// Overall health status string for the UI.
   String get healthStatus {
+    if (_reconnectLimitReached) return '重连失败（已达上限 $_maxReconnectAttempts 次）';
     if (!_connected && !_reconnecting) return '已断开';
     if (_reconnecting) return '重连中 (#$_reconnectAttempts)...';
     if (_stale) return '无数据';
@@ -313,6 +317,7 @@ class GrpcService extends ChangeNotifier {
     _connected = false;
     _reconnecting = false;
     _reconnectAttempts = 0;
+    _reconnectLimitReached = false;
     _stale = false;
     _latestHistory = null;
     _latestImu = null;
@@ -346,12 +351,23 @@ class GrpcService extends ChangeNotifier {
 
   /// Attempt to reconnect after a stream failure.
   /// Uses exponential backoff: 1s, 2s, 4s, 8s, ... up to 30s.
+  /// Stops automatically after [_maxReconnectAttempts] consecutive failures.
   void _scheduleReconnect() {
     if (_intentionalDisconnect) return;
     if (_reconnecting) return; // already scheduled
 
-    _reconnecting = true;
     _reconnectAttempts++;
+
+    if (_reconnectAttempts > _maxReconnectAttempts) {
+      _reconnectLimitReached = true;
+      _reconnecting = false;
+      _log('⛔', 'Reconnect', 'max attempts ($_maxReconnectAttempts) reached — stopping auto-reconnect');
+      onErrorNotify?.call('自动重连已达上限（$_maxReconnectAttempts 次），请手动重新连接');
+      notifyListeners();
+      return;
+    }
+
+    _reconnecting = true;
 
     // Exponential backoff with jitter
     final backoffMs = math.min(

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:han_dog_message/han_dog_message.dart' hide Duration, Matrix4, Matrix4Int32;
 import '../services/grpc_service.dart';
 import '../services/preset_service.dart';
 import '../services/model_service.dart';
@@ -578,6 +579,9 @@ class _ParamsPageState extends State<ParamsPage> {
           const SizedBox(height: 20),
           // Parameter Overview: avg KP/KD per leg
           _ParameterOverview(config: _config, cs: cs),
+          const SizedBox(height: 20),
+          // 当前推理增益：从 latestHistory.kp/kd 读取实际执行值
+          _InferenceGainCard(history: widget.grpc.latestHistory, cs: cs),
         ],
       ),
     );
@@ -792,7 +796,7 @@ class _ParamsPageState extends State<ParamsPage> {
                       )),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
-                        onPressed: () async { await ms.scan(); setState(() {}); AppToast.showSuccess(context, '已刷新'); },
+                        onPressed: () async { await ms.scan(); if (!mounted) return; setState(() {}); AppToast.showSuccess(context, '已刷新'); },
                         icon: const Icon(Icons.refresh, size: 16),
                         label: const Text('刷新'),
                       ),
@@ -1169,6 +1173,131 @@ class _OverviewRow extends StatelessWidget {
         Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.4))),
         Text(value, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: cs.onSurface)),
       ],
+    );
+  }
+}
+
+/// 当前推理增益卡片：展示 latestHistory.kp/kd 的各腿均值
+class _InferenceGainCard extends StatelessWidget {
+  final History? history;
+  final ColorScheme cs;
+
+  const _InferenceGainCard({required this.history, required this.cs});
+
+  // 关节组：腿名 → History.kp/kd 中的 index 列表（与 _legCards 一致）
+  static const _legNames = ['前左 FL', '前右 FR', '后左 RL', '后右 RR'];
+  static const _legIndices = [[3, 4, 5], [0, 1, 2], [9, 10, 11], [6, 7, 8]];
+  static const _jointNames = ['髋', '大腿', '小腿'];
+  static const _legColors = [Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFF8B5CF6), Color(0xFFF59E0B)];
+
+  double _avg(List<double> vals, List<int> indices) {
+    if (vals.isEmpty) return 0.0;
+    double sum = 0;
+    int count = 0;
+    for (final i in indices) {
+      if (i < vals.length) { sum += vals[i]; count++; }
+    }
+    return count > 0 ? sum / count : 0.0;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final kpVals = history?.hasKp() == true ? List<double>.from(history!.kp.values) : <double>[];
+    final kdVals = history?.hasKd() == true ? List<double>.from(history!.kd.values) : <double>[];
+    final hasData = history != null && kpVals.isNotEmpty && kdVals.isNotEmpty;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.4)),
+        boxShadow: dark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 标题行
+          Row(children: [
+            Icon(Icons.tune_rounded, size: 18, color: AppTheme.teal),
+            const SizedBox(width: 8),
+            Text('当前推理增益', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cs.onSurface)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: (hasData ? AppTheme.green : cs.onSurface).withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                hasData ? '实时' : '未连接',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: hasData ? AppTheme.green : cs.onSurface.withValues(alpha: 0.35)),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          if (!hasData)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Text('未连接或无推理数据', style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.3))),
+              ),
+            )
+          else ...[
+            // 表头
+            Row(children: [
+              SizedBox(width: 80, child: Text('腿 / 关节', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: cs.onSurface.withValues(alpha: 0.35), letterSpacing: 0.5))),
+              Expanded(child: Text('Kp', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: cs.onSurface.withValues(alpha: 0.35), letterSpacing: 0.5), textAlign: TextAlign.center)),
+              Expanded(child: Text('Kd', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: cs.onSurface.withValues(alpha: 0.35), letterSpacing: 0.5), textAlign: TextAlign.center)),
+            ]),
+            const SizedBox(height: 8),
+            // 4 腿：每腿显示均值行 + 折叠关节明细
+            ...List.generate(4, (leg) {
+              final indices = _legIndices[leg];
+              final avgKp = _avg(kpVals, indices);
+              final avgKd = _avg(kdVals, indices);
+              final color = _legColors[leg];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: color.withValues(alpha: 0.15)),
+                  ),
+                  child: Column(children: [
+                    // 腿均值行
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      child: Row(children: [
+                        SizedBox(width: 80, child: Text(_legNames[leg], style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color))),
+                        Expanded(child: Text(avgKp.toStringAsFixed(1), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cs.onSurface, fontFeatures: const [FontFeature.tabularFigures()]), textAlign: TextAlign.center)),
+                        Expanded(child: Text(avgKd.toStringAsFixed(2), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cs.onSurface, fontFeatures: const [FontFeature.tabularFigures()]), textAlign: TextAlign.center)),
+                      ]),
+                    ),
+                    // 关节明细（细分行）
+                    ...List.generate(3, (ji) {
+                      final idx = indices[ji];
+                      final kp = idx < kpVals.length ? kpVals[idx] : 0.0;
+                      final kd = idx < kdVals.length ? kdVals[idx] : 0.0;
+                      return Container(
+                        decoration: BoxDecoration(border: Border(top: BorderSide(color: color.withValues(alpha: 0.08)))),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        child: Row(children: [
+                          SizedBox(width: 80, child: Text('  ${_jointNames[ji]}', style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.4)))),
+                          Expanded(child: Text(kp.toStringAsFixed(1), style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.55), fontFeatures: const [FontFeature.tabularFigures()]), textAlign: TextAlign.center)),
+                          Expanded(child: Text(kd.toStringAsFixed(2), style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.55), fontFeatures: const [FontFeature.tabularFigures()]), textAlign: TextAlign.center)),
+                        ]),
+                      );
+                    }),
+                  ]),
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
     );
   }
 }

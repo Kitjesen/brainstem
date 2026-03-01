@@ -47,33 +47,61 @@ class RobotProfile {
 
   factory RobotProfile.fromJson(Map<String, dynamic> json) {
     return RobotProfile(
-      name: json['name'] as String,
+      name: _reqString(json, 'name'),
       description: json['description'] as String? ?? '',
-      modelPath: json['modelPath'] as String,
-      standingPose: _joints(json['standingPose']),
-      sittingPose: _joints(json['sittingPose']),
+      modelPath: _reqString(json, 'modelPath'),
+      standingPose: _joints16(json, 'standingPose'),
+      sittingPose: _joints16(json, 'sittingPose'),
       standUpCounts: (json['standUpCounts'] as num?)?.toInt() ?? 150,
       sitDownCounts: (json['sitDownCounts'] as num?)?.toInt() ?? 150,
-      inferKp: _joints(json['inferKp']),
-      inferKd: _joints(json['inferKd']),
-      standUpKp: _joints(json['standUpKp']),
-      standUpKd: _joints(json['standUpKd']),
-      sitDownKp: _joints(json['sitDownKp']),
-      sitDownKd: _joints(json['sitDownKd']),
+      inferKp: _joints16(json, 'inferKp'),
+      inferKd: _joints16(json, 'inferKd'),
+      standUpKp: _joints16(json, 'standUpKp'),
+      standUpKd: _joints16(json, 'standUpKd'),
+      sitDownKp: _joints16(json, 'sitDownKp'),
+      sitDownKd: _joints16(json, 'sitDownKd'),
       imuGyroscopeScale: (json['imuGyroscopeScale'] as num?)?.toDouble() ?? 0.25,
-      jointVelocityScale: _tuple4(json['jointVelocityScale']),
-      actionScale: _tuple4(json['actionScale']),
+      jointVelocityScale: _tuple4(json['jointVelocityScale'], 'jointVelocityScale',
+          defaultValue: (0.05, 0.05, 0.05, 0.05)),
+      actionScale: _tuple4(json['actionScale'], 'actionScale',
+          defaultValue: (0.125, 0.25, 0.25, 5.0)),
     );
   }
 
-  static JointsMatrix _joints(dynamic v) {
-    final list = (v as List).map((e) => (e as num).toDouble()).toList();
-    return JointsMatrix.fromList(list);
+  static String _reqString(Map<String, dynamic> json, String key) {
+    final v = json[key];
+    if (v == null) throw FormatException('Missing required field: "$key"');
+    if (v is! String) {
+      throw FormatException('Field "$key" must be a string, got ${v.runtimeType}');
+    }
+    return v;
   }
 
-  static (double, double, double, double) _tuple4(dynamic v) {
-    if (v == null) return (0.05, 0.05, 0.05, 0.05);
-    final list = (v as List).map((e) => (e as num).toDouble()).toList();
+  static JointsMatrix _joints16(Map<String, dynamic> json, String key) {
+    final v = json[key];
+    if (v == null) throw FormatException('Missing required field: "$key"');
+    if (v is! List) {
+      throw FormatException('Field "$key" must be a list, got ${v.runtimeType}');
+    }
+    if (v.length != 16) {
+      throw FormatException('Field "$key" must have 16 elements, got ${v.length}');
+    }
+    return JointsMatrix.fromList(v.map((e) => (e as num).toDouble()).toList());
+  }
+
+  static (double, double, double, double) _tuple4(
+    dynamic v,
+    String key, {
+    required (double, double, double, double) defaultValue,
+  }) {
+    if (v == null) return defaultValue;
+    if (v is! List) {
+      throw FormatException('Field "$key" must be a list, got ${v.runtimeType}');
+    }
+    if (v.length < 4) {
+      throw FormatException('Field "$key" must have at least 4 elements, got ${v.length}');
+    }
+    final list = v.map((e) => (e as num).toDouble()).toList();
     return (list[0], list[1], list[2], list[3]);
   }
 
@@ -106,8 +134,8 @@ Future<Map<String, RobotProfile>> loadProfiles(String directory) async {
         final profile = RobotProfile.fromJson(json);
         profiles[profile.name] = profile;
         _log.info('Loaded profile: ${profile.name} from ${entity.path}');
-      } catch (e) {
-        _log.warning('Failed to load profile from ${entity.path}: $e');
+      } catch (e, st) {
+        _log.warning('Failed to load profile from ${entity.path}', e, st);
       }
     }
   }

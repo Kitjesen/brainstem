@@ -78,7 +78,7 @@ void main() async {
   )..loadModel('model/mini_policy6.onnx');
   final m = M(brain)..add(Init());
 
-  await Future.delayed(Duration.zero);
+  await Future<void>.delayed(Duration.zero);
 
   print(m.state);
 

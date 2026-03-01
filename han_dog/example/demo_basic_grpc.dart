@@ -66,7 +66,7 @@ void main() async {
 
   final M m = M(brain)..add(Init());
   m.stream.listen(print);
-  await Future.delayed(.zero); // !!! 完成 Init()
+  await Future<void>.delayed(.zero); // !!! 完成 Init()
   final arbiter = ControlArbiter(m);
   final imuBroadcast = imu.stateStream.asBroadcastStream();
   final jointBroadcast = joint.reportStream.asBroadcastStream();
@@ -121,7 +121,7 @@ void main() async {
 
 class SimpleBlocObserver extends BlocObserver {
   @override
-  void onChange(BlocBase bloc, Change change) {
+  void onChange(BlocBase<dynamic> bloc, Change<dynamic> change) {
     super.onChange(bloc, change);
     print('${bloc.runtimeType} $change');
   }

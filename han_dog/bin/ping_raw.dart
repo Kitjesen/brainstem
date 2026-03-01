@@ -44,7 +44,7 @@ void main() async {
   }
 
   // 等待响应
-  await Future.delayed(const Duration(seconds: 3));
+  await Future<void>.delayed(const Duration(seconds: 3));
 
   print('\n扫描完成');
 

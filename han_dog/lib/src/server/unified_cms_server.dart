@@ -55,6 +55,10 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   final DateTime _startTime = DateTime.now();
 
+  /// 最近一次运动命令（walk/standUp/sitDown）的时间戳。
+  DateTime? _lastCommandAt;
+  DateTime? get lastCommandAt => _lastCommandAt;
+
   /// 仿真模式 listenImu 用的默认四元数。
   static final _identityQ = Quaternion.identity();
 
@@ -101,9 +105,17 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   // ═══════════════════════════════════════════════════════════
 
   void _dispatch(A action) {
+    final now = DateTime.now();
+    final sinceMs = _lastCommandAt != null
+        ? now.difference(_lastCommandAt!).inMilliseconds
+        : null;
+    _lastCommandAt = now;
+
     final a = arbiter;
     if (a != null) {
       if (!a.command(action, ControlSource.grpc)) {
+        _log.warning('${action.runtimeType} rejected: ${a.owner} has priority'
+            '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
         throw GrpcError.failedPrecondition(
           'Control rejected: ${a.owner} has priority',
         );
@@ -111,17 +123,33 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     } else {
       _m.add(action);
     }
+    _log.finest('${action.runtimeType} dispatched'
+        '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
     gains?.applyCommand(action);
   }
+
+  /// Walk 指令向量最大幅值。遥控器各轴 [-1, 1]，最大幅值 √3 ≈ 1.73；
+  /// 设 3.0 为上界，阻止异常大值进入观测特征空间。
+  static const _walkDirMaxMagnitude = 3.0;
 
   @override
   Future<proto.Empty> walk(ServiceCall call, proto.Vector3 request) async {
     if (!request.x.isFinite || !request.y.isFinite || !request.z.isFinite) {
+      throw GrpcError.invalidArgument('Walk direction contains NaN or Inf');
+    }
+    final dir = request.toVM();
+    final mag = dir.length;
+    if (mag > _walkDirMaxMagnitude) {
+      _log.warning(
+        'Walk direction magnitude=${mag.toStringAsFixed(2)} '
+        'exceeds max=$_walkDirMaxMagnitude — rejected',
+      );
       throw GrpcError.invalidArgument(
-        'Walk direction contains NaN or Inf',
+        'Walk direction magnitude=${mag.toStringAsFixed(2)} '
+        'exceeds max $_walkDirMaxMagnitude',
       );
     }
-    _dispatch(A.walk(request.toVM()));
+    _dispatch(A.walk(dir));
     return proto.Empty();
   }
 
@@ -184,7 +212,13 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     if (_m.state is! Grounded) {
       throw GrpcError.failedPrecondition('Must be in Grounded state');
     }
-    await pm.switchTo(request.name);
+    try {
+      await pm.switchTo(request.name);
+    } on ArgumentError catch (e) {
+      throw GrpcError.invalidArgument('${e.message}');
+    } on StateError catch (e) {
+      throw GrpcError.failedPrecondition(e.message);
+    }
     _log.info('Profile switched to: ${pm.currentName}');
     return proto.ProfileInfo(
       current: pm.currentName,

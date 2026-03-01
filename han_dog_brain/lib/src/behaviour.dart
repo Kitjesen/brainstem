@@ -70,7 +70,7 @@ class SitDown extends Behaviour {
     int i = 0;
     final currentPose = joint.position;
     await for (final _ in ts) {
-      final t = (i / steps).clamp(0.0, 1.0);
+      final t = steps == 0 ? 1.0 : (i / steps).clamp(0.0, 1.0);
       final nextAction = JointsMatrix.lerp(
         currentPose,
         sittingPose,
@@ -101,7 +101,7 @@ class StandUp extends Behaviour {
     int i = 0;
     final currentPose = joint.position;
     await for (final _ in ts) {
-      final t = (i / steps).clamp(0.0, 1.0);
+      final t = steps == 0 ? 1.0 : (i / steps).clamp(0.0, 1.0);
       final nextAction = JointsMatrix.lerp(
         currentPose,
         standingPose,
@@ -133,7 +133,7 @@ class Gesture extends Behaviour {
       final steps = keyframe.counts;
       int i = 0;
       await for (final _ in ts) {
-        final t = (i / steps).clamp(0.0, 1.0);
+        final t = steps == 0 ? 1.0 : (i / steps).clamp(0.0, 1.0);
         final nextAction = JointsMatrix.lerp(
           currentPose,
           keyframe.targetPose,
@@ -153,6 +153,9 @@ class Gesture extends Behaviour {
 
 class Walk extends Behaviour {
   final ObservationBuilder observationBuilder;
+
+  /// 当前行走方向向量。可在两帧之间直接更新，无需加锁——
+  /// Dart 单 Isolate 模型保证同一 Isolate 内的读写是顺序执行的。
   Vector3 direction = .zero();
 
   Walk({
@@ -174,6 +177,8 @@ class Walk extends Behaviour {
 
   /// 最近一次 ONNX 推理耗时（微秒）。未推理时为 0。
   int lastInferenceUs = 0;
+
+  bool _disposed = false;
 
   JointsMatrix get standingPose => observationBuilder.standingPose;
 
@@ -210,14 +215,16 @@ class Walk extends Behaviour {
         }
       }
       _session = session;
-    } catch (e) {
+    } catch (e, st) {
       _session = null;
-      _log.severe('Failed to load ONNX model from $path: $e');
+      _log.severe('Failed to load ONNX model from $path', e, st);
       rethrow;
     }
   }
 
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _observationController.close();
     _session?.dispose();
     _env.dispose();
@@ -265,6 +272,8 @@ class Walk extends Behaviour {
     });
   }
 
+  /// broadcast 流：允许多个订阅者（如监控 UI 和测试）同时监听每帧观测向量，
+  /// 无需协调谁先谁后。
   final _observationController = StreamController<List<double>>.broadcast();
   Stream<List<double>> get observationStream => _observationController.stream;
 
@@ -281,7 +290,19 @@ class Walk extends Behaviour {
         inputName: OnnxFloat(value: obs, shape: [1, obs.length]),
       });
       lastInferenceUs = sw.elapsedMicroseconds;
-      return .fromList((outputValues[0] as OnnxFloat).value);
+      final rawValues = (outputValues[0] as OnnxFloat).value;
+      // Safety: reject NaN/Inf before they reach motor hardware.
+      // A corrupted model or numerical instability must never produce
+      // invalid float commands.
+      for (int i = 0; i < rawValues.length; i++) {
+        if (!rawValues[i].isFinite) {
+          throw StateError(
+            'ONNX output[$i]=${rawValues[i]} — NaN/Inf rejected '
+            '(model may be corrupted or numerically unstable)',
+          );
+        }
+      }
+      return JointsMatrix.fromList(rawValues);
     } catch (e, st) {
       _log.severe('Walk._run: ONNX inference failed', e, st);
       rethrow;

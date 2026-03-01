@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/grpc_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/motor_status.dart';
 
 class MonitorPage extends StatefulWidget {
   final GrpcService grpc;
@@ -582,6 +583,7 @@ class _MonitorPageState extends State<MonitorPage> {
           SizedBox(width: 48, child: Text('关节', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.25), letterSpacing: 0.5))),
           SizedBox(width: 56, child: Text('弧度', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.25), letterSpacing: 0.5), textAlign: TextAlign.right)),
           Expanded(child: Text('速度/力矩', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.25), letterSpacing: 0.5), textAlign: TextAlign.center)),
+          SizedBox(width: 52, child: Text('状态', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.25), letterSpacing: 0.5), textAlign: TextAlign.right)),
         ]),
         const SizedBox(height: 4),
         // 3 joint rows
@@ -590,6 +592,10 @@ class _MonitorPageState extends State<MonitorPage> {
           final pos = j != null && j.position.values.length > idx ? j.position.values[idx] : 0.0;
           final vel = j != null && j.velocity.values.length > idx ? j.velocity.values[idx] : 0.0;
           final torque = j != null && j.torque.values.length > idx ? j.torque.values[idx] : 0.0;
+          // 电机状态码（G6620 协议）
+          final statusCode = j != null && j.status.values.length > idx ? j.status.values[idx] : 0;
+          final statusLabel = decodeMotorStatus(statusCode);
+          final statusColor = motorStatusColor(statusCode);
 
           // Mini sparkline from history
           final hist = _jHist[idx];
@@ -611,6 +617,20 @@ class _MonitorPageState extends State<MonitorPage> {
                 Text('${vel.toStringAsFixed(1)} r/s', style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.3), fontFeatures: const [FontFeature.tabularFigures()])),
                 Text('${torque.toStringAsFixed(1)} Nm', style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.3), fontFeatures: const [FontFeature.tabularFigures()])),
               ]),
+              const SizedBox(width: 6),
+              // 电机状态彩色标签
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.35), width: 0.8),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(fontSize: 8, fontWeight: FontWeight.w600, color: statusColor),
+                ),
+              ),
             ]),
           );
         }),

@@ -56,6 +56,11 @@ class SimSensorService implements ImuService, JointService, SimStateInjector {
   @override
   final JointsMatrix initialVelocity;
 
+  int _droppedFrames = 0;
+
+  /// 累计丢弃帧数（含 NaN/Inf 的注入帧）。
+  int get droppedFrames => _droppedFrames;
+
   SimSensorService({required JointsMatrix standingPose})
       : position = standingPose,
         velocity = JointsMatrix.zero(),
@@ -73,12 +78,16 @@ class SimSensorService implements ImuService, JointService, SimStateInjector {
     required JointsMatrix velocity,
     JointsMatrix? torque,
   }) {
-    if (_hasNonFiniteV3(gyroscope) ||
-        _hasNonFiniteQuat(quaternion) ||
-        position.hasNonFinite ||
-        velocity.hasNonFinite ||
-        (torque != null && torque.hasNonFinite)) {
-      _log.warning('injectSim: discarding frame with NaN/Inf values');
+    final bad = _checkNonFinite(
+      gyroscope: gyroscope,
+      quaternion: quaternion,
+      position: position,
+      velocity: velocity,
+      torque: torque,
+    );
+    if (bad != null) {
+      _droppedFrames++;
+      _log.warning('injectSim: discarding frame — $bad (total dropped: $_droppedFrames)');
       return;
     }
     this.gyroscope = gyroscope;
@@ -89,8 +98,24 @@ class SimSensorService implements ImuService, JointService, SimStateInjector {
   }
 }
 
-bool _hasNonFiniteV3(Vector3 v) =>
-    !v.x.isFinite || !v.y.isFinite || !v.z.isFinite;
+/// 返回首个含 NaN/Inf 的字段名，全部有限则返回 null。
+String? _checkNonFinite({
+  required Vector3 gyroscope,
+  required Quaternion quaternion,
+  required JointsMatrix position,
+  required JointsMatrix velocity,
+  JointsMatrix? torque,
+}) {
+  if (!gyroscope.x.isFinite) return 'gyroscope.x';
+  if (!gyroscope.y.isFinite) return 'gyroscope.y';
+  if (!gyroscope.z.isFinite) return 'gyroscope.z';
+  if (!quaternion.x.isFinite) return 'quaternion.x';
+  if (!quaternion.y.isFinite) return 'quaternion.y';
+  if (!quaternion.z.isFinite) return 'quaternion.z';
+  if (!quaternion.w.isFinite) return 'quaternion.w';
+  if (position.hasNonFinite) return 'position';
+  if (velocity.hasNonFinite) return 'velocity';
+  if (torque != null && torque.hasNonFinite) return 'torque';
+  return null;
+}
 
-bool _hasNonFiniteQuat(Quaternion q) =>
-    !q.x.isFinite || !q.y.isFinite || !q.z.isFinite || !q.w.isFinite;

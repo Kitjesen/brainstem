@@ -152,8 +152,10 @@ class Brain {
   Future<void> loadModel(String path, {String? inputName}) =>
       walk.loadModel(path, inputName: inputName);
 
-  /// 切换策略。必须在 FSM Grounded 状态下调用。
+  /// 切换策略。必须在 FSM Grounded 状态下调用（由调用方保证）。
   /// 保留 memory/imu/joint/clock，替换 Walk/StandUp/SitDown 行为并重新加载模型。
+  /// 若 [walk.loadModel] 抛出异常，walk 已被替换为新实例但模型未加载；
+  /// 调用方应捕获异常并保持 FSM 在 Grounded 状态，避免触发 Walk。
   Future<void> switchProfile({
     required JointsMatrix standingPose,
     required JointsMatrix sittingPose,

@@ -1,6 +1,9 @@
 import 'dart:convert';
 
+import 'package:logging/logging.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
+
+final _log = Logger('han_dog_brain.gesture');
 
 /// 关键帧：一个目标姿态 + 到达该姿态的插值帧数。
 class Keyframe {
@@ -61,7 +64,11 @@ class GestureLibrary {
   GestureLibrary({required this.standingPose});
 
   void register(GestureDefinition definition) {
+    if (_gestures.containsKey(definition.name)) {
+      _log.warning('Overwriting existing gesture: "${definition.name}"');
+    }
     _gestures[definition.name] = definition;
+    _log.fine('Registered gesture: ${definition.name}');
   }
 
   GestureDefinition? get(String name) => _gestures[name];
@@ -72,9 +79,14 @@ class GestureLibrary {
 
   /// 从 JSON 字符串批量加载动作定义。
   void loadFromJson(String jsonString) {
-    final list = jsonDecode(jsonString) as List;
-    for (final item in list) {
-      register(GestureDefinition.fromJson(item as Map<String, dynamic>));
+    try {
+      final list = jsonDecode(jsonString) as List;
+      for (final item in list) {
+        register(GestureDefinition.fromJson(item as Map<String, dynamic>));
+      }
+    } catch (e, st) {
+      _log.warning('loadFromJson failed', e, st);
+      rethrow;
     }
   }
 
@@ -89,6 +101,7 @@ class GestureLibrary {
     register(_wiggle());
     register(_stretch());
     register(_dance());
+    _log.info('Registered ${_gestures.length} default gestures');
   }
 
   // ── 预定义动作 ──────────────────────────────────────────────

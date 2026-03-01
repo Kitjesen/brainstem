@@ -16,13 +16,16 @@ final _log = Logger('han_dog');
 final _cfg = HanDogConfig();
 
 /// 所有需要在关机时取消的 subscription
-final _subs = <StreamSubscription>[];
+final _subs = <StreamSubscription<Object?>>[];
 
 /// 用于异常退出时关闭 gRPC、释放端口
 grpc.Server? _grpcServerForCleanup;
 
+/// 策略热加载定时器（关机时取消）
+Timer? _profileReloadTimer;
+
 void main() {
-  setupLogging();
+  setupLogging(logDir: _cfg.logDir);
   runZonedGuarded(
     () async => _run(),
     (error, stack) {
@@ -40,8 +43,17 @@ void main() {
 
 Future<void> _run() async {
   Bloc.observer = SimpleBlocObserver(_log);
-  RealFrequency.manager.watch();
 
+  // ──── 0. 配置校验（前置检查）─────────────────────────────────
+  final configErrors = _cfg.validate();
+  if (configErrors.isNotEmpty) {
+    for (final err in configErrors) {
+      _log.severe('Config error: $err');
+    }
+    exit(1);
+  }
+
+  RealFrequency.manager.watch();
   _log.info('han_dog starting — $_cfg');
 
   final clock = StreamController<void>.broadcast();
@@ -71,7 +83,7 @@ Future<void> _run() async {
   // 发送 setReporting x3（带间隔），防止刚 open 后首帧丢失
   for (var retry = 0; retry < 3; retry++) {
     joint.setReporting(true);
-    await Future.delayed(const Duration(milliseconds: 100));
+    await Future<void>.delayed(const Duration(milliseconds: 100));
   }
   await _checkJointReporting(joint);
 
@@ -83,11 +95,25 @@ Future<void> _run() async {
     standingPose: standingPose,
     sittingPose: .zero(),
   );
-  try {
-    await brain.loadModel(_cfg.modelPath);
-    _log.info('ONNX model loaded.');
-  } catch (e) {
-    _log.severe('Failed to load ONNX model: $e');
+  const modelLoadMaxAttempts = 3;
+  bool modelLoaded = false;
+  for (var attempt = 1; attempt <= modelLoadMaxAttempts; attempt++) {
+    try {
+      await brain.loadModel(_cfg.modelPath);
+      _log.info('ONNX model loaded (attempt $attempt).');
+      modelLoaded = true;
+      break;
+    } catch (e) {
+      if (attempt == modelLoadMaxAttempts) {
+        _log.severe('Failed to load ONNX model after $modelLoadMaxAttempts attempts: $e');
+      } else {
+        final delay = Duration(seconds: attempt * 2);
+        _log.warning('ONNX model load failed (attempt $attempt/$modelLoadMaxAttempts): $e — retrying in $delay');
+        await Future<void>.delayed(delay);
+      }
+    }
+  }
+  if (!modelLoaded) {
     joint.disable();
     imu.dispose();
     joint.dispose();
@@ -110,7 +136,20 @@ Future<void> _run() async {
   // ──── 4. FSM + 仲裁器 ──────────────────────────────────────
   final M m = M(brain)..add(Init());
   _subs.add(m.stream.listen((s) => _log.info('CMS state: $s')));
-  await m.stream.firstWhere((s) => s is Grounded);
+  try {
+    await m.stream
+        .firstWhere((s) => s is Grounded)
+        .timeout(_cfg.startupTimeout);
+  } on TimeoutException {
+    _log.severe(
+        'FSM 未能在 ${_cfg.startupTimeoutSec}s 内到达 Grounded 状态 — 中止启动');
+    await m.close();
+    joint.disable();
+    imu.dispose();
+    joint.dispose();
+    controller.dispose();
+    return;
+  }
   _log.info('CMS initialized: ${m.state}');
 
   final arbiter = ControlArbiter(m, timeout: _cfg.arbiterTimeout);
@@ -161,6 +200,16 @@ Future<void> _run() async {
     _log.info('No profiles found in ${_cfg.profileDir}, running without ProfileManager');
   }
 
+  // ──── 4c. 策略热加载（每 30s 扫描 profileDir）────────────────
+  if (profileManager != null) {
+    final pm = profileManager;
+    _profileReloadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      pm.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
+        _log.warning('Profile hot-reload failed', e, st);
+      });
+    });
+  }
+
   // ──── 5. 监控 ──────────────────────────────────────────────
   _subs.add(startSensorMonitoring(
     imu: imu,
@@ -171,6 +220,11 @@ Future<void> _run() async {
   _subs.add(startControllerMonitoring(
     controller: controller,
     arbiter: arbiter,
+  ));
+  _subs.add(startJointLimitMonitoring(
+    joint: joint,
+    arbiter: arbiter,
+    limitRad: _cfg.jointLimitRad,
   ));
 
   // ──── 6. gRPC 服务器 ───────────────────────────────────────
@@ -238,7 +292,7 @@ Future<void> _run() async {
   });
 
   if (_cfg.debugTui) {
-    startDebugTui(imu: imu, joint: joint, m: m);
+    startDebugTui(imu: imu, joint: joint, m: m, arbiter: arbiter);
   }
 }
 
@@ -252,7 +306,7 @@ Future<void> _checkJointReporting(RealJoint joint) async {
     'RR Hip', 'RR Thigh', 'RR Calf', 'RR Foot',
     'RL Hip', 'RL Thigh', 'RL Calf', 'RL Foot',
   ];
-  await Future.delayed(const Duration(seconds: 1));
+  await Future<void>.delayed(const Duration(seconds: 1));
   final noReport = <String>[];
   final hasReport = <String>[];
   for (var i = 0; i < joint.frequencyWatches.length; i++) {
@@ -287,7 +341,7 @@ Future<grpc.Server> _startGrpc(UnifiedCmsServer cmsService) async {
           'Port ${_cfg.grpcPort} in use, freeing (fuser -k ${_cfg.grpcPort}/tcp)...');
       await Process.run('fuser', ['-k', '${_cfg.grpcPort}/tcp'],
           runInShell: false);
-      await Future.delayed(const Duration(seconds: 1));
+      await Future<void>.delayed(const Duration(seconds: 1));
       server = create();
       await server.serve(
           address: InternetAddress.anyIPv4, port: _cfg.grpcPort);
@@ -317,7 +371,14 @@ void _registerShutdown({
   Future<void> handle(ProcessSignal signal) async {
     if (shuttingDown) return;
     shuttingDown = true;
-    _log.info('Received $signal');
+    _log.info('Received $signal — starting graceful shutdown');
+
+    // 全局关机总超时：防止任意步骤挂起导致进程永久卡死
+    const hardDeadline = Duration(seconds: 15);
+    Timer(hardDeadline, () {
+      _log.severe('Shutdown exceeded ${hardDeadline.inSeconds}s hard deadline — forcing exit(1)');
+      exit(1);
+    });
 
     try {
       final current = m.state;
@@ -339,16 +400,20 @@ void _registerShutdown({
         _log.info('Grounded.');
       }
     } on TimeoutException {
-      _log.warning('Shutdown timeout, proceeding with disable.');
+      _log.warning('FSM shutdown timeout, proceeding with disable.');
     } catch (e) {
-      _log.warning('Shutdown error: $e, proceeding with disable.');
+      _log.warning('Shutdown FSM error: $e, proceeding with disable.');
     }
 
     joint.disable();
     _log.info('Motors disabled safely.');
 
-    await grpcServer.shutdown();
-    _log.info('gRPC server stopped.');
+    try {
+      await grpcServer.shutdown().timeout(const Duration(seconds: 3));
+      _log.info('gRPC server stopped.');
+    } on TimeoutException {
+      _log.warning('gRPC shutdown timed out — continuing.');
+    }
 
     // 释放所有资源
     for (final sub in _subs) {
@@ -356,11 +421,12 @@ void _registerShutdown({
     }
     _subs.clear();
     getClockTimer()?.cancel();
+    _profileReloadTimer?.cancel();
     for (final disposable in [arbiter, controlDog, controller, imu, joint, brain]) {
       try { (disposable as dynamic).dispose(); } catch (_) {}
     }
-    try { await m.close(); } catch (_) {}
-    _log.info('All resources released.');
+    try { await m.close().timeout(const Duration(seconds: 2)); } catch (_) {}
+    _log.info('All resources released — exit(0)');
     exit(0);
   }
 

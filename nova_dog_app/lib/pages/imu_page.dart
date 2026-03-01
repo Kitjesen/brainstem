@@ -385,16 +385,16 @@ class _AttitudeGauge extends StatelessWidget {
   final String label;
   final double value; // degrees
   final Color color;
-  final double warnAt;   // |value| threshold for orange
-  final double critAt;   // |value| threshold for red
 
-  const _AttitudeGauge({required this.label, required this.value, required this.color,
-    this.warnAt = 20.0, this.critAt = 35.0});
+  static const double _warnAt = 20.0; // |value| threshold for orange
+  static const double _critAt = 35.0; // |value| threshold for red
+
+  const _AttitudeGauge({required this.label, required this.value, required this.color});
 
   Color _activeColor() {
     final abs = value.abs();
-    if (abs >= critAt) return AppTheme.red;
-    if (abs >= warnAt) return AppTheme.orange;
+    if (abs >= _critAt) return AppTheme.red;
+    if (abs >= _warnAt) return AppTheme.orange;
     return color;
   }
 
@@ -402,7 +402,7 @@ class _AttitudeGauge extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final activeColor = _activeColor();
-    final isWarning = value.abs() >= warnAt;
+    final isWarning = value.abs() >= _warnAt;
 
     return SizedBox(
       width: 110,

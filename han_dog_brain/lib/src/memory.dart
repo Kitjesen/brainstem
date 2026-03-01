@@ -1,11 +1,15 @@
+import 'package:logging/logging.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 
 import 'common.dart';
 
+final _log = Logger('han_dog_brain.memory');
+
 class Memory<T> {
   final int historySize;
   final ReplaySubject<T> controller;
+  bool _disposed = false;
 
   List<T>? _cachedHistories;
   List<T> get histories => _cachedHistories ??= controller.values.toList();
@@ -22,6 +26,9 @@ class Memory<T> {
   }
 
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _log.fine('Memory disposed (historySize=$historySize)');
     controller.close();
   }
 

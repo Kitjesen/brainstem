@@ -1,0 +1,48 @@
+# Dockerfile.sim — 仿真模式服务器（MuJoCo + gRPC）
+#
+# 构建：docker build -f Dockerfile.sim -t nova-dog-sim .
+# 运行：docker run -p 13145:13145 nova-dog-sim
+#
+# 注意：真实硬件模式（han_dog）依赖 PCAN/串口硬件，不支持容器化。
+
+# ── Stage 1: 编译 ─────────────────────────────────────────────
+FROM dart:stable AS build
+
+WORKDIR /app
+
+# 复制工作区配置和所有包源码
+COPY brainstem/pubspec.yaml brainstem/pubspec.yaml
+COPY brainstem/han_dog/ brainstem/han_dog/
+COPY brainstem/han_dog_brain/ brainstem/han_dog_brain/
+COPY brainstem/han_dog_message/ brainstem/han_dog_message/
+COPY brainstem/frequency_watch/ brainstem/frequency_watch/
+COPY brainstem/skinny_dog_algebra/ brainstem/skinny_dog_algebra/
+
+WORKDIR /app/brainstem
+
+RUN dart pub get
+
+# 编译仿真服务器为原生二进制
+RUN dart compile exe han_dog/bin/server.dart -o /app/server
+
+# ── Stage 2: 运行时镜像 ───────────────────────────────────────
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY --from=build /app/server /app/server
+
+# ONNX 模型通过 volume 挂载
+# docker run -v /path/to/models:/app/model -p 13145:13145 nova-dog-sim
+RUN mkdir -p /app/model
+
+EXPOSE 13145
+
+ENV HAN_DOG_PORT=13145 \
+    HAN_DOG_LOG=INFO
+
+CMD ["/app/server"]
