@@ -1,0 +1,14 @@
+name: brainstem
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+workspace:
+  - frequency_watch
+  - skinny_dog_algebra
+  - onnx_runtime
+  - han_dog_message/dart
+  - han_dog_brain
+  - han_dog
+  - nova_dog_app

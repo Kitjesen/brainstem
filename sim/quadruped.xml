@@ -1,0 +1,208 @@
+<mujoco model="quadruped_gesture_test">
+  <compiler angle="radian" meshdir="meshes"/>
+
+  <option gravity="0 0 -9.81" timestep="0.002"/>
+
+  <visual>
+    <global offwidth="1280" offheight="720"/>
+  </visual>
+
+  <default>
+    <joint damping="4" armature="0.01"/>
+    <geom condim="3" friction="1 0.5 0.5"/>
+    <position kp="200" kv="8"/>
+  </default>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0.0 0.0 0.0" width="512" height="512"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1="0.8 0.8 0.8" rgb2="0.6 0.6 0.6" width="256" height="256"/>
+    <material name="grid" texture="grid" texrepeat="8 8" reflectance="0.1"/>
+    <!-- STL meshes from URDF export -->
+    <mesh name="base_link"     file="base_link.STL"/>
+    <mesh name="fr_hip"        file="fr_hip_Link.STL"/>
+    <mesh name="fr_thigh"      file="fr_thigh_Link.STL"/>
+    <mesh name="fr_calf"       file="fr_calf_Link.STL"/>
+    <mesh name="fr_foot"       file="fr_foot_Link.STL"/>
+    <mesh name="fl_hip"        file="fl_hip_Link.STL"/>
+    <mesh name="fl_thigh"      file="fl_thigh_Link.STL"/>
+    <mesh name="fl_calf"       file="fl_calf_Link.STL"/>
+    <mesh name="fl_foot"       file="fl_foot_Link.STL"/>
+    <mesh name="rr_hip"        file="rr_hip_Link.STL"/>
+    <mesh name="rr_thigh"      file="rr_thigh_Link.STL"/>
+    <mesh name="rr_calf"       file="rr_calf_Link.STL"/>
+    <mesh name="rr_foot"       file="rr_foot_Link.STL"/>
+    <mesh name="rl_hip"        file="rl_hip_Link.STL"/>
+    <mesh name="rl_thigh"      file="rl_thigh_Link.STL"/>
+    <mesh name="rl_calf"       file="rl_calf_Link.STL"/>
+    <mesh name="rl_foot"       file="rl_foot_Link.STL"/>
+  </asset>
+
+  <worldbody>
+    <light directional="true" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3" pos="0 0 5" dir="0 0 -1"/>
+    <geom type="plane" size="3 3 0.01" material="grid"/>
+
+    <!-- Trunk: free-floating body -->
+    <!-- Inertial from URDF: mass=8, pos=(0.0108, 0.0073, 0.0758) -->
+    <body name="trunk" pos="0 0 0.45">
+      <freejoint name="root"/>
+      <inertial pos="0.0108 0.0073 0.0758" mass="8" diaginertia="0.05 0.08 0.05"/>
+      <!-- Visual: real mesh (no collision) -->
+      <geom type="mesh" mesh="base_link" rgba="0.25 0.25 0.3 1" contype="0" conaffinity="0"/>
+      <!-- Collision: box from URDF — half-size 0.22 0.12 0.055, origin (0.01, 0, 0.08) -->
+      <geom name="trunk_col" type="box" size="0.22 0.12 0.055" pos="0.01 0 0.08" rgba="0.25 0.25 0.3 0"/>
+
+      <!-- ═══ FR (Front Right) ═══ -->
+      <body name="fr_hip" pos="0.2395 -0.0646 0.0807">
+        <inertial pos="0.069 -0.021 0" mass="0.5" diaginertia="0.001 0.001 0.001"/>
+        <joint name="fr_hip_joint" type="hinge" axis="-1 0 0" range="-0.8 0.8"/>
+        <geom type="mesh" mesh="fr_hip" rgba="0.5 0.3 0.3 1" contype="0" conaffinity="0"/>
+        <!-- Collision: URDF cylinder r=0.025 l=0.08 at (0.04,-0.04,0) along Z -->
+        <geom name="fr_hip_col" type="capsule" size="0.025" fromto="0.04 -0.04 -0.04  0.04 -0.04 0.04" rgba="0.5 0.3 0.3 0"/>
+
+        <body name="fr_thigh" pos="0.078 -0.0795 0">
+          <inertial pos="-0.126 -0.030 -0.009" mass="1.0" diaginertia="0.005 0.005 0.001"/>
+          <joint name="fr_thigh_joint" type="hinge" axis="0 -1 0" range="-2.5 2.5"/>
+          <geom type="mesh" mesh="fr_thigh" rgba="0.6 0.4 0.2 1" contype="0" conaffinity="0"/>
+          <!-- Collision: URDF cylinder r=0.022 l=0.25 at (-0.125,-0.03,0) along X -->
+          <geom name="fr_thigh_col" type="capsule" size="0.022" fromto="-0.25 -0.03 0  0 -0.03 0" rgba="0.6 0.4 0.2 0"/>
+
+          <body name="fr_calf" pos="-0.2494 -0.057 -0.0172">
+            <inertial pos="0.120 -0.030 0.025" mass="0.5" diaginertia="0.003 0.003 0.001"/>
+            <joint name="fr_calf_joint" type="hinge" axis="0 -1 0" range="-3.0 3.0"/>
+            <geom type="mesh" mesh="fr_calf" rgba="0.4 0.5 0.3 1" contype="0" conaffinity="0"/>
+            <!-- Collision: URDF cylinder r=0.02 l=0.25 at (0.12,-0.03,0.025) along X -->
+            <geom name="fr_calf_col" type="capsule" size="0.02" fromto="-0.005 -0.03 0.025  0.245 -0.03 0.025" rgba="0.4 0.5 0.3 0"/>
+
+            <body name="fr_foot" pos="0.244 -0.061 0.0545">
+              <inertial pos="0 -0.014 0" mass="0.3" diaginertia="0.001 0.001 0.001"/>
+              <joint name="fr_foot_joint" type="hinge" axis="0 1 0" range="-0.8 0.8"/>
+              <geom type="mesh" mesh="fr_foot" rgba="0.2 0.2 0.2 1" contype="0" conaffinity="0"/>
+              <!-- Collision: URDF sphere r=0.04 at (0,-0.014,0) -->
+              <geom name="fr_foot_col" type="sphere" size="0.04" pos="0 -0.014 0" rgba="0.2 0.2 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+
+      <!-- ═══ FL (Front Left) ═══ -->
+      <body name="fl_hip" pos="0.2395 0.0654 0.0807">
+        <inertial pos="0.069 0.021 0" mass="0.5" diaginertia="0.001 0.001 0.001"/>
+        <joint name="fl_hip_joint" type="hinge" axis="1 0 0" range="-0.8 0.8"/>
+        <geom type="mesh" mesh="fl_hip" rgba="0.5 0.3 0.3 1" contype="0" conaffinity="0"/>
+        <!-- Collision: URDF cylinder r=0.025 l=0.08 at (0.04,0.04,0) along Z -->
+        <geom name="fl_hip_col" type="capsule" size="0.025" fromto="0.04 0.04 -0.04  0.04 0.04 0.04" rgba="0.5 0.3 0.3 0"/>
+
+        <body name="fl_thigh" pos="0.078 0.0795 0">
+          <inertial pos="-0.126 0.030 -0.009" mass="1.0" diaginertia="0.005 0.005 0.001"/>
+          <joint name="fl_thigh_joint" type="hinge" axis="0 1 0" range="-2.5 2.5"/>
+          <geom type="mesh" mesh="fl_thigh" rgba="0.6 0.4 0.2 1" contype="0" conaffinity="0"/>
+          <!-- Collision: URDF cylinder r=0.022 l=0.25 at (-0.125,0.03,0) along X -->
+          <geom name="fl_thigh_col" type="capsule" size="0.022" fromto="-0.25 0.03 0  0 0.03 0" rgba="0.6 0.4 0.2 0"/>
+
+          <body name="fl_calf" pos="-0.2495 0.057 -0.0152">
+            <inertial pos="0.120 0.030 0.025" mass="0.5" diaginertia="0.003 0.003 0.001"/>
+            <joint name="fl_calf_joint" type="hinge" axis="0 1 0" range="-3.0 3.0"/>
+            <geom type="mesh" mesh="fl_calf" rgba="0.4 0.5 0.3 1" contype="0" conaffinity="0"/>
+            <!-- Collision: URDF cylinder r=0.02 l=0.25 at (0.12,0.03,0.025) along X -->
+            <geom name="fl_calf_col" type="capsule" size="0.02" fromto="-0.005 0.03 0.025  0.245 0.03 0.025" rgba="0.4 0.5 0.3 0"/>
+
+            <body name="fl_foot" pos="0.2444 0.061 0.0525">
+              <inertial pos="0 0.014 0" mass="0.3" diaginertia="0.001 0.001 0.001"/>
+              <joint name="fl_foot_joint" type="hinge" axis="0 -1 0" range="-0.8 0.8"/>
+              <geom type="mesh" mesh="fl_foot" rgba="0.2 0.2 0.2 1" contype="0" conaffinity="0"/>
+              <!-- Collision: URDF sphere r=0.04 at (0,0.014,0) -->
+              <geom name="fl_foot_col" type="sphere" size="0.04" pos="0 0.014 0" rgba="0.2 0.2 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+
+      <!-- ═══ RR (Rear Right) ═══ -->
+      <body name="rr_hip" pos="-0.2395 -0.0646 0.0807">
+        <inertial pos="-0.069 -0.021 0" mass="0.5" diaginertia="0.001 0.001 0.001"/>
+        <joint name="rr_hip_joint" type="hinge" axis="-1 0 0" range="-0.8 0.8"/>
+        <geom type="mesh" mesh="rr_hip" rgba="0.5 0.3 0.3 1" contype="0" conaffinity="0"/>
+        <!-- Collision: URDF cylinder r=0.025 l=0.08 at (-0.04,-0.04,0) along Z -->
+        <geom name="rr_hip_col" type="capsule" size="0.025" fromto="-0.04 -0.04 -0.04  -0.04 -0.04 0.04" rgba="0.5 0.3 0.3 0"/>
+
+        <body name="rr_thigh" pos="-0.078 -0.0795 0">
+          <inertial pos="0.126 -0.030 -0.009" mass="1.0" diaginertia="0.005 0.005 0.001"/>
+          <joint name="rr_thigh_joint" type="hinge" axis="0 -1 0" range="-2.5 2.5"/>
+          <geom type="mesh" mesh="rr_thigh" rgba="0.6 0.4 0.2 1" contype="0" conaffinity="0"/>
+          <!-- Collision: URDF cylinder r=0.022 l=0.25 at (0.125,-0.03,0) along X -->
+          <geom name="rr_thigh_col" type="capsule" size="0.022" fromto="0 -0.03 0  0.25 -0.03 0" rgba="0.6 0.4 0.2 0"/>
+
+          <body name="rr_calf" pos="0.2495 -0.057 -0.0152">
+            <inertial pos="-0.120 -0.030 0.025" mass="0.5" diaginertia="0.003 0.003 0.001"/>
+            <joint name="rr_calf_joint" type="hinge" axis="0 -1 0" range="-3.0 3.0"/>
+            <geom type="mesh" mesh="rr_calf" rgba="0.4 0.5 0.3 1" contype="0" conaffinity="0"/>
+            <!-- Collision: URDF cylinder r=0.02 l=0.25 at (-0.12,-0.03,0.025) along X -->
+            <geom name="rr_calf_col" type="capsule" size="0.02" fromto="-0.245 -0.03 0.025  0.005 -0.03 0.025" rgba="0.4 0.5 0.3 0"/>
+
+            <body name="rr_foot" pos="-0.2444 -0.061 0.0525">
+              <inertial pos="0 -0.014 0" mass="0.3" diaginertia="0.001 0.001 0.001"/>
+              <joint name="rr_foot_joint" type="hinge" axis="0 1 0" range="-0.8 0.8"/>
+              <geom type="mesh" mesh="rr_foot" rgba="0.2 0.2 0.2 1" contype="0" conaffinity="0"/>
+              <!-- Collision: URDF sphere r=0.04 at (0,-0.014,0) -->
+              <geom name="rr_foot_col" type="sphere" size="0.04" pos="0 -0.014 0" rgba="0.2 0.2 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+
+      <!-- ═══ RL (Rear Left) ═══ -->
+      <body name="rl_hip" pos="-0.2395 0.0654 0.0807">
+        <inertial pos="-0.069 0.021 0" mass="0.5" diaginertia="0.001 0.001 0.001"/>
+        <joint name="rl_hip_joint" type="hinge" axis="-1 0 0" range="-0.8 0.8"/>
+        <geom type="mesh" mesh="rl_hip" rgba="0.5 0.3 0.3 1" contype="0" conaffinity="0"/>
+        <!-- Collision: URDF cylinder r=0.025 l=0.08 at (-0.04,0.04,0) along Z -->
+        <geom name="rl_hip_col" type="capsule" size="0.025" fromto="-0.04 0.04 -0.04  -0.04 0.04 0.04" rgba="0.5 0.3 0.3 0"/>
+
+        <body name="rl_thigh" pos="-0.078 0.0795 0">
+          <inertial pos="0.126 0.030 -0.009" mass="1.0" diaginertia="0.005 0.005 0.001"/>
+          <joint name="rl_thigh_joint" type="hinge" axis="0 1 0" range="-2.5 2.5"/>
+          <geom type="mesh" mesh="rl_thigh" rgba="0.6 0.4 0.2 1" contype="0" conaffinity="0"/>
+          <!-- Collision: URDF cylinder r=0.022 l=0.25 at (0.125,0.03,0) along X -->
+          <geom name="rl_thigh_col" type="capsule" size="0.022" fromto="0 0.03 0  0.25 0.03 0" rgba="0.6 0.4 0.2 0"/>
+
+          <body name="rl_calf" pos="0.2495 0.057 -0.0152">
+            <inertial pos="-0.120 0.030 0.025" mass="0.5" diaginertia="0.003 0.003 0.001"/>
+            <joint name="rl_calf_joint" type="hinge" axis="0 1 0" range="-3.0 3.0"/>
+            <geom type="mesh" mesh="rl_calf" rgba="0.4 0.5 0.3 1" contype="0" conaffinity="0"/>
+            <!-- Collision: URDF cylinder r=0.02 l=0.25 at (-0.12,0.03,0.025) along X -->
+            <geom name="rl_calf_col" type="capsule" size="0.02" fromto="-0.245 0.03 0.025  0.005 0.03 0.025" rgba="0.4 0.5 0.3 0"/>
+
+            <body name="rl_foot" pos="-0.2444 0.061 0.0525">
+              <inertial pos="0 0.014 0" mass="0.3" diaginertia="0.001 0.001 0.001"/>
+              <joint name="rl_foot_joint" type="hinge" axis="0 -1 0" range="-0.8 0.8"/>
+              <geom type="mesh" mesh="rl_foot" rgba="0.2 0.2 0.2 1" contype="0" conaffinity="0"/>
+              <!-- Collision: URDF sphere r=0.04 at (0,0.014,0) -->
+              <geom name="rl_foot_col" type="sphere" size="0.04" pos="0 0.014 0" rgba="0.2 0.2 0.2 1"/>
+            </body>
+          </body>
+        </body>
+      </body>
+
+    </body>
+  </worldbody>
+
+  <!-- Position actuators: PD control to track target joint angles -->
+  <actuator>
+    <position joint="fr_hip_joint"   name="fr_hip"   ctrlrange="-0.8 0.8"/>
+    <position joint="fr_thigh_joint" name="fr_thigh" ctrlrange="-2.5 2.5"/>
+    <position joint="fr_calf_joint"  name="fr_calf"  ctrlrange="-3.0 3.0"/>
+    <position joint="fr_foot_joint"  name="fr_foot"  ctrlrange="-0.8 0.8"/>
+    <position joint="fl_hip_joint"   name="fl_hip"   ctrlrange="-0.8 0.8"/>
+    <position joint="fl_thigh_joint" name="fl_thigh" ctrlrange="-2.5 2.5"/>
+    <position joint="fl_calf_joint"  name="fl_calf"  ctrlrange="-3.0 3.0"/>
+    <position joint="fl_foot_joint"  name="fl_foot"  ctrlrange="-0.8 0.8"/>
+    <position joint="rr_hip_joint"   name="rr_hip"   ctrlrange="-0.8 0.8"/>
+    <position joint="rr_thigh_joint" name="rr_thigh" ctrlrange="-2.5 2.5"/>
+    <position joint="rr_calf_joint"  name="rr_calf"  ctrlrange="-3.0 3.0"/>
+    <position joint="rr_foot_joint"  name="rr_foot"  ctrlrange="-0.8 0.8"/>
+    <position joint="rl_hip_joint"   name="rl_hip"   ctrlrange="-0.8 0.8"/>
+    <position joint="rl_thigh_joint" name="rl_thigh" ctrlrange="-2.5 2.5"/>
+    <position joint="rl_calf_joint"  name="rl_calf"  ctrlrange="-3.0 3.0"/>
+    <position joint="rl_foot_joint"  name="rl_foot"  ctrlrange="-0.8 0.8"/>
+  </actuator>
+</mujoco>

@@ -1,0 +1,46 @@
+# Dart
+.dart_tool/
+pubspec.lock
+build/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+
+# Generated (do not edit manually)
+*.freezed.dart
+*.g.dart
+
+# ONNX native binaries
+*.dll
+*.so
+*.dylib
+
+# Hookify local rules
+.claude/*.local.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Large binary assets (tracked separately or via LFS)
+sim/*.mp4
+sim/meshes/
+assets/urdf/
+assets/*.zip
+
+# Dart compiled snapshots
+*.dill
+
+# Large sample data
+han_dog/sample/case1.json
+han_dog/sample/case1_real.json

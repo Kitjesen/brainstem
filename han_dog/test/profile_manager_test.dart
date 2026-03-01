@@ -1,0 +1,217 @@
+import 'package:han_dog/han_dog.dart';
+import 'package:han_dog_brain/han_dog_brain.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
+import 'package:test/test.dart';
+
+class MockBrain extends Mock implements Brain {}
+
+class MockGainManager extends Mock implements GainManager {}
+
+class MockRealControlDog extends Mock implements RealControlDog {}
+
+final _pose1 = JointsMatrix.fromList(List.filled(16, 1.0));
+final _pose2 = JointsMatrix.fromList(List.filled(16, 2.0));
+final _kp1 = JointsMatrix.fromList(List.filled(16, 10.0));
+final _kd1 = JointsMatrix.fromList(List.filled(16, 20.0));
+final _kp2 = JointsMatrix.fromList(List.filled(16, 30.0));
+final _kd2 = JointsMatrix.fromList(List.filled(16, 40.0));
+
+RobotProfile _profile(String name, JointsMatrix pose, JointsMatrix kp,
+        JointsMatrix kd) =>
+    RobotProfile(
+      name: name,
+      modelPath: 'model/$name.onnx',
+      standingPose: pose,
+      sittingPose: JointsMatrix.zero(),
+      inferKp: kp,
+      inferKd: kd,
+      standUpKp: kp,
+      standUpKd: kd,
+      sitDownKp: kp,
+      sitDownKd: kd,
+    );
+
+void main() {
+  late MockBrain brain;
+  late MockGainManager gains;
+  late MockRealControlDog controlDog;
+  late Map<String, RobotProfile> profiles;
+
+  setUpAll(() {
+    registerFallbackValue(JointsMatrix.zero());
+    registerFallbackValue(GestureLibrary(standingPose: JointsMatrix.zero()));
+    registerFallbackValue(
+        StandardObservationBuilder(standingPose: JointsMatrix.zero()));
+  });
+
+  setUp(() {
+    brain = MockBrain();
+    gains = MockGainManager();
+    controlDog = MockRealControlDog();
+
+    profiles = {
+      'alpha': _profile('alpha', _pose1, _kp1, _kd1),
+      'beta': _profile('beta', _pose2, _kp2, _kd2),
+    };
+
+    when(() => brain.switchProfile(
+          observationBuilder: any(named: 'observationBuilder'),
+          standingPose: any(named: 'standingPose'),
+          sittingPose: any(named: 'sittingPose'),
+          modelPath: any(named: 'modelPath'),
+          standUpCounts: any(named: 'standUpCounts'),
+          sitDownCounts: any(named: 'sitDownCounts'),
+        )).thenAnswer((_) async {});
+
+    when(() => brain.gestureLibrary = any()).thenReturn(null);
+
+    when(() => gains.switchGains(
+          inferKp: any(named: 'inferKp'),
+          inferKd: any(named: 'inferKd'),
+          standUpKp: any(named: 'standUpKp'),
+          standUpKd: any(named: 'standUpKd'),
+          sitDownKp: any(named: 'sitDownKp'),
+          sitDownKd: any(named: 'sitDownKd'),
+        )).thenReturn(null);
+
+    when(() => controlDog.switchGains(
+          inferKp: any(named: 'inferKp'),
+          inferKd: any(named: 'inferKd'),
+          standUpKp: any(named: 'standUpKp'),
+          standUpKd: any(named: 'standUpKd'),
+          sitDownKp: any(named: 'sitDownKp'),
+          sitDownKd: any(named: 'sitDownKd'),
+        )).thenReturn(null);
+  });
+
+  test('initial state', () {
+    final pm = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      initial: 'alpha',
+    );
+    expect(pm.currentName, 'alpha');
+    expect(pm.names, ['alpha', 'beta']);
+  });
+
+  test('switchTo calls brain.switchProfile and updates currentName', () async {
+    final pm = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      gains: gains,
+      controlDog: controlDog,
+      initial: 'alpha',
+    );
+
+    await pm.switchTo('beta');
+
+    expect(pm.currentName, 'beta');
+    verify(() => brain.switchProfile(
+          observationBuilder: any(named: 'observationBuilder'),
+          standingPose: any(named: 'standingPose'),
+          sittingPose: any(named: 'sittingPose'),
+          modelPath: 'model/beta.onnx',
+          standUpCounts: 150,
+          sitDownCounts: 150,
+        )).called(1);
+  });
+
+  test('switchTo updates GainManager gains', () async {
+    final pm = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      gains: gains,
+      initial: 'alpha',
+    );
+
+    await pm.switchTo('beta');
+
+    verify(() => gains.switchGains(
+          inferKp: _kp2,
+          inferKd: _kd2,
+          standUpKp: _kp2,
+          standUpKd: _kd2,
+          sitDownKp: _kp2,
+          sitDownKd: _kd2,
+        )).called(1);
+  });
+
+  test('switchTo updates RealControlDog gains', () async {
+    final pm = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      controlDog: controlDog,
+      initial: 'alpha',
+    );
+
+    await pm.switchTo('beta');
+
+    verify(() => controlDog.switchGains(
+          inferKp: _kp2,
+          inferKd: _kd2,
+          standUpKp: _kp2,
+          standUpKd: _kd2,
+          sitDownKp: _kp2,
+          sitDownKd: _kd2,
+        )).called(1);
+  });
+
+  test('switchTo same profile is a no-op', () async {
+    final pm = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      gains: gains,
+      controlDog: controlDog,
+      initial: 'alpha',
+    );
+
+    await pm.switchTo('alpha');
+
+    verifyNever(() => brain.switchProfile(
+          observationBuilder: any(named: 'observationBuilder'),
+          standingPose: any(named: 'standingPose'),
+          sittingPose: any(named: 'sittingPose'),
+          modelPath: any(named: 'modelPath'),
+          standUpCounts: any(named: 'standUpCounts'),
+          sitDownCounts: any(named: 'sitDownCounts'),
+        ));
+  });
+
+  test('switchTo unknown profile throws ArgumentError', () {
+    final pm = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      initial: 'alpha',
+    );
+
+    expect(() => pm.switchTo('unknown'), throwsArgumentError);
+  });
+
+  test('toggle cycles through profiles', () async {
+    final pm = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      gains: gains,
+      controlDog: controlDog,
+      initial: 'alpha',
+    );
+
+    await pm.toggle();
+    expect(pm.currentName, 'beta');
+
+    await pm.toggle();
+    expect(pm.currentName, 'alpha');
+  });
+
+  test('toggle with single profile is a no-op', () async {
+    final pm = ProfileManager(
+      profiles: {'only': profiles['alpha']!},
+      brain: brain,
+      initial: 'only',
+    );
+
+    await pm.toggle();
+    expect(pm.currentName, 'only');
+  });
+}

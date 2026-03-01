@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "han-dog-message"
+version = "1.0.0"
+description = "gRPC/Protobuf message definitions for Han Dog quadruped robot."
+authors = ["Dz <MathBeWithCode@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.13"
+protobuf = "6.33.0"
+grpcio = "^1.76.0"
+
+
+[tool.poetry.group.dev.dependencies]
+grpcio-tools = "^1.76.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
