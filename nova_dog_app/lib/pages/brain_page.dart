@@ -17,6 +17,7 @@ class _BrainPageState extends State<BrainPage> {
   String? _switchingTo;
   static const int _maxHzPts = 120;
   final List<double> _hzHistory = [];
+  double _lastHz = 0;
 
   @override
   void initState() {
@@ -33,7 +34,8 @@ class _BrainPageState extends State<BrainPage> {
   void _onData() {
     if (!mounted) return;
     final hz = widget.grpc.historyHz;
-    if (hz > 0) {
+    if (hz > 0 && hz != _lastHz) {
+      _lastHz = hz;
       _hzHistory.add(hz);
       if (_hzHistory.length > _maxHzPts) _hzHistory.removeAt(0);
     }

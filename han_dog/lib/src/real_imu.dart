@@ -23,6 +23,10 @@ class RealImu implements ImuService {
   @override
   Vector3 get initialProjectedGravity => .new(0, 0, -1);
 
+  // 复用缓冲，避免每帧分配 Vector3 对象
+  final _gyroBuffer = Vector3.zero();
+  final _gravBuffer = Vector3(0, 0, -1);
+
   final hz = RealFrequency();
 
   late final StreamSubscription<Iterable<Hi91State>> subs;
@@ -42,12 +46,15 @@ class RealImu implements ImuService {
         if (data.isEmpty) return;
         final imuData = data.last;
         hz.add(data.length);
-        gyroscope = .new(
+        _gyroBuffer.setValues(
           _degreeToRadius(imuData.gyroscope.x),
           _degreeToRadius(imuData.gyroscope.y),
           _degreeToRadius(imuData.gyroscope.z),
         );
-        projectedGravity = imuData.quaternion.rotate(.new(0, 0, -1));
+        gyroscope = _gyroBuffer;
+        _gravBuffer.setValues(0, 0, -1);
+        imuData.quaternion.rotate(_gravBuffer);
+        projectedGravity = _gravBuffer;
       },
       onError: (Object error, StackTrace st) {
         _log.severe('IMU port stream error', error, st);

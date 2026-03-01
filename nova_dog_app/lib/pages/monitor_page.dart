@@ -16,6 +16,7 @@ class _MonitorPageState extends State<MonitorPage> {
   final List<List<double>> _jHist = List.generate(16, (_) => []);
   int _selLeg = 0; // 0=FR, 1=FL, 2=RR, 3=RL
   String _logFilter = 'all'; // 'all' | 'error' | 'warn'
+  DateTime? _lastUiUpdate;
 
   @override
   void initState() { super.initState(); widget.grpc.addListener(_onData); }
@@ -30,7 +31,12 @@ class _MonitorPageState extends State<MonitorPage> {
         if (_jHist[i].length > _maxPts) _jHist[i].removeAt(0);
       }
     }
-    if (mounted) setState(() {});
+    final now = DateTime.now();
+    if (_lastUiUpdate == null ||
+        now.difference(_lastUiUpdate!).inMilliseconds >= 50) {
+      _lastUiUpdate = now;
+      if (mounted) setState(() {});
+    }
   }
 
   // Count joints whose absolute position exceeds the safe range (1.5 rad ≈ 86°)
@@ -695,7 +701,10 @@ class _SparkPainter extends CustomPainter {
     }
     canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 1.5..strokeCap = StrokeCap.round);
   }
-  @override bool shouldRepaint(covariant _SparkPainter old) => true;
+  @override
+  bool shouldRepaint(covariant _SparkPainter old) =>
+      data.length != old.data.length ||
+      (data.isNotEmpty && data.last != old.data.last);
 }
 
 // ── Torque heatmap gradient legend ──────────────────────────────

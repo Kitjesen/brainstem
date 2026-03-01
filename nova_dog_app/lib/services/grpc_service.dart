@@ -98,6 +98,9 @@ class GrpcService extends ChangeNotifier {
   DateTime? _walkStart;      // when current walk segment started
   double _maxTorqueEver = 0; // max single-joint torque seen this session
 
+  // ── Coalesced notifications (max 60Hz) ──
+  Timer? _pendingNotify;
+
   // ── Connection health monitoring ──
   bool _reconnecting = false;
   int _reconnectAttempts = 0;
@@ -183,6 +186,16 @@ class GrpcService extends ChangeNotifier {
     if (g == 'D') return '较差';
     if (g == 'F') return '不可用';
     return '--';
+  }
+
+  /// 合并 16ms 内的多次数据更新为单次 [notifyListeners()]，避免过度重建。
+  /// 仅用于高频数据流回调；连接状态变更应直接调用 [notifyListeners()]。
+  void _scheduleNotify() {
+    if (_pendingNotify != null) return;
+    _pendingNotify = Timer(const Duration(milliseconds: 16), () {
+      _pendingNotify = null;
+      notifyListeners();
+    });
   }
 
   void _log(String direction, String method, [String summary = '']) {
@@ -301,6 +314,8 @@ class GrpcService extends ChangeNotifier {
     _intentionalDisconnect = true;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _pendingNotify?.cancel();
+    _pendingNotify = null;
     _healthTimer?.cancel();
     _healthTimer = null;
     _rttTimer?.cancel();
@@ -507,7 +522,7 @@ class GrpcService extends ChangeNotifier {
         _updateCmsState(history.command);
         _updateFrequency();
         _touchData();
-        notifyListeners();
+        _scheduleNotify();
       },
       onError: (e) {
         _log('✕', 'ListenHistory', e.toString());
@@ -526,7 +541,7 @@ class GrpcService extends ChangeNotifier {
         _imuCount++;
         _updateFrequency();
         _touchData();
-        notifyListeners();
+        _scheduleNotify();
       },
       onError: (e) {
         _log('✕', 'ListenImu', e.toString());
@@ -601,7 +616,7 @@ class GrpcService extends ChangeNotifier {
       _lastJointNotify = now;
       _rebuildAllJoints();
       _updateTorqueHistory(_latestJoints!);
-      notifyListeners();
+      _scheduleNotify();
     }
   }
 
@@ -621,7 +636,7 @@ class GrpcService extends ChangeNotifier {
     }
 
     _updateTorqueHistory(allJoints);
-    notifyListeners();
+    _scheduleNotify();
   }
 
   /// Build an AllJoints protobuf message from the aggregated local arrays.
@@ -774,7 +789,7 @@ class GrpcService extends ChangeNotifier {
       _lastRttMs = sw.elapsedMilliseconds.toDouble();
       rttHistory.add(_lastRttMs);
       if (rttHistory.length > _maxRttHist) rttHistory.removeAt(0);
-      notifyListeners();
+      _scheduleNotify();
     } catch (_) {}
   }
 
@@ -834,6 +849,7 @@ class GrpcService extends ChangeNotifier {
     _intentionalDisconnect = true;
     _reconnectTimer?.cancel();
     _healthTimer?.cancel();
+    _pendingNotify?.cancel();
     disconnect();
     super.dispose();
   }
