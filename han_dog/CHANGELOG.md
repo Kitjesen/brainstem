@@ -1,3 +1,50 @@
+## 2.0.0
+
+### 安全与可靠性
+- **关机硬限时**：`_registerShutdown()` 增加 15s 全局 `Timer(exit(1))`，防止任意步骤挂死进程；gRPC shutdown 和 `m.close()` 分别加 3s/2s 超时
+- **ONNX 加载重试**：最多 3 次（2s/4s 退避），失败后安全 `joint.disable()` 再退出
+- **关节位置安全限位**：`startJointLimitMonitoring(limitRad)` 每 tick 检查 16 关节绝对值，超限立即 `arbiter.fault()`；新增环境变量 `HAN_DOG_JOINT_LIMIT_RAD`（默认 π rad）
+- **YUNZHUO 双手偏航**：`direction` 流中 `rightStick.x × 0.5` 叠加到旋转轴；`LT` = 精确模式 0.5×，`RT` = 冲刺模式 1.5×
+- **FSM 启动超时**：`firstWhere(Grounded).timeout(_cfg.startupTimeout)`；新增 `HAN_DOG_STARTUP_TIMEOUT`（默认 10s）
+
+### 配置（`HanDogConfig`）
+- `validate()` 返回类型从 `bool` 改为 `List<String>`（**破坏性变更**），返回所有错误描述；新增 `isValid` getter
+- 新增字段：`startupTimeoutSec` / `startupTimeout`、`jointLimitRad`、`logDir`（`HAN_DOG_LOG_DIR`，默认 `logs`）
+- `toString()` 包含全部新字段
+
+### 日志持久化
+- `setupLogging({String logDir = ''})` 新增 `logDir` 参数：非空时写入每日 `han_dog_YYYYMMDD.log`（同步 `RandomAccessFile`，`FileMode.append`）
+- 启动时自动删除 7 天前旧日志文件（`_cleanOldLogs()`）
+
+### 监控（`monitoring.dart`）
+- `startSensorMonitoring()`：双阈值——首次降频仅 warning，连续 `threshold` 次才 Fault；恢复时记录持续低频帧数
+- 新增 `startJointLimitMonitoring()`：16 关节位置超限即时 Fault，一帧只报一次
+- `startDebugTui()` 新增 `ControlArbiter?` 参数，TUI 显示当前控制权；ANSI 颜色（≥45Hz 绿 / ≥30Hz 黄 / <30Hz 红）
+
+### 策略管理（Profile）
+- `RobotProfile` 新增 `description` 字段（可选，默认 `''`）；`fromJson` 改为严格校验（缺字段/类型错误均带字段名）
+- `ProfileManager._profiles` 改为可变 `Map.of()`；新增 `reload(profileDir)` 方法：热扫描目录、添加新策略/更新非当前策略，切换进行中时跳过
+- `ProfileManager` 新增 `descriptions` / `currentDescription` getter
+- `han_dog.dart` 每 30s 调用 `pm.reload()`，关机时取消定时器（`_profileReloadTimer`）
+
+### 其他改进
+- `ControlArbiter`：`OwnershipEvent` 带 `reason` 字段 + 最近 20 条历史环形缓冲区
+- `RobotProfile.fromJson`：引入 `_reqString` / `_joints16` 工具方法，错误信息精确定位字段
+- `GainManager`：增益切换日志 + `identical()` 去重 `onChanged` 回调
+- `ProfileManager.switchTo()`：`_switching` 防并发 + 失败自动回滚增益（try/catch + rethrow）
+- `UnifiedCmsServer`：`_lastCommandAt` 时间戳，`_dispatch()` 记录命令间隔毫秒
+- `SimSensor`：NaN/Inf 精确字段名定位 + `droppedFrames` 计数器
+- 所有硬件驱动（`RealImu`/`RealJoint`/`RealController`）：补全 open/reopen/dispose 操作日志及 `onError` 回调
+
+### DevOps
+- `.github/workflows/ci.yml`：Dart analyze+test（ubuntu-latest）+ Flutter Windows release 构建 + 制品上传（7天保留）
+- `Dockerfile.sim`：仿真服务器两阶段容器化（`dart:stable` 编译 → `ubuntu:22.04` 运行，挂载 `/app/model`，暴露 13145）
+
+### 测试
+- `han_dog_test.dart`：新增 HanDogConfig 校验、ControlArbiter 历史/幂等/抢占、RobotProfile 解析错误路径等 22 个测试
+- `profile_manager_test.dart`：新增并发切换保护、失败回滚测试
+- `analysis_options.yaml`：启用 `strict-casts / strict-raw-types / strict-inference`
+
 ## 1.3.0
 
 ### 新增

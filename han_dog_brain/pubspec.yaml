@@ -1,6 +1,6 @@
 name: han_dog_brain
 description: Inference core and FSM for Han Dog quadruped robot.
-version: 1.3.0
+version: 1.4.0
 publish_to: none
 
 environment:

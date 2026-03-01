@@ -1,3 +1,21 @@
+## 1.4.0
+
+### 新增
+- `memory.dart`：Memory 类补充内部状态保护，防止历史观测缓冲越界访问
+- `gesture.dart`：GestureLibrary 注册默认手势时日志增强，registerDefaults() 加入 Logger 输出
+
+### 变更
+- `behaviour.dart`：Walk / StandUp / SitDown 行为类补全 `onError` + `StackTrace` 回调签名，与 strict 模式兼容
+- `cms.dart`：FSM 过渡状态的 Fault 安全路径补充日志，StandUp→SitDown 防死循环逻辑注释说明
+
+### 代码质量
+- `analysis_options.yaml`：启用 `strict-casts / strict-raw-types / strict-inference`
+- 全包将 `Future.delayed()` 统一改为 `Future<void>.delayed()`，满足 strict-inference 要求
+- 测试文件（`cms_test.dart` / `behaviour_test.dart` / `gesture_test.dart`）：修复 strict 模式下类型推断警告（`<S>[]` 显式泛型、`Future<void>.delayed`）
+
+### 测试
+- 全包 181 个测试全部通过（含 han_dog 包）
+
 ## 1.3.0
 
 ### 新增
