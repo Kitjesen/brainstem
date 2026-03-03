@@ -107,7 +107,6 @@ void main() {
       final s = HanDogConfig().toString();
       expect(s, contains('port='));
       expect(s, contains('imu='));
-      expect(s, contains('model='));
       expect(s, contains('profileDir='));
       expect(s, contains('startupTimeout='));
     });

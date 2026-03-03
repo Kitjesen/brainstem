@@ -17,8 +17,8 @@ class ProtocolLogEntry {
 
 /// Central gRPC connection manager for the robot.
 ///
-/// Communicates with the han_dog RealDogServer (or SimDogServer) via gRPC.
-/// The real server sends individual [SingleJoint] updates per motor;
+/// Communicates with the han_dog UnifiedCmsServer via gRPC.
+/// The server sends individual [SingleJoint] updates per motor;
 /// this service aggregates them into a complete [AllJoints] snapshot for the UI.
 ///
 /// Features:
@@ -564,8 +564,8 @@ class GrpcService extends ChangeNotifier {
     );
 
     // Joint stream — handles both SingleJoint and AllJoints
-    // The real server (RealDogServer) sends individual SingleJoint per motor report.
-    // The sim server (SimDogServer) may send AllJoints batches.
+    // UnifiedCmsServer sends individual SingleJoint per motor report in hardware mode,
+    // or AllJoints batches in simulation mode.
     _jointSub = _client!.listenJoint(Empty()).listen(
       (joint) {
         _jointCount++;
@@ -804,9 +804,9 @@ class GrpcService extends ChangeNotifier {
     final String dir;
     if (Platform.isWindows) {
       final appData = Platform.environment['APPDATA'] ?? '';
-      dir = '$appData\\nova_dog';
+      dir = '$appData\\sirius';
     } else {
-      dir = '${Platform.environment['HOME']}/.nova_dog';
+      dir = '${Platform.environment['HOME']}/.sirius';
     }
     return File('$dir${Platform.pathSeparator}last_connected.json');
   }

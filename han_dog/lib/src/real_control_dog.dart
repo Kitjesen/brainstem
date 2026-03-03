@@ -65,6 +65,9 @@ class RealControlDog {
       onError: (Object error, StackTrace st) {
         _log.severe('State stream error', error, st);
       },
+      onDone: () {
+        _log.fine('State stream closed (arbiter disposed)');
+      },
     ));
 
     // 遥控器事件 → 通过仲裁器发送（ControlSource.yunzhuo）

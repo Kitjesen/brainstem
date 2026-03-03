@@ -19,9 +19,8 @@ class M extends Cms<S, A> {
 
   M(this._brain) : super(const Zero());
 
-  /// Listen to the idle behaviour (infinite stream driven by clock).
-  /// onDone should never fire under normal operation; if it does the clock
-  /// stream was interrupted and we force a fault so the FSM stays coherent.
+  /// 监听 idle 行为（由时钟驱动的无限流）。
+  /// 正常运行时 onDone 不应触发；若触发说明时钟流中断，强制触发 Fault 保持 FSM 一致性。
   StreamSubscription<History> _listenIdle() {
     return _brain.idle.doing.listen(
       _brain.memory.add,
@@ -38,8 +37,8 @@ class M extends Cms<S, A> {
     );
   }
 
-  /// Listen to a transition behaviour (finite stream: StandUp, SitDown, or Gesture).
-  /// Fires [Done] when the behaviour completes.
+  /// 监听过渡行为（有限流：StandUp、SitDown 或 Gesture）。
+  /// 行为完成时触发 [Done]。
   StreamSubscription<History> _listenTransition(Command target) {
     final stream = switch (target) {
       StandUpCommand() => _brain.standUp.doing,
@@ -60,13 +59,20 @@ class M extends Cms<S, A> {
     );
   }
 
-  /// Listen to the walk behaviour (infinite stream, no onDone).
+  /// 监听行走行为（由时钟驱动的无限流）。
+  /// 正常运行时 onDone 不应触发；若触发说明时钟流中断，强制触发 Fault 保持 FSM 一致性。
   StreamSubscription<History> _listenWalk(Vector3 direction) {
     return _brain.walk.doing(direction).listen(
       _brain.memory.add,
       onError: (Object error, StackTrace st) {
         _log.severe('Walk stream error', error, st);
         Future.microtask(() => add(A.fault('Walk error: $error')));
+      },
+      onDone: () {
+        _log.severe('Walk stream closed unexpectedly — clock interrupted?');
+        Future.microtask(
+          () => add(A.fault('Walk stream closed unexpectedly')),
+        );
       },
     );
   }

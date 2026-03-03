@@ -154,8 +154,7 @@ class Brain {
 
   /// 切换策略。必须在 FSM Grounded 状态下调用（由调用方保证）。
   /// 保留 memory/imu/joint/clock，替换 Walk/StandUp/SitDown 行为并重新加载模型。
-  /// 若 [walk.loadModel] 抛出异常，walk 已被替换为新实例但模型未加载；
-  /// 调用方应捕获异常并保持 FSM 在 Grounded 状态，避免触发 Walk。
+  /// 若模型加载失败，自动回滚到旧行为实例，保证 Brain 始终处于可用状态。
   Future<void> switchProfile({
     required JointsMatrix standingPose,
     required JointsMatrix sittingPose,
@@ -173,7 +172,6 @@ class Brain {
     (double, double, double, double) actionScale = (0.125, 0.25, 0.25, 5.0),
     String? inputName,
   }) async {
-    walk.dispose();
     final builder = observationBuilder ??
         StandardObservationBuilder(
           standingPose: standingPose,
@@ -181,7 +179,7 @@ class Brain {
           jointVelocityScale: jointVelocityScale,
           actionScale: actionScale,
         );
-    standUp = StandUp(
+    final newStandUp = StandUp(
       clock: clock,
       imu: imu,
       joint: joint,
@@ -189,7 +187,7 @@ class Brain {
       standingPose: standingPose,
       counts: standUpCounts,
     );
-    sitDown = SitDown(
+    final newSitDown = SitDown(
       clock: clock,
       imu: imu,
       joint: joint,
@@ -197,14 +195,39 @@ class Brain {
       sittingPose: sittingPose,
       counts: sitDownCounts,
     );
-    walk = Walk(
+    final newWalk = Walk(
       observationBuilder: builder,
       imu: imu,
       joint: joint,
       clock: clock,
       memory: memory,
     );
-    await walk.loadModel(modelPath, inputName: inputName);
+
+    try {
+      await newWalk.loadModel(modelPath, inputName: inputName);
+    } catch (_) {
+      newWalk.dispose();
+      rethrow;
+    }
+
+    // 模型加载成功，安全替换旧实例
+    walk.dispose();
+    walk = newWalk;
+    standUp = newStandUp;
+    sitDown = newSitDown;
+
+    // 清除旧策略的观测历史帧，防止新模型推理时读到不兼容的历史数据。
+    // 使用当前传感器读数初始化，比 initialGyroscope/initialProjectedGravity
+    // 更贴近机器人实际状态（此时 FSM 处于 Grounded，关节已稳定）。
+    memory.reset(History(
+      gyroscope: imu.gyroscope,
+      projectedGravity: imu.projectedGravity,
+      command: Command.idle(),
+      jointPosition: joint.position,
+      jointVelocity: joint.velocity,
+      action: JointsMatrix.zero(),
+      nextAction: JointsMatrix.zero(),
+    ));
   }
 
   void dispose() {

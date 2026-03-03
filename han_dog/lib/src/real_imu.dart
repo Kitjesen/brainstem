@@ -29,6 +29,10 @@ class RealImu implements ImuService {
 
   final hz = RealFrequency();
 
+  /// 当 IMU 串口流发生错误或意外关闭时调用的回调。
+  /// 由外部（如 han_dog.dart）设置，用于将传感器断联事件转发为 FSM Fault。
+  void Function(String reason)? onDisconnect;
+
   late final StreamSubscription<Iterable<Hi91State>> subs;
 
   /// 广播流控制器：port.state 是单订阅流，这里转发为广播流，
@@ -58,9 +62,11 @@ class RealImu implements ImuService {
       },
       onError: (Object error, StackTrace st) {
         _log.severe('IMU port stream error', error, st);
+        onDisconnect?.call('IMU stream error: $error');
       },
       onDone: () {
         _log.warning('IMU port stream closed unexpectedly');
+        onDisconnect?.call('IMU stream closed');
       },
     );
   }

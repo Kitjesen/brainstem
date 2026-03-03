@@ -37,7 +37,7 @@ class AppLocalizations {
   String get colorPink => locale.languageCode == 'zh' ? '粉色' : 'Pink';
 
   // Common
-  String get appTitle => locale.languageCode == 'zh' ? '穹沛科技' : 'QiongPei Tech';
+  String get appTitle => locale.languageCode == 'zh' ? 'Sirius' : 'Sirius';
   String get connected => locale.languageCode == 'zh' ? '已连接' : 'Connected';
   String get disconnected => locale.languageCode == 'zh' ? '未连接' : 'Disconnected';
 

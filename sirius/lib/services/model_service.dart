@@ -28,7 +28,7 @@ class ModelService {
 
   Future<void> init() async {
     final appData = Platform.environment['APPDATA'] ?? Platform.environment['HOME'] ?? '.';
-    _modelsDir = Directory(p.join(appData, 'qiongpei_app', 'models'));
+    _modelsDir = Directory(p.join(appData, 'sirius', 'models'));
     await _modelsDir.create(recursive: true);
     await scan();
   }

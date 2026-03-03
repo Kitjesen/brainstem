@@ -10,7 +10,6 @@ import 'package:logging/logging.dart';
 import 'package:cms/cms.dart';
 import 'package:han_dog/src/app/config.dart';
 import 'package:han_dog/src/app/monitoring.dart';
-import 'package:han_dog/src/app/robot_params.dart';
 
 final _log = Logger('han_dog');
 final _cfg = HanDogConfig();
@@ -56,6 +55,33 @@ Future<void> _run() async {
   RealFrequency.manager.watch();
   _log.info('han_dog starting — $_cfg');
 
+  // ──── 0b. 策略加载（必须先于一切设备初始化）───────────────────
+  // RobotProfile 是所有机器人参数的唯一真相来源：
+  // standingPose / sittingPose / kp / kd / modelPath 均来自此处。
+  final profiles = await loadProfiles(_cfg.profileDir);
+  if (profiles.isEmpty) {
+    _log.severe(
+        'No profiles found in "${_cfg.profileDir}" — '
+        'cannot start without at least one profile. '
+        'Create a JSON profile file and set HAN_DOG_PROFILE_DIR if needed.');
+    exit(1);
+  }
+
+  final defaultName = _cfg.defaultProfile;
+  final RobotProfile defaultProfile;
+  if (defaultName != null && profiles.containsKey(defaultName)) {
+    defaultProfile = profiles[defaultName]!;
+  } else {
+    if (defaultName != null) {
+      _log.warning(
+          'HAN_DOG_DEFAULT_PROFILE="$defaultName" not found in profiles '
+          '(available: ${profiles.keys.join(", ")}). '
+          'Using first profile: "${profiles.keys.first}".');
+    }
+    defaultProfile = profiles.values.first;
+  }
+  _log.info('Default profile: ${defaultProfile.name} (model=${defaultProfile.modelPath})');
+
   final clock = StreamController<void>.broadcast();
 
   // ──── 1. 设备初始化 ────────────────────────────────────────
@@ -87,19 +113,19 @@ Future<void> _run() async {
   }
   await _checkJointReporting(joint);
 
-  // ──── 2. Brain + ONNX 模型 ─────────────────────────────────
+  // ──── 2. Brain（参数来自默认策略）─────────────────────────────
   final brain = Brain(
     imu: imu,
     joint: joint,
     clock: clock,
-    standingPose: standingPose,
-    sittingPose: .zero(),
+    standingPose: defaultProfile.standingPose,
+    sittingPose: defaultProfile.sittingPose,
   );
   const modelLoadMaxAttempts = 3;
   bool modelLoaded = false;
   for (var attempt = 1; attempt <= modelLoadMaxAttempts; attempt++) {
     try {
-      await brain.loadModel(_cfg.modelPath);
+      await brain.loadModel(defaultProfile.modelPath);
       _log.info('ONNX model loaded (attempt $attempt).');
       modelLoaded = true;
       break;
@@ -120,8 +146,8 @@ Future<void> _run() async {
     return;
   }
 
-  joint.kpExt = inferKp;
-  joint.kdExt = inferKd;
+  joint.kpExt = defaultProfile.inferKp;
+  joint.kdExt = defaultProfile.inferKd;
 
   // ──── 3. YUNZHUO 遥控器 ────────────────────────────────────
   final controller = RealController(_cfg.yunzhuoPort);
@@ -156,59 +182,56 @@ Future<void> _run() async {
   _subs.add(arbiter.ownerStream.listen((owner) {
     _log.info('Arbiter control owner: ${owner ?? "none"}');
   }));
+  // IMU 串口断联 → 立即触发 FSM Fault，防止机器人用陈旧读数盲推理。
+  imu.onDisconnect = (reason) => arbiter.fault(reason);
 
   // 推理输出 → 电机动作
   _subs.add(brain.nextActionStream.listen(
     (action) {
-      // TODO: 验证数据流正常后取消注释以启用电机输出
+      // TODO(phase3): Enable motor output after data stream validation.
       // joint.sendAction(action);
     },
     onError: (Object error, StackTrace st) {
       _log.severe('Inference stream error: $error', error, st);
       arbiter.fault('Inference stream error: $error');
     },
+    onDone: () {
+      _log.severe('Inference stream closed unexpectedly');
+      arbiter.fault('Inference stream closed');
+    },
   ));
 
-  // YUNZHUO 遥控器 → CMS 命令映射
+  // YUNZHUO 遥控器 → CMS 命令映射（增益来自默认策略）
   final controlDog = RealControlDog(
     brain: brain,
     imu: imu,
     joint: joint,
     arbiter: arbiter,
-    inferKd: inferKd,
-    inferKp: inferKp,
-    standUpKd: standUpKd,
-    standUpKp: standUpKp,
-    sitDownKd: sitDownKd,
-    sitDownKp: sitDownKp,
+    inferKd: defaultProfile.inferKd,
+    inferKp: defaultProfile.inferKp,
+    standUpKd: defaultProfile.standUpKd,
+    standUpKp: defaultProfile.standUpKp,
+    sitDownKd: defaultProfile.sitDownKd,
+    sitDownKp: defaultProfile.sitDownKp,
     controller: controller,
   );
 
-  // ──── 4b. 策略管理 ────────────────────────────────────────
-  final profiles = await loadProfiles(_cfg.profileDir);
-  ProfileManager? profileManager;
-  if (profiles.isNotEmpty) {
-    profileManager = ProfileManager(
-      profiles: profiles,
-      brain: brain,
-      controlDog: controlDog,
-      initial: profiles.keys.first,
-    );
-    controlDog.onProfileSwitch = () => profileManager!.toggle();
-    _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
-  } else {
-    _log.info('No profiles found in ${_cfg.profileDir}, running without ProfileManager');
-  }
+  // ──── 4b. 策略管理（始终创建，ProfileManager 为必需组件）────────
+  final profileManager = ProfileManager(
+    profiles: profiles,
+    brain: brain,
+    controlDog: controlDog,
+    initial: defaultProfile.name,
+  );
+  controlDog.onProfileSwitch = () => profileManager.toggle();
+  _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
 
   // ──── 4c. 策略热加载（每 30s 扫描 profileDir）────────────────
-  if (profileManager != null) {
-    final pm = profileManager;
-    _profileReloadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      pm.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
-        _log.warning('Profile hot-reload failed', e, st);
-      });
+  _profileReloadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    profileManager.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
+      _log.warning('Profile hot-reload failed', e, st);
     });
-  }
+  });
 
   // ──── 5. 监控 ──────────────────────────────────────────────
   _subs.add(startSensorMonitoring(

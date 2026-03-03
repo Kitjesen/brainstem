@@ -115,9 +115,9 @@ class DataRecorder extends ChangeNotifier {
     final String dir;
     if (Platform.isWindows) {
       final docs = Platform.environment['USERPROFILE'] ?? '';
-      dir = '$docs\\Documents\\nova_dog_recordings';
+      dir = '$docs\\Documents\\sirius_recordings';
     } else {
-      dir = '${Platform.environment['HOME']}/nova_dog_recordings';
+      dir = '${Platform.environment['HOME']}/sirius_recordings';
     }
     await Directory(dir).create(recursive: true);
     return '$dir${Platform.pathSeparator}recording_$stamp.csv';

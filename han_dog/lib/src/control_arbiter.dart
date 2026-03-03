@@ -27,6 +27,7 @@ class ControlArbiter {
 
   ControlSource? _owner;
   Timer? _releaseTimer;
+  int _ownerVersion = 0;
   final _ownerController = StreamController<ControlSource?>.broadcast();
 
   static const _historyMaxLen = 20;
@@ -93,13 +94,17 @@ class ControlArbiter {
     final changed = _owner != source;
     _owner = source;
     if (changed) {
+      ++_ownerVersion;
       const reason = 'acquired';
       _log.info('Control acquired by $source');
       _addHistory(source, '$reason by $source');
       _ownerController.add(source);
     }
     _releaseTimer?.cancel();
-    _releaseTimer = Timer(timeout, () => _doRelease('timeout'));
+    final versionAtSchedule = _ownerVersion;
+    _releaseTimer = Timer(timeout, () {
+      if (_ownerVersion == versionAtSchedule) _doRelease('timeout');
+    });
   }
 
   void _doRelease(String reason) {

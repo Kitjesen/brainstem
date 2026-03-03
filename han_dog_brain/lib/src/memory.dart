@@ -25,6 +25,18 @@ class Memory<T> {
     controller.add(h);
   }
 
+  /// 清空历史缓冲区并重新填充 [historySize] 帧初始值。
+  ///
+  /// 用于策略切换后清除旧模型的观测历史，防止新模型推理时
+  /// 收到与新策略不兼容的历史帧。
+  void reset(T initial) {
+    _cachedHistories = null;
+    for (var i = 0; i < historySize; i++) {
+      controller.add(initial);
+    }
+    _log.fine('Memory reset ($historySize frames)');
+  }
+
   void dispose() {
     if (_disposed) return;
     _disposed = true;

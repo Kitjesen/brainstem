@@ -46,7 +46,7 @@ class RunHistoryService {
 
   Future<void> init() async {
     final appData = Platform.environment['APPDATA'] ?? Platform.environment['HOME'] ?? '.';
-    final dir = Directory(p.join(appData, 'qiongpei_app'));
+    final dir = Directory(p.join(appData, 'sirius'));
     await dir.create(recursive: true);
     _file = File(p.join(dir.path, 'run_history.json'));
     await _load();

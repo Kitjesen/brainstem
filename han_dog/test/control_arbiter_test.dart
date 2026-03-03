@@ -235,6 +235,53 @@ void main() {
     });
   });
 
+  group('version tracking', () {
+    test('stale timeout does not release new owner', () {
+      fakeAsync((async) {
+        final arbiter = ControlArbiter(mockM, timeout: const Duration(seconds: 3));
+
+        // 1. gRPC acquires → timer scheduled (version 1)
+        arbiter.command(const A.standUp(), ControlSource.grpc);
+        expect(arbiter.owner, ControlSource.grpc);
+
+        // 2. After 2s, YUNZHUO preempts → version bumps to 2, new timer
+        async.elapse(const Duration(seconds: 2));
+        arbiter.command(const A.standUp(), ControlSource.yunzhuo);
+        expect(arbiter.owner, ControlSource.yunzhuo);
+
+        // 3. At 3s mark, the *old* gRPC timer would fire (3s from step 1).
+        //    Version mismatch → must NOT release yunzhuo.
+        async.elapse(const Duration(seconds: 1));
+        expect(arbiter.owner, ControlSource.yunzhuo);
+
+        // 4. At 5s mark (3s from YUNZHUO's acquire), yunzhuo timer fires
+        async.elapse(const Duration(seconds: 2));
+        expect(arbiter.owner, isNull);
+      });
+    });
+
+    test('same source command does not bump version', () {
+      fakeAsync((async) {
+        final arbiter = ControlArbiter(mockM, timeout: const Duration(seconds: 3));
+        final events = <ControlSource?>[];
+        arbiter.ownerStream.listen(events.add);
+
+        arbiter.command(const A.standUp(), ControlSource.grpc);
+        // Same source → no version bump, timer resets normally
+        async.elapse(const Duration(seconds: 2));
+        arbiter.command(const A.sitDown(), ControlSource.grpc);
+
+        async.flushMicrotasks();
+        // Only one acquire event (same source = no ownership change)
+        expect(events, [ControlSource.grpc]);
+
+        // Release happens 3s after last command
+        async.elapse(const Duration(seconds: 3));
+        expect(arbiter.owner, isNull);
+      });
+    });
+  });
+
   group('dispose', () {
     test('cancels timer and closes stream', () {
       fakeAsync((async) {

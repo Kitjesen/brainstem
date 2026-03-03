@@ -5,7 +5,7 @@ import 'package:han_dog_brain/han_dog_brain.dart';
 import 'package:logging/logging.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 
-final _log = Logger('han_dog.profile');
+final _log = Logger('han_dog.profile.loader');
 
 /// 机器人策略配置：一套完整的模型 + 姿态 + 增益 + 缩放参数。
 class RobotProfile {

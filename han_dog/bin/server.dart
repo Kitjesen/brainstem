@@ -5,33 +5,47 @@ import 'package:grpc/grpc.dart';
 import 'package:han_dog/han_dog.dart';
 import 'package:han_dog_brain/han_dog_brain.dart';
 import 'package:logging/logging.dart';
-import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 
-final _log = Logger('medulla');
+final _log = Logger('han_dog.medulla');
 
 // ─── 配置（从环境变量读取，有默认值）─────────────────────────
 int get _port => int.tryParse(Platform.environment['MEDULLA_PORT'] ?? '') ?? 13145;
-String get _modelPath => Platform.environment['MEDULLA_MODEL'] ?? 'model/policy.onnx';
 String get _profileDir => Platform.environment['MEDULLA_PROFILE_DIR'] ?? 'profiles';
+String? get _defaultProfile => Platform.environment['MEDULLA_DEFAULT_PROFILE'];
 int get _historySize => int.tryParse(Platform.environment['MEDULLA_HISTORY_SIZE'] ?? '') ?? 1;
-int get _standUpCounts => int.tryParse(Platform.environment['MEDULLA_STANDUP_COUNTS'] ?? '') ?? 150;
-int get _sitDownCounts => int.tryParse(Platform.environment['MEDULLA_SITDOWN_COUNTS'] ?? '') ?? 150;
-
-// ─── 站立姿态（rad）─────────────────────────────────────────
-// dart format off
-final _standingPose = JointsMatrix(
-  0, -0.64,  1.6,   // FR: hip, thigh, calf
-  0,  0.64, -1.6,   // FL
-  0,  0.64, -1.6,   // RR
-  0, -0.64,  1.6,   // RL
-  0,  0,    0,  0,  // foot × 4
-);
-// dart format on
 
 Future<void> main() async {
   _setupLogging();
 
-  _log.info('medulla starting — port=$_port model=$_modelPath');
+  // ── 策略加载（必须先于 Brain 初始化）─────────────────────────
+  // RobotProfile 是所有机器人参数的唯一真相来源：
+  // standingPose / sittingPose / kp / kd / modelPath 均来自此处。
+  final profiles = await loadProfiles(_profileDir);
+  if (profiles.isEmpty) {
+    _log.severe(
+        'No profiles found in "$_profileDir" — '
+        'cannot start without at least one profile. '
+        'Create a JSON profile file and set MEDULLA_PROFILE_DIR if needed.');
+    exit(1);
+  }
+
+  final String defaultName;
+  final RobotProfile defaultProfile;
+  final requested = _defaultProfile;
+  if (requested != null && profiles.containsKey(requested)) {
+    defaultName = requested;
+    defaultProfile = profiles[requested]!;
+  } else {
+    if (requested != null) {
+      _log.warning(
+          'MEDULLA_DEFAULT_PROFILE="$requested" not found in profiles '
+          '(available: ${profiles.keys.join(", ")}). '
+          'Using first profile: "${profiles.keys.first}".');
+    }
+    defaultName = profiles.keys.first;
+    defaultProfile = profiles.values.first;
+  }
+  _log.info('medulla starting — port=$_port profile=$defaultName (model=${defaultProfile.modelPath})');
 
   // ── 传感器 ────────────────────────────────────────────────
   //
@@ -41,7 +55,7 @@ Future<void> main() async {
   //   final imu   = CanImuService(canInterface: 'can0');
   //   final joint = CanJointService(canInterface: 'can0');
   //   final motor = CanMotorService(canInterface: 'can0');
-  final sim = SimSensorService(standingPose: _standingPose);
+  final sim = SimSensorService(standingPose: defaultProfile.standingPose);
 
   // ── 时钟 ──────────────────────────────────────────────────
   //
@@ -56,21 +70,21 @@ Future<void> main() async {
   //   // 关机时: hwClock?.cancel();
   final clock = StreamController<void>.broadcast();
 
-  // ── 推理核心 ───────────────────────────────────────────────
+  // ── 推理核心（参数来自默认策略）──────────────────────────────
   final brain = Brain(
     imu: sim,
     joint: sim,
     clock: clock,
-    standingPose: _standingPose,
-    sittingPose: JointsMatrix.zero(),
+    standingPose: defaultProfile.standingPose,
+    sittingPose: defaultProfile.sittingPose,
     historySize: _historySize,
-    standUpCounts: _standUpCounts,
-    sitDownCounts: _sitDownCounts,
+    standUpCounts: defaultProfile.standUpCounts,
+    sitDownCounts: defaultProfile.sitDownCounts,
   );
 
   try {
-    await brain.loadModel(_modelPath);
-    _log.info('ONNX model loaded from $_modelPath');
+    await brain.loadModel(defaultProfile.modelPath);
+    _log.info('ONNX model loaded from ${defaultProfile.modelPath}');
   } catch (e) {
     _log.severe('Failed to load model: $e');
     exit(1);
@@ -79,17 +93,13 @@ Future<void> main() async {
   // ── FSM ───────────────────────────────────────────────────
   final m = M(brain);
 
-  // ── 策略管理 ─────────────────────────────────────────────
-  final profiles = await loadProfiles(_profileDir);
-  ProfileManager? profileManager;
-  if (profiles.isNotEmpty) {
-    profileManager = ProfileManager(
-      profiles: profiles,
-      brain: brain,
-      initial: profiles.keys.first,
-    );
-    _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
-  }
+  // ── 策略管理（始终创建）──────────────────────────────────────
+  final profileManager = ProfileManager(
+    profiles: profiles,
+    brain: brain,
+    initial: defaultName,
+  );
+  _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
 
   // ── gRPC 服务器 ────────────────────────────────────────────
   final cmsService = UnifiedCmsServer(

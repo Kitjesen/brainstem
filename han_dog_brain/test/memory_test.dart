@@ -37,6 +37,31 @@ void main() {
     expect(m.latest, 3);
   });
 
+  group('reset', () {
+    test('replaces all history with new initial value', () {
+      final m = Memory(historySize: 3, initial: 0);
+      m.add(1);
+      m.add(2);
+      expect(m.histories, [0, 1, 2]);
+      m.reset(99);
+      expect(m.histories, [99, 99, 99]);
+    });
+
+    test('latest after reset is the new initial', () {
+      final m = Memory(historySize: 2, initial: 0);
+      m.add(7);
+      m.reset(42);
+      expect(m.latest, 42);
+    });
+
+    test('add after reset works normally', () {
+      final m = Memory(historySize: 3, initial: 0);
+      m.reset(5);
+      m.add(6);
+      expect(m.histories, [5, 5, 6]);
+    });
+  });
+
   group("next stream", () {
     test('case 1', () {
       final size = 3;

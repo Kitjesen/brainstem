@@ -11,8 +11,9 @@ class HanDogConfig {
       Platform.environment['HAN_DOG_IMU_PORT'] ?? '/dev/ttyUSB1';
   String get yunzhuoPort =>
       Platform.environment['HAN_DOG_YUNZHUO_PORT'] ?? '/dev/yunzhuo';
-  String get modelPath =>
-      Platform.environment['HAN_DOG_MODEL'] ?? 'model/policy_260106.onnx';
+  /// 默认策略名称（对应 profileDir 中的 JSON 文件 name 字段）。
+  /// 未设置时使用加载顺序第一个策略。
+  String? get defaultProfile => Platform.environment['HAN_DOG_DEFAULT_PROFILE'];
   int get arbiterTimeoutSec =>
       int.tryParse(Platform.environment['HAN_DOG_ARBITER_TIMEOUT'] ?? '') ?? 3;
   int get sensorLowThreshold =>
@@ -68,12 +69,14 @@ class HanDogConfig {
 
   @override
   String toString() => 'port=$grpcPort imu=$imuPort yunzhuo=$yunzhuoPort '
-      'model=$modelPath arbiterTimeout=${arbiterTimeoutSec}s '
+      'profileDir=$profileDir '
+      '${defaultProfile != null ? "defaultProfile=$defaultProfile " : ""}'
+      'arbiterTimeout=${arbiterTimeoutSec}s '
       'sensorLowThreshold=$sensorLowThreshold '
       'shutdownTimeout=${shutdownTimeoutSec}s '
       'startupTimeout=${startupTimeoutSec}s '
       'jointLimitRad=$jointLimitRad '
-      'profileDir=$profileDir logDir=$logDir debugTui=$debugTui';
+      'logDir=$logDir debugTui=$debugTui';
 }
 
 /// 初始化 Logger，级别由 HAN_DOG_LOG 环境变量控制（默认 INFO）。

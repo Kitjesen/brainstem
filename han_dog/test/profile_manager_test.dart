@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:han_dog/han_dog.dart';
 import 'package:han_dog_brain/han_dog_brain.dart';
@@ -278,5 +279,90 @@ void main() {
 
     await pm.toggle();
     expect(pm.currentName, 'only');
+  });
+
+  group('reload', () {
+    /// 写入一条最小合法 profile JSON 文件到 [dir]/[name].json。
+    Future<void> writeProfileJson(Directory dir, String name) async {
+      const zeros16 = '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]';
+      final json = '{'
+          '"name":"$name","modelPath":"$name.onnx",'
+          '"standingPose":$zeros16,"sittingPose":$zeros16,'
+          '"inferKp":$zeros16,"inferKd":$zeros16,'
+          '"standUpKp":$zeros16,"standUpKd":$zeros16,'
+          '"sitDownKp":$zeros16,"sitDownKd":$zeros16'
+          '}';
+      await File('${dir.path}/$name.json').writeAsString(json);
+    }
+
+    test('reload adds profiles newly added to disk', () async {
+      final dir = await Directory.systemTemp.createTemp('pm_test_');
+      try {
+        await writeProfileJson(dir, 'alpha');
+        await writeProfileJson(dir, 'beta');
+
+        final pm = ProfileManager(
+          profiles: {'alpha': profiles['alpha']!},
+          brain: brain,
+          initial: 'alpha',
+        );
+        expect(pm.names, ['alpha']);
+
+        await pm.reload(dir.path);
+        expect(pm.names, containsAll(['alpha', 'beta']));
+      } finally {
+        await dir.delete(recursive: true);
+      }
+    });
+
+    test('reload removes profiles deleted from disk, never removes current', () async {
+      final dir = await Directory.systemTemp.createTemp('pm_test_');
+      try {
+        // Disk only has alpha and beta — gamma was deleted
+        await writeProfileJson(dir, 'alpha');
+        await writeProfileJson(dir, 'beta');
+
+        final pm = ProfileManager(
+          profiles: {
+            'alpha': profiles['alpha']!,
+            'beta': profiles['beta']!,
+            'gamma': _profile('gamma', _pose1, _kp1, _kd1),
+          },
+          brain: brain,
+          initial: 'alpha',
+        );
+        expect(pm.names, containsAll(['alpha', 'beta', 'gamma']));
+
+        await pm.reload(dir.path);
+
+        expect(pm.names, isNot(contains('gamma'))); // 磁盘上已删除
+        expect(pm.names, containsAll(['alpha', 'beta']));
+        expect(pm.currentName, 'alpha'); // 当前策略不受影响
+      } finally {
+        await dir.delete(recursive: true);
+      }
+    });
+
+    test('reload does not remove current profile even if absent from disk', () async {
+      final dir = await Directory.systemTemp.createTemp('pm_test_');
+      try {
+        // Disk only has beta — alpha (current) is absent
+        await writeProfileJson(dir, 'beta');
+
+        final pm = ProfileManager(
+          profiles: {'alpha': profiles['alpha']!, 'beta': profiles['beta']!},
+          brain: brain,
+          initial: 'alpha',
+        );
+
+        await pm.reload(dir.path);
+
+        // alpha is current → 即使磁盘上不存在也不能移除
+        expect(pm.names, contains('alpha'));
+        expect(pm.currentName, 'alpha');
+      } finally {
+        await dir.delete(recursive: true);
+      }
+    });
   });
 }

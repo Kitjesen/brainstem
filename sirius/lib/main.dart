@@ -12,7 +12,7 @@ void main() async {
     center: true,
     backgroundColor: Colors.transparent,
     titleBarStyle: TitleBarStyle.hidden,
-    title: '穹佩控制面板',
+    title: 'Sirius',
   );
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
@@ -20,5 +20,5 @@ void main() async {
     await windowManager.focus();
   });
 
-  runApp(const QiongPeiApp());
+  runApp(const SiriusApp());
 }

@@ -70,7 +70,7 @@ class _ProtocolPageState extends State<ProtocolPage> {
     final lines = log.reversed.map((e) {
       return '${_fmtTime(e.time)}  ${e.direction}  ${e.method.padRight(20)}  ${e.summary}';
     }).join('\n');
-    await File(path).writeAsString('# nova_dog gRPC 协议日志\n# 导出时间: ${DateTime.now()}\n\n$lines\n');
+    await File(path).writeAsString('# Sirius gRPC 协议日志\n# 导出时间: ${DateTime.now()}\n\n$lines\n');
     if (mounted) AppToast.showSuccess(context, '日志已导出');
   }
 

@@ -6,6 +6,7 @@ import 'package:han_dog_brain/src/behaviour.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 import 'package:test/test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:vector_math/vector_math.dart';
 
 class MockBrain extends Mock implements Brain {
   final mockIdle = MockIdle();
@@ -39,6 +40,7 @@ class TestM extends M {
 void main() {
   setUpAll(() {
     registerFallbackValue(FakeHistory());
+    registerFallbackValue(Vector3.zero()); // for Walk.doing(any())
   });
 
   blocTest(
@@ -296,6 +298,46 @@ void main() {
       expect: () => [
         predicate((S s) => s is Transitioning && s.target is SitDownCommand),
         predicate((S s) => s is Grounded),
+      ],
+    );
+  }();
+
+  // ── Walk 流意外关闭 ────────────────────────────────────────
+
+  () {
+    final standUpSequence = <JointsMatrix>[
+      .fromList(.filled(16, 1.0)),
+    ].map(fakeStandUp).toList();
+
+    blocTest(
+      'walk stream closes unexpectedly → fault → standUp → standing',
+      build: () {
+        final m = TestM();
+        final mockBrain = m.mockBrain;
+        when(() => mockBrain.walk).thenReturn(mockBrain.mockWalk);
+        when(() => mockBrain.standUp).thenReturn(mockBrain.mockStandUp);
+        when(() => mockBrain.idle).thenReturn(mockBrain.mockIdle);
+        when(() => mockBrain.memory).thenReturn(mockBrain.mockMemory);
+        // Walk stream closes immediately (simulates clock interruption)
+        when(() => mockBrain.mockWalk.doing(any()))
+            .thenAnswer((_) => Stream.empty());
+        when(() => mockBrain.mockStandUp.doing)
+            .thenAnswer((_) => Stream.fromIterable(standUpSequence));
+        when(() => mockBrain.mockIdle.doing).thenAnswer((_) => Stream.empty());
+        return m;
+      },
+      // Seed from Standing so that CmdWalk calls _listenWalk (which registers onDone).
+      // Seeding directly as Walking would bypass _listenWalk and its onDone handler.
+      seed: () => Standing(Stream<History>.empty().listen((_) {})),
+      act: (m) async {
+        m.add(A.walk(Vector3.zero())); // Standing → Walking via _listenWalk
+        // Walk stream (Stream.empty) closes → onDone fires → Fault via microtask
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      },
+      expect: () => [
+        predicate((S s) => s is Walking),
+        predicate((S s) => s is Transitioning && s.target is StandUpCommand),
+        predicate((S s) => s is Standing),
       ],
     );
   }();

@@ -47,7 +47,7 @@ class PresetService {
   /// Initialize directories and load existing presets/history.
   Future<void> init() async {
     final appData = Platform.environment['APPDATA'] ?? Platform.environment['HOME'] ?? '.';
-    final base = Directory(p.join(appData, 'qiongpei_app'));
+    final base = Directory(p.join(appData, 'sirius'));
     _presetsDir = Directory(p.join(base.path, 'presets'));
     _historyDir = Directory(p.join(base.path, 'history'));
     await _presetsDir.create(recursive: true);

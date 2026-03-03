@@ -4,14 +4,14 @@ import 'theme/app_theme.dart';
 import 'pages/shell_page.dart';
 import 'l10n/app_localizations.dart';
 
-class QiongPeiApp extends StatefulWidget {
-  const QiongPeiApp({super.key});
+class SiriusApp extends StatefulWidget {
+  const SiriusApp({super.key});
 
   @override
-  State<QiongPeiApp> createState() => _QiongPeiAppState();
+  State<SiriusApp> createState() => _SiriusAppState();
 }
 
-class _QiongPeiAppState extends State<QiongPeiApp> {
+class _SiriusAppState extends State<SiriusApp> {
   ThemeMode _themeMode = ThemeMode.light;
   double _textScale = 1.0;
   BrandColor _brandColor = BrandColor.purple;
@@ -47,7 +47,7 @@ class _QiongPeiAppState extends State<QiongPeiApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '穹沛科技',
+      title: 'Sirius',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(_brandColor.color),
       darkTheme: AppTheme.dark(_brandColor.color),

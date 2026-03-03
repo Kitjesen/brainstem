@@ -5,7 +5,10 @@ import '../real_control_dog.dart';
 import '../server/gain_manager.dart';
 import 'robot_profile.dart';
 
-final _log = Logger('han_dog.profile');
+final _log = Logger('han_dog.profile.manager');
+
+// TODO(phase2): Evaluate moving ProfileManager to a shared library —
+// currently in han_dog but also needed by han_dog_brain's server.dart.
 
 /// 策略切换编排器：汇集 Brain / GainManager / RealControlDog 的切换逻辑。
 class ProfileManager {
@@ -146,6 +149,7 @@ class ProfileManager {
     final fresh = await loadProfiles(profileDir);
     int added = 0;
     int updated = 0;
+    // 添加或更新磁盘上存在的策略
     for (final entry in fresh.entries) {
       if (entry.key == _current) continue; // 不替换运行中的策略
       if (_profiles.containsKey(entry.key)) {
@@ -156,8 +160,17 @@ class ProfileManager {
         added++;
       }
     }
-    if (added > 0 || updated > 0) {
-      _log.info('Profile hot-reload: +$added 新, ~$updated 更新 (current=$_current)');
+    // 移除磁盘上已删除的策略（当前运行的策略不受影响）
+    final toRemove = _profiles.keys
+        .where((k) => k != _current && !fresh.containsKey(k))
+        .toList();
+    for (final k in toRemove) {
+      _profiles.remove(k);
+    }
+    final removed = toRemove.length;
+    if (added > 0 || updated > 0 || removed > 0) {
+      _log.info(
+          'Profile hot-reload: +$added 新, ~$updated 更新, -$removed 移除 (current=$_current)');
     }
   }
 }
