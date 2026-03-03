@@ -1,3 +1,5 @@
+// 控制权仲裁器：协调 gRPC 与 YUNZHUO 遥控器的控制权，yunzhuo 具有更高优先级。
+
 import 'dart:async';
 
 import 'package:han_dog_brain/han_dog_brain.dart';

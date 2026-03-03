@@ -1,3 +1,12 @@
+/// 电机 ping 工具 — 开发 / 调试专用，非生产程序。
+///
+/// 通过 4 路 PCAN CAN 总线逐条腿 ping 电机，验证硬件连接。
+/// 腿配置：FR=usbbus3, FL=usbbus1, RR=usbbus4, RL=usbbus2。
+///
+/// 运行：dart run han_dog/bin/ping.dart
+/// 前置：PCAN 硬件已连接，驱动已加载。
+library;
+
 import 'dart:async';
 import 'dart:io';
 

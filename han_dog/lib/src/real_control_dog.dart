@@ -1,3 +1,5 @@
+// YUNZHUO 遥控器驱动桥接：将摇杆信号转换为 FSM 动作（Walk/StandUp/SitDown/Idle）。
+
 import 'dart:async';
 
 import 'package:han_dog/han_dog.dart';

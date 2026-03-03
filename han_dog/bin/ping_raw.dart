@@ -1,5 +1,10 @@
-/// 原始 ping 工具 — 对照验证
-/// 直接在 4 路 PCAN 通道上扫描 canId 0~254，打印所有响应
+/// 原始 ping 工具 — 开发 / 调试专用，非生产程序。
+///
+/// 直接在 4 路 PCAN 通道上扫描 canId 1~4，打印所有响应。
+/// 与 [ping.dart] 的区别：无结构化输出，仅原始打印，用于对照验证。
+///
+/// 运行：dart run han_dog/bin/ping_raw.dart
+/// 前置：PCAN 硬件已连接，驱动已加载。
 library;
 import 'package:robo_device/robo_device.dart';
 import 'package:robo_device_proto/robo_device_proto.dart';

@@ -1,3 +1,20 @@
+/// 仿真模式服务器入口（medulla）。
+///
+/// MuJoCo Python 端通过 Tick/Step gRPC 调用驱动控制循环，
+/// 无需真实硬件即可测试推理逻辑。
+///
+/// 对标程序：[han_dog.dart] — 真实硬件入口（50Hz Timer 驱动）。
+///
+/// 运行：dart run han_dog/bin/server.dart
+///
+/// 环境变量：
+///   MEDULLA_PORT            监听端口（默认 13145）
+///   MEDULLA_PROFILE_DIR     策略目录（默认 'profiles'）
+///   MEDULLA_DEFAULT_PROFILE 默认策略名
+///   MEDULLA_HISTORY_SIZE    历史帧数（默认 1）
+///   MEDULLA_LOG             日志级别（FINE/INFO/WARNING/SEVERE，默认 INFO）
+library;
+
 import 'dart:async';
 import 'dart:io';
 

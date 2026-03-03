@@ -77,3 +77,49 @@ hookify 规则：
 - `block-proto-generated` — 阻止编辑 protoc 生成的 `.pb.dart`
 - `warn-dangerous-git` — 警告 force push / hard reset
 - `require-analyze-before-stop` — 停止前提醒运行 analyze + test
+
+## 术语表
+
+| 术语 | 含义 |
+|------|------|
+| `han_dog.dart` | 真实硬件主程序入口（50Hz Timer 驱动） |
+| `server.dart` / medulla | 仿真模式主程序入口（MuJoCo gRPC，Logger 名 `han_dog.medulla`） |
+| UnifiedCmsServer | 统一 gRPC 服务，取代了旧的 RealDogServer / SimDogServer |
+| SimSensorService | 仿真传感器（实现 ImuService + JointService + SimStateInjector） |
+| SimImu / SimJoint | **已废弃**，使用 SimSensorService 替代 |
+| RealControlDog | YUNZHUO 遥控器驱动，将摇杆信号转换为 FSM 动作 |
+| Brain | 推理核心 facade（在 han_dog_brain 中），封装 ONNX 推理 + FSM 行为 |
+| M / A / S | FSM 的机器 / 动作 / 状态（Cms<S,A>，在 han_dog_brain/cms/ 中）|
+| ProfileManager | 策略切换编排器，汇集 Brain + GainManager + RealControlDog |
+| ControlArbiter | gRPC 与 YUNZHUO 遥控器的控制权仲裁器（yunzhuo 优先级更高）|
+
+## 新成员第一天检查清单
+
+```bash
+# 1. 获取依赖
+dart pub get
+
+# 2. 验证代码质量（必须零 issue）
+dart analyze han_dog_brain/ han_dog/
+
+# 3. 运行测试（必须全部通过）
+dart test han_dog/ han_dog_brain/ frequency_watch/ skinny_dog_algebra/
+
+# 4. 了解入口程序
+#    真机：dart run han_dog/bin/han_dog.dart
+#    仿真：dart run han_dog/bin/server.dart
+#    App：cd sirius && flutter run -d windows
+
+# 5. 调试工具（非生产）
+#    dart run han_dog/bin/ping.dart       — PCAN CAN总线电机ping
+#    dart run han_dog/bin/ping_raw.dart   — 原始4路CAN全扫描
+#    dart run han_dog/bin/test_grpc.dart  — 本地gRPC接口测试
+
+# 6. 阅读以下文档
+#    README.md（根目录）  — 完整项目文档
+#    SDK_DESIGN.md        — 高层架构设计
+#    han_dog_message/README.md — gRPC 协议规范
+```
+
+> sim/ 目录：MuJoCo 物理仿真资源（URDF/XML/STL 模型、动作预览视频、verify_gestures.py）。
+> 不是 Dart 包，由 MuJoCo Python 端加载。

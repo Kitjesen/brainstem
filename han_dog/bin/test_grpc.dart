@@ -1,7 +1,10 @@
-/// gRPC 接口测试脚本
+/// gRPC 接口测试脚本 — 开发 / 调试专用，非生产程序。
 ///
 /// 测试 localhost:13145 上的所有 CMS gRPC 接口。
 /// 安全：joint.realActionExt 已注释，电机不会动。
+///
+/// 运行：dart run han_dog/bin/test_grpc.dart
+/// 前置：目标服务器（han_dog 或 server.dart）已启动在 localhost:13145。
 library;
 import 'dart:async' show TimeoutException;
 import 'dart:core';
