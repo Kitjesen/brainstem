@@ -1,3 +1,15 @@
+## 1.1.1
+
+### 修复
+- `grpc_service.dart`：包路径注释 `nova_dog` → `sirius`，`RealDogServer/SimDogServer` → `UnifiedCmsServer`
+
+### 文档
+- `README.md`：完整重写（62行）——App 说明、9 个导航页、运行命令、gRPC 连接配置
+- 删除历史过程文档：`FINAL_UI_REPORT.md` / `OPTIMIZATION_COMPLETED.md` / `OPTIMIZATION_SUGGESTIONS.md` / `PRODUCT_ANALYSIS.md` / `UI_IMPROVEMENTS.md`
+
+### 版本
+- `pubspec.yaml`：版本号 `1.1.0+2` → `1.1.1`（与 CHANGELOG 语义对齐，移除 build number）
+
 ## 1.1.0
 
 ### 新增页面

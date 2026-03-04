@@ -1,3 +1,24 @@
+## 2.1.0
+
+### 测试
+- `unified_cms_server_test.dart`（新建）：12 个测试覆盖 walk 输入校验（NaN/Inf/超幅）、tick/step 模式守卫、`getProfile` / `switchProfile` gRPC 路径；全包共 212 个测试
+
+### 代码规范
+- Logger 命名修正：`server.dart` 入口 `'medulla'` → `'han_dog.medulla'`；`robot_profile.dart` / `profile_manager.dart` 均从 `'han_dog.profile'` 拆分为 `'.profile.loader'` / `'.profile.manager'`
+
+### 文档
+- `README.md`：完整重写（包职责、两个生产入口程序、全量环境变量、profiles/ 目录说明）
+- `bin/README.md`（新建）：列出全部 5 个 bin 程序（2 生产 + 3 调试工具）
+- `bin/ping.dart` / `bin/ping_raw.dart` / `bin/test_grpc.dart`：添加"非生产程序"文件头注释
+- `bin/server.dart`：添加仿真入口文件头注释（对标 han_dog.dart）
+- `lib/src/sim_imu.dart` / `lib/src/sim_joint.dart`：添加 DEPRECATED 文档注释，指向 `SimSensorService`
+- `lib/src/control_arbiter.dart` / `lib/src/real_control_dog.dart`：添加单行职责注释
+
+### DevOps
+- CI 触发分支 `main` → `master`；Flutter job 目录 `nova_dog_app` → `sirius`
+- CI 新增 tag（`v*`）触发；artifact 名含版本号；保留期 7 天 → 30 天
+- CI 新增 `release` job：push tag 后自动构建 → zip → 创建 GitHub Release
+
 ## 2.0.0
 
 ### 安全与可靠性

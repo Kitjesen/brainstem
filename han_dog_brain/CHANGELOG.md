@@ -1,3 +1,9 @@
+## 1.4.1
+
+### 文档
+- `README.md`：完整重写（197行）——Brain API 说明、FSM 状态转换图、5 种行为规范、传感器接口定义、使用示例
+- `cms.dart`：3 处英文文档注释改为中文（idleStream / transitionStream / walkStream 的 onDone 语义说明）
+
 ## 1.4.0
 
 ### 新增
