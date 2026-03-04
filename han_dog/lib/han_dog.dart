@@ -1,8 +1,6 @@
 export 'src/app/profile_manager.dart';
 export 'src/app/robot_profile.dart';
 export 'src/control_arbiter.dart';
-export 'src/sim_imu.dart';
-export 'src/sim_joint.dart';
 export 'src/real_imu.dart';
 export 'src/real_joint.dart';
 export 'src/real_controller.dart';

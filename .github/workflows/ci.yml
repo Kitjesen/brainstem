@@ -22,39 +22,30 @@ jobs:
 
       - name: Install dependencies
         run: dart pub get
-        working-directory: brainstem
 
       - name: Analyze han_dog_brain
         run: dart analyze han_dog_brain/
-        working-directory: brainstem
 
       - name: Analyze han_dog
         run: dart analyze han_dog/
-        working-directory: brainstem
 
       - name: Analyze frequency_watch
         run: dart analyze frequency_watch/
-        working-directory: brainstem
 
       - name: Analyze skinny_dog_algebra
         run: dart analyze skinny_dog_algebra/
-        working-directory: brainstem
 
       - name: Test han_dog_brain
         run: dart test han_dog_brain/
-        working-directory: brainstem
 
       - name: Test han_dog
         run: dart test han_dog/
-        working-directory: brainstem
 
       - name: Test frequency_watch
         run: dart test frequency_watch/
-        working-directory: brainstem
 
       - name: Test skinny_dog_algebra
         run: dart test skinny_dog_algebra/
-        working-directory: brainstem
 
   # ── Flutter App：analyze + build ───────────────────────────
   flutter:
@@ -71,21 +62,21 @@ jobs:
 
       - name: Install Flutter dependencies
         run: flutter pub get
-        working-directory: brainstem/sirius
+        working-directory: sirius
 
       - name: Analyze sirius
         run: flutter analyze lib/
-        working-directory: brainstem/sirius
+        working-directory: sirius
 
       - name: Build sirius (Windows)
         run: flutter build windows --release
-        working-directory: brainstem/sirius
+        working-directory: sirius
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: sirius-windows-${{ github.ref_name }}
-          path: brainstem/sirius/build/windows/x64/runner/Release/
+          path: sirius/build/windows/x64/runner/Release/
           retention-days: 30
 
   # ── Release：仅 tag 推送时触发 ──────────────────────────────
@@ -105,15 +96,15 @@ jobs:
 
       - name: Install Flutter dependencies
         run: flutter pub get
-        working-directory: brainstem/sirius
+        working-directory: sirius
 
       - name: Build sirius (Windows release)
         run: flutter build windows --release
-        working-directory: brainstem/sirius
+        working-directory: sirius
 
       - name: Zip artifact
         run: |
-          Compress-Archive -Path brainstem/sirius/build/windows/x64/runner/Release/* `
+          Compress-Archive -Path sirius/build/windows/x64/runner/Release/* `
             -DestinationPath sirius-${{ github.ref_name }}-windows.zip
         shell: pwsh
 
@@ -122,7 +113,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          body_path: brainstem/sirius/CHANGELOG.md
+          body_path: sirius/CHANGELOG.md
           files: sirius-${{ github.ref_name }}-windows.zip
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
