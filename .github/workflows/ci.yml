@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   # ── Dart 包：analyze + test ─────────────────────────────────
@@ -70,19 +70,19 @@ jobs:
 
       - name: Install Flutter dependencies
         run: flutter pub get
-        working-directory: brainstem/nova_dog_app
+        working-directory: brainstem/sirius
 
-      - name: Analyze nova_dog_app
+      - name: Analyze sirius
         run: flutter analyze lib/
-        working-directory: brainstem/nova_dog_app
+        working-directory: brainstem/sirius
 
-      - name: Build nova_dog_app (Windows)
+      - name: Build sirius (Windows)
         run: flutter build windows --release
-        working-directory: brainstem/nova_dog_app
+        working-directory: brainstem/sirius
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: nova_dog_app-windows
-          path: brainstem/nova_dog_app/build/windows/x64/runner/Release/
+          name: sirius-windows
+          path: brainstem/sirius/build/windows/x64/runner/Release/
           retention-days: 7
