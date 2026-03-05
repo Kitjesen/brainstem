@@ -14,18 +14,8 @@ dependencies:
   frequency_watch: ^1.0.0
   han_dog_brain: ^1.0.0
   han_dog_message: ^1.0.0
-
-  # ── 硬件驱动（外部 Git，未纳入 workspace）────────────────────
-  robo_device:
-    git:
-      url: https://github.com/Kitjesen/robo_device
-      path: dart/robo_device
-      ref: main  # TODO: pin to specific commit SHA before production
-  robo_device_proto:
-    git:
-      url: https://github.com/Kitjesen/robo_device_proto
-      path: dart/robo_device_proto
-      ref: HEAD  # TODO: pin to specific commit SHA before production (must match robo_device's dependency)
+  robo_device: ^1.0.0
+  robo_device_proto: ^1.0.0
 
   # ── 第三方包 ──────────────────────────────────────────────────
   grpc: ^5.1.0
