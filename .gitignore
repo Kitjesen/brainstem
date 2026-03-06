@@ -19,6 +19,10 @@ logs/
 *.freezed.dart
 *.g.dart
 
+# 例外：FFI bindings 由 ffigen + C 头文件生成，CI 无法轻易重新生成
+!onnx_runtime/lib/ffi/bindings.g.dart
+!pcan/lib/src/pcan_basic.dart
+
 # ONNX native binaries
 *.dll
 *.so
