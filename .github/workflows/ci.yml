@@ -24,6 +24,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate code (han_dog_brain)
+        run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: han_dog_brain
+
+      - name: Generate code (robo_device_proto)
+        run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: robo_device_proto
+
       - name: Analyze han_dog_brain
         run: dart analyze han_dog_brain/
 
@@ -64,6 +72,14 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate code (han_dog_brain)
+        run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: han_dog_brain
+
+      - name: Generate code (robo_device_proto)
+        run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: robo_device_proto
+
       - name: Analyze sirius
         run: flutter analyze lib/
         working-directory: sirius
@@ -96,6 +112,14 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Generate code (han_dog_brain)
+        run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: han_dog_brain
+
+      - name: Generate code (robo_device_proto)
+        run: dart run build_runner build --delete-conflicting-outputs
+        working-directory: robo_device_proto
 
       - name: Build sirius (Windows release)
         run: flutter build windows --release
