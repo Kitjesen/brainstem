@@ -8,7 +8,7 @@ on:
     branches: [master]
 
 jobs:
-  # ── Dart 包：analyze + test ─────────────────────────────────
+  # ── Dart 包：analyze + test（Flutter workspace，需要 Flutter SDK）──
   dart:
     name: Dart (analyze + test)
     runs-on: ubuntu-latest
@@ -16,12 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dart-lang/setup-dart@v1
+      - uses: subosito/flutter-action@v2
         with:
-          sdk: stable
+          flutter-version: '3.x'
+          channel: stable
 
       - name: Install dependencies
-        run: dart pub get
+        run: flutter pub get
 
       - name: Analyze han_dog_brain
         run: dart analyze han_dog_brain/
@@ -60,9 +61,8 @@ jobs:
           flutter-version: '3.x'
           channel: stable
 
-      - name: Install Flutter dependencies
+      - name: Install dependencies
         run: flutter pub get
-        working-directory: sirius
 
       - name: Analyze sirius
         run: flutter analyze lib/
@@ -94,9 +94,8 @@ jobs:
           flutter-version: '3.x'
           channel: stable
 
-      - name: Install Flutter dependencies
+      - name: Install dependencies
         run: flutter pub get
-        working-directory: sirius
 
       - name: Build sirius (Windows release)
         run: flutter build windows --release

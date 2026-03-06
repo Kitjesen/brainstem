@@ -7,7 +7,7 @@
 ```bash
 dart analyze han_dog_brain/ han_dog/   # 必须零 issue（strict 模式已开启）
 dart test han_dog_brain/ han_dog/ frequency_watch/ skinny_dog_algebra/  # 163+ 个测试全部通过
-dart pub get                           # 获取依赖
+flutter pub get                        # 获取依赖（workspace 含 Flutter，必须用 flutter pub get）
 dart run build_runner build --delete-conflicting-outputs  # 重新生成 Freezed 代码
 ```
 
@@ -97,7 +97,7 @@ hookify 规则：
 
 ```bash
 # 1. 获取依赖
-dart pub get
+flutter pub get
 
 # 2. 验证代码质量（必须零 issue）
 dart analyze han_dog_brain/ han_dog/
