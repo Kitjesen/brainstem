@@ -21,7 +21,8 @@ logs/
 
 # 例外：FFI bindings 由 ffigen + C 头文件生成，CI 无法轻易重新生成
 !onnx_runtime/lib/ffi/bindings.g.dart
-!pcan/lib/src/pcan_basic.dart
+!pcan/lib/src/pcan_basic.g.dart
+!serial_port/lib/src/cserialport.g.dart
 
 # ONNX native binaries
 *.dll
