@@ -12,6 +12,7 @@
 ///   MEDULLA_PROFILE_DIR     策略目录（默认 'profiles'）
 ///   MEDULLA_DEFAULT_PROFILE 默认策略名
 ///   MEDULLA_HISTORY_SIZE    历史帧数（默认 1）
+///   MEDULLA_STANDALONE      设为 "1" 启用 50Hz 自驱动时钟（无需 MuJoCo Tick）
 ///   MEDULLA_LOG             日志级别（FINE/INFO/WARNING/SEVERE，默认 INFO）
 library;
 
@@ -77,15 +78,18 @@ Future<void> main() async {
   // ── 时钟 ──────────────────────────────────────────────────
   //
   // 仿真模式：MuJoCo 通过 Tick RPC 驱动，不需要 Timer。
-  //
-  // 真实硬件模式：取消注释下面的 Timer，以 50Hz 驱动控制循环：
-  //   Timer? hwClock;
-  //   hwClock = Timer.periodic(
-  //     const Duration(milliseconds: 20),
-  //     (_) => clock.add(null),
-  //   );
-  //   // 关机时: hwClock?.cancel();
+  // 独立模式（MEDULLA_STANDALONE=1）：50Hz Timer 自驱动时钟，
+  //   用于 han_dog_bridge 集成测试（无需 MuJoCo）。
   final clock = StreamController<void>.broadcast();
+  final standalone = Platform.environment['MEDULLA_STANDALONE'] == '1';
+  Timer? standaloneClock;
+  if (standalone) {
+    standaloneClock = Timer.periodic(
+      const Duration(milliseconds: 20),
+      (_) => clock.add(null),
+    );
+    _log.info('Standalone mode: 50Hz self-driven clock enabled');
+  }
 
   // ── 推理核心（参数来自默认策略）──────────────────────────────
   final brain = Brain(
@@ -133,8 +137,13 @@ Future<void> main() async {
   _log.info('CMS gRPC server listening on :$_port');
 
   // ── 优雅关机 ───────────────────────────────────────────────
-  ProcessSignal.sigint.watch().listen((_) => _shutdown(m, brain, clock, server));
-  ProcessSignal.sigterm.watch().listen((_) => _shutdown(m, brain, clock, server));
+  shutdown() {
+    standaloneClock?.cancel();
+    _shutdown(m, brain, clock, server);
+  }
+
+  ProcessSignal.sigint.watch().listen((_) => shutdown());
+  ProcessSignal.sigterm.watch().listen((_) => shutdown());
 }
 
 Future<void> _shutdown(
