@@ -1,7 +1,6 @@
 import 'dart:isolate';
 import 'package:test/test.dart';
 import 'package:serial_port/serial_port.dart';
-import 'package:meta/meta.dart';
 
 Future<void> _justDispose((SendPort, Null) message) async {
   final port = SerialPort();
@@ -39,7 +38,6 @@ void main() {
   t('open success with close', _openSuccessWithClose, '/dev/ttyACM0');
 }
 
-@isTest
 void t<T>(
   Object description,
   void Function((SendPort, T)) entryPoint,

@@ -3,6 +3,58 @@ import 'dart:io';
 import 'package:cms/cms.dart';
 import 'package:logging/logging.dart';
 
+const _defaultProfileDirCandidates = <String>['profiles', 'han_dog/profiles'];
+
+/// 解析策略目录。
+///
+/// 优先级：
+/// 1. [primaryEnvVar]
+/// 2. [legacyEnvVars]
+/// 3. 默认候选目录（先 `profiles/`，再 `han_dog/profiles/`）
+String resolveProfileDir({
+  required String primaryEnvVar,
+  List<String> legacyEnvVars = const [],
+  Map<String, String>? environment,
+  String? workingDirectory,
+}) {
+  final env = environment ?? Platform.environment;
+  for (final key in <String>[primaryEnvVar, ...legacyEnvVars]) {
+    final value = env[key]?.trim();
+    if (value != null && value.isNotEmpty) {
+      return value;
+    }
+  }
+
+  for (final candidate in _defaultProfileDirCandidates) {
+    if (_directoryExists(candidate, workingDirectory: workingDirectory)) {
+      return candidate;
+    }
+  }
+  return _defaultProfileDirCandidates.first;
+}
+
+bool _directoryExists(String path, {String? workingDirectory}) {
+  final dir = Directory(path);
+  if (dir.isAbsolute || workingDirectory == null) {
+    return dir.existsSync();
+  }
+  return Directory(_joinPath(workingDirectory, path)).existsSync();
+}
+
+String _joinPath(String base, String child) {
+  final trimmedBase = base.endsWith(Platform.pathSeparator)
+      ? base.substring(0, base.length - 1)
+      : base;
+  final normalizedChild = child
+      .split(RegExp(r'[\\/]'))
+      .where((segment) => segment.isNotEmpty)
+      .join(Platform.pathSeparator);
+  if (normalizedChild.isEmpty) {
+    return trimmedBase;
+  }
+  return '$trimmedBase${Platform.pathSeparator}$normalizedChild';
+}
+
 /// 从环境变量读取配置，每个都有合理的默认值。
 class HanDogConfig {
   int get grpcPort =>
@@ -11,6 +63,7 @@ class HanDogConfig {
       Platform.environment['HAN_DOG_IMU_PORT'] ?? '/dev/ttyUSB1';
   String get yunzhuoPort =>
       Platform.environment['HAN_DOG_YUNZHUO_PORT'] ?? '/dev/yunzhuo';
+
   /// 默认策略名称（对应 profileDir 中的 JSON 文件 name 字段）。
   /// 未设置时使用加载顺序第一个策略。
   String? get defaultProfile => Platform.environment['HAN_DOG_DEFAULT_PROFILE'];
@@ -18,23 +71,27 @@ class HanDogConfig {
       int.tryParse(Platform.environment['HAN_DOG_ARBITER_TIMEOUT'] ?? '') ?? 3;
   int get sensorLowThreshold =>
       int.tryParse(
-          Platform.environment['HAN_DOG_SENSOR_LOW_THRESHOLD'] ?? '') ??
+        Platform.environment['HAN_DOG_SENSOR_LOW_THRESHOLD'] ?? '',
+      ) ??
       3;
   int get shutdownTimeoutSec =>
       int.tryParse(Platform.environment['HAN_DOG_SHUTDOWN_TIMEOUT'] ?? '') ?? 8;
   int get startupTimeoutSec =>
       int.tryParse(Platform.environment['HAN_DOG_STARTUP_TIMEOUT'] ?? '') ?? 10;
+
   /// 关节位置安全限位（绝对值，rad）。任一关节超过此值立即触发 Fault。
   /// 默认 3.14 rad（π，物理不可能超过），设置更小值可提供提前保护。
   double get jointLimitRad =>
-      double.tryParse(Platform.environment['HAN_DOG_JOINT_LIMIT_RAD'] ?? '') ?? 3.14;
-  String get profileDir =>
-      Platform.environment['HAN_DOG_PROFILE_DIR'] ?? 'profiles';
+      double.tryParse(Platform.environment['HAN_DOG_JOINT_LIMIT_RAD'] ?? '') ??
+      3.14;
+  String get profileDir => resolveProfileDir(
+    primaryEnvVar: 'HAN_DOG_PROFILE_DIR',
+    legacyEnvVars: const ['HAN_DOG_PROFILES_DIR'],
+  );
+
   /// 日志目录（默认 'logs'，空字符串禁用文件日志）。
-  String get logDir =>
-      Platform.environment['HAN_DOG_LOG_DIR'] ?? 'logs';
-  bool get debugTui =>
-      Platform.environment['HAN_DOG_DEBUG_TUI'] == 'true';
+  String get logDir => Platform.environment['HAN_DOG_LOG_DIR'] ?? 'logs';
+  bool get debugTui => Platform.environment['HAN_DOG_DEBUG_TUI'] == 'true';
 
   Duration get arbiterTimeout => Duration(seconds: arbiterTimeoutSec);
   Duration get shutdownTimeout => Duration(seconds: shutdownTimeoutSec);
@@ -61,6 +118,9 @@ class HanDogConfig {
     if (sensorLowThreshold < 1) {
       errors.add('HAN_DOG_SENSOR_LOW_THRESHOLD=$sensorLowThreshold 至少需 1');
     }
+    if (!_directoryExists(profileDir)) {
+      errors.add('HAN_DOG_PROFILE_DIR="$profileDir" 目录不存在');
+    }
     return errors;
   }
 
@@ -68,7 +128,8 @@ class HanDogConfig {
   bool get isValid => validate().isEmpty;
 
   @override
-  String toString() => 'port=$grpcPort imu=$imuPort yunzhuo=$yunzhuoPort '
+  String toString() =>
+      'port=$grpcPort imu=$imuPort yunzhuo=$yunzhuoPort '
       'profileDir=$profileDir '
       '${defaultProfile != null ? "defaultProfile=$defaultProfile " : ""}'
       'arbiterTimeout=${arbiterTimeoutSec}s '
@@ -98,11 +159,13 @@ void setupLogging({String logDir = ''}) {
       dir.createSync(recursive: true);
       _cleanOldLogs(dir);
       final now = DateTime.now();
-      final dateStr = '${now.year.toString().padLeft(4, '0')}'
+      final dateStr =
+          '${now.year.toString().padLeft(4, '0')}'
           '${now.month.toString().padLeft(2, '0')}'
           '${now.day.toString().padLeft(2, '0')}';
-      logFile = File('$logDir${Platform.pathSeparator}han_dog_$dateStr.log')
-          .openSync(mode: FileMode.append);
+      logFile = File(
+        '$logDir${Platform.pathSeparator}han_dog_$dateStr.log',
+      ).openSync(mode: FileMode.append);
     } catch (e) {
       stderr.writeln('setupLogging: cannot open log file in $logDir: $e');
     }

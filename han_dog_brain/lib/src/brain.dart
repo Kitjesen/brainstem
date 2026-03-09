@@ -144,6 +144,9 @@ class Brain {
   /// 先订阅再触发，保证不漏事件。
   /// [timeout] 默认 2 秒；超时抛 [TimeoutException]（防止 ONNX 异常导致调用方永久挂起）。
   Future<History> tick({Duration timeout = const Duration(seconds: 2)}) {
+    if (clock.isClosed) {
+      return Future<History>.error(StateError('Clock is closed'));
+    }
     final next = memory.next.timeout(timeout);
     clock.add(null);
     return next;

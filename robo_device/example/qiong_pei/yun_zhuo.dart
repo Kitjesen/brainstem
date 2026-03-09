@@ -1,5 +1,5 @@
-import 'package:robo_device/device.dart';
-import 'package:robo_device_proto/device_proto.dart';
+import 'package:robo_device/robo_device.dart';
+import 'package:robo_device_proto/robo_device_proto.dart';
 
 void main() async {
   final device = SerialPortController<QPYunZhuoEvent, QPYunZhuoState>(

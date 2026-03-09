@@ -131,6 +131,7 @@ class RealController {
     _portSub?.cancel();
     _portSub = port.state.listen(
       (batch) {
+        if (_disposed) return;
         hz.add(batch.length);
         for (final s in batch) {
           _stateController.add(s);

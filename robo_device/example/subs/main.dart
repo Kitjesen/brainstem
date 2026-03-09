@@ -1,6 +1,6 @@
-import 'package:robo_device/src/serial_port/controller.dart';
+import 'package:robo_device/robo_device.dart';
 import 'package:logging/logging.dart';
-import 'package:robo_device_proto/device_proto.dart';
+import 'package:robo_device_proto/robo_device_proto.dart';
 
 void main() async {
   Logger.root
@@ -9,7 +9,9 @@ void main() async {
       print('[${record.level.name}] ${record.time}: ${record.message}');
     });
 
-  final device = SerialPortController<Never, YunZhuoState>('/dev/ttyUSB0');
+  final device = SerialPortController<QPYunZhuoEvent, YunZhuoState>(
+    '/dev/ttyUSB0',
+  );
 
   if (!device.open()) {
     device.dispose();

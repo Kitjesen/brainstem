@@ -9,9 +9,9 @@
 ///
 /// 环境变量：
 ///   MEDULLA_PORT            监听端口（默认 13145）
-///   MEDULLA_PROFILE_DIR     策略目录（默认 'profiles'）
+///   MEDULLA_PROFILE_DIR     策略目录（自动探测 `profiles/` 或 `han_dog/profiles/`）
 ///   MEDULLA_DEFAULT_PROFILE 默认策略名
-///   MEDULLA_HISTORY_SIZE    历史帧数（默认 1）
+///   MEDULLA_HISTORY_SIZE    历史帧数（未设置时按模型输入维度自动推断）
 ///   MEDULLA_LOG             日志级别（FINE/INFO/WARNING/SEVERE，默认 INFO）
 library;
 
@@ -20,16 +20,20 @@ import 'dart:io';
 
 import 'package:grpc/grpc.dart';
 import 'package:han_dog/han_dog.dart';
+import 'package:han_dog/src/app/config.dart';
 import 'package:han_dog_brain/han_dog_brain.dart';
 import 'package:logging/logging.dart';
 
 final _log = Logger('han_dog.medulla');
 
 // ─── 配置（从环境变量读取，有默认值）─────────────────────────
-int get _port => int.tryParse(Platform.environment['MEDULLA_PORT'] ?? '') ?? 13145;
-String get _profileDir => Platform.environment['MEDULLA_PROFILE_DIR'] ?? 'profiles';
+int get _port =>
+    int.tryParse(Platform.environment['MEDULLA_PORT'] ?? '') ?? 13145;
+String get _profileDir => resolveProfileDir(
+  primaryEnvVar: 'MEDULLA_PROFILE_DIR',
+  legacyEnvVars: const ['MEDULLA_PROFILES_DIR'],
+);
 String? get _defaultProfile => Platform.environment['MEDULLA_DEFAULT_PROFILE'];
-int get _historySize => int.tryParse(Platform.environment['MEDULLA_HISTORY_SIZE'] ?? '') ?? 1;
 
 Future<void> main() async {
   _setupLogging();
@@ -40,9 +44,10 @@ Future<void> main() async {
   final profiles = await loadProfiles(_profileDir);
   if (profiles.isEmpty) {
     _log.severe(
-        'No profiles found in "$_profileDir" — '
-        'cannot start without at least one profile. '
-        'Create a JSON profile file and set MEDULLA_PROFILE_DIR if needed.');
+      'No profiles found in "$_profileDir" — '
+      'cannot start without at least one profile. '
+      'Create a JSON profile file and set MEDULLA_PROFILE_DIR if needed.',
+    );
     exit(1);
   }
 
@@ -55,14 +60,19 @@ Future<void> main() async {
   } else {
     if (requested != null) {
       _log.warning(
-          'MEDULLA_DEFAULT_PROFILE="$requested" not found in profiles '
-          '(available: ${profiles.keys.join(", ")}). '
-          'Using first profile: "${profiles.keys.first}".');
+        'MEDULLA_DEFAULT_PROFILE="$requested" not found in profiles '
+        '(available: ${profiles.keys.join(", ")}). '
+        'Using first profile: "${profiles.keys.first}".',
+      );
     }
     defaultName = profiles.keys.first;
     defaultProfile = profiles.values.first;
   }
-  _log.info('medulla starting — port=$_port profile=$defaultName (model=${defaultProfile.modelPath})');
+  final historySize = await _resolveHistorySize(defaultProfile);
+  _log.info(
+    'medulla starting — port=$_port profile=$defaultName '
+    'historySize=$historySize (model=${defaultProfile.modelPath})',
+  );
 
   // ── 传感器 ────────────────────────────────────────────────
   //
@@ -94,7 +104,7 @@ Future<void> main() async {
     clock: clock,
     standingPose: defaultProfile.standingPose,
     sittingPose: defaultProfile.sittingPose,
-    historySize: _historySize,
+    historySize: historySize,
     standUpCounts: defaultProfile.standUpCounts,
     sitDownCounts: defaultProfile.sitDownCounts,
   );
@@ -108,7 +118,19 @@ Future<void> main() async {
   }
 
   // ── FSM ───────────────────────────────────────────────────
-  final m = M(brain);
+  final m = M(brain)..add(Init());
+  try {
+    await m.stream
+        .firstWhere((s) => s is Grounded)
+        .timeout(const Duration(seconds: 5));
+    _log.info('CMS initialized: ${m.state}');
+  } on TimeoutException {
+    _log.severe('CMS failed to reach Grounded within 5 seconds');
+    await m.close();
+    brain.dispose();
+    await clock.close();
+    exit(1);
+  }
 
   // ── 策略管理（始终创建）──────────────────────────────────────
   final profileManager = ProfileManager(
@@ -125,18 +147,52 @@ Future<void> main() async {
     mode: CmsMode.simulation,
     simInjector: sim,
   )..profileManager = profileManager;
-  final server = Server.create(
-    services: [cmsService],
-  );
+  final server = Server.create(services: [cmsService]);
 
   await server.serve(port: _port);
   _log.info('CMS gRPC server listening on :$_port');
 
   // ── 优雅关机 ───────────────────────────────────────────────
-  ProcessSignal.sigint.watch().listen((_) => _shutdown(m, brain, clock, server));
+  ProcessSignal.sigint.watch().listen(
+    (_) => _shutdown(m, brain, clock, server),
+  );
   if (!Platform.isWindows) {
-    ProcessSignal.sigterm.watch().listen((_) => _shutdown(m, brain, clock, server));
+    ProcessSignal.sigterm.watch().listen(
+      (_) => _shutdown(m, brain, clock, server),
+    );
   }
+}
+
+Future<int> _resolveHistorySize(RobotProfile profile) async {
+  final raw = Platform.environment['MEDULLA_HISTORY_SIZE']?.trim();
+  if (raw != null && raw.isNotEmpty) {
+    final parsed = int.tryParse(raw);
+    if (parsed == null || parsed < 1) {
+      throw FormatException(
+        'MEDULLA_HISTORY_SIZE must be a positive integer, got "$raw"',
+      );
+    }
+    return parsed;
+  }
+
+  final tensorSize = profile.toObservationBuilder().tensorSize;
+  final inferred = await inferHistorySizeFromModel(
+    modelPath: profile.modelPath,
+    tensorSize: tensorSize,
+  );
+  if (inferred != null) {
+    _log.info(
+      'Inferred historySize=$inferred from model input '
+      '(tensorSize=$tensorSize, model=${profile.modelPath})',
+    );
+    return inferred;
+  }
+
+  _log.warning(
+    'Unable to infer history size from model ${profile.modelPath}; '
+    'falling back to 1',
+  );
+  return 1;
 }
 
 Future<void> _shutdown(
@@ -147,20 +203,22 @@ Future<void> _shutdown(
 ) async {
   _log.info('Shutdown signal received — starting graceful shutdown');
 
-  // 1. 发坐下指令
-  m.add(const A.sitDown());
-
-  // 2. 等 FSM 真正到 Grounded（最多 10 秒）
-  try {
-    await m.stream
-        .firstWhere((s) => s is Grounded)
-        .timeout(const Duration(seconds: 10));
-    _log.info('FSM reached Grounded — safe to power off');
-  } on TimeoutException {
-    _log.warning('Shutdown timeout: FSM did not reach Grounded in 10s');
+  // 1. 已经在 Grounded 时无需再等待新的状态事件。
+  if (m.state is Grounded) {
+    _log.info('FSM already Grounded');
+  } else {
+    m.add(const A.sitDown());
+    try {
+      await m.stream
+          .firstWhere((s) => s is Grounded)
+          .timeout(const Duration(seconds: 10));
+      _log.info('FSM reached Grounded — safe to power off');
+    } on TimeoutException {
+      _log.warning('Shutdown timeout: FSM did not reach Grounded in 10s');
+    }
   }
 
-  // 3. 释放资源
+  // 2. 释放资源
   await m.close();
   brain.dispose();
   await clock.close();
@@ -178,7 +236,8 @@ void _setupLogging() {
   );
   Logger.root.level = level;
   Logger.root.onRecord.listen((r) {
-    final prefix = '${r.time.toIso8601String()} ${r.level.name.padRight(7)} ${r.loggerName}';
+    final prefix =
+        '${r.time.toIso8601String()} ${r.level.name.padRight(7)} ${r.loggerName}';
     if (r.level >= Level.WARNING) {
       stderr.writeln('$prefix: ${r.message}');
       if (r.error != null) stderr.writeln('  error: ${r.error}');

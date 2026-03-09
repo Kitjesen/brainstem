@@ -54,7 +54,7 @@ Environment="LD_PRELOAD=/usr/lib/libpcanbasic.so"
 # Dart / ONNX model path
 Environment="HAN_DOG_MODEL_PATH=/home/sunrise/Desktop/brainstem/model/policy_260106.onnx"
 # Profiles directory
-Environment="HAN_DOG_PROFILES_DIR=/home/sunrise/Desktop/brainstem/han_dog/profiles"
+Environment="HAN_DOG_PROFILE_DIR=/home/sunrise/Desktop/brainstem/han_dog/profiles"
 
 Restart=on-failure
 RestartSec=5

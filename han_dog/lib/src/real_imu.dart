@@ -29,6 +29,14 @@ class RealImu implements ImuService {
 
   final hz = RealFrequency();
 
+  /// 最后一次收到 IMU 数据的时间戳。null 表示从未收到数据。
+  DateTime? lastUpdate;
+
+  /// IMU 数据是否已过期（超过 200ms 未更新）。
+  bool get isStale =>
+      lastUpdate == null ||
+      DateTime.now().difference(lastUpdate!).inMilliseconds > 200;
+
   /// 当 IMU 串口流发生错误或意外关闭时调用的回调。
   /// 由外部（如 han_dog.dart）设置，用于将传感器断联事件转发为 FSM Fault。
   void Function(String reason)? onDisconnect;
@@ -48,6 +56,7 @@ class RealImu implements ImuService {
         // 转发到广播流（在过滤之前，保证所有数据对外可见）
         _broadcastController.add(data);
         if (data.isEmpty) return;
+        lastUpdate = DateTime.now();
         final imuData = data.last;
         hz.add(data.length);
         _gyroBuffer.setValues(

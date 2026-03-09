@@ -88,14 +88,24 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   @override
   Future<proto.Empty> enable(ServiceCall call, proto.Empty request) async {
-    await motor?.enable();
+    try {
+      await motor?.enable();
+    } catch (e, st) {
+      _log.severe('Motor enable failed', e, st);
+      throw GrpcError.internal('Motor enable failed: $e');
+    }
     _log.info('Motors enabled');
     return proto.Empty();
   }
 
   @override
   Future<proto.Empty> disable(ServiceCall call, proto.Empty request) async {
-    await motor?.disable();
+    try {
+      await motor?.disable();
+    } catch (e, st) {
+      _log.severe('Motor disable failed', e, st);
+      throw GrpcError.internal('Motor disable failed: $e');
+    }
     _log.info('Motors disabled');
     return proto.Empty();
   }

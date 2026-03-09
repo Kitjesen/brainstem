@@ -48,17 +48,26 @@ class SerialPortController<E, S> {
   }
 
   void add(E event) {
-    _serialPort.write(_eventConverter(event));
+    try {
+      _serialPort.write(_eventConverter(event));
+    } catch (e, st) {
+      _logger.severe('Serial write failed on ${_serialPort.portName}', e, st);
+    }
   }
 
   Stream<Iterable<S>> get state => _stateConverter(_serialPort.onData);
 
+  bool _disposed = false;
+
   void close() {
+    if (_disposed) return;
     _logger.info('Closing ${_serialPort.portName}.');
     _serialPort.close();
   }
 
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _logger.info('Disposing ${_serialPort.portName}.');
     _serialPort.dispose();
   }

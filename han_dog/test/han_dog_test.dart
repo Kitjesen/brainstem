@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:han_dog/src/app/config.dart';
 import 'package:han_dog/src/app/robot_profile.dart';
 import 'package:han_dog/src/control_arbiter.dart';
@@ -69,9 +71,11 @@ void main() {
     test('ownershipHistory is unmodifiable', () {
       final history = arbiter.ownershipHistory;
       expect(
-        () => (history as List).add(
-          (at: DateTime.now(), owner: null, reason: 'hack'),
-        ),
+        () => (history as List).add((
+          at: DateTime.now(),
+          owner: null,
+          reason: 'hack',
+        )),
         throwsUnsupportedError,
       );
     });
@@ -79,7 +83,10 @@ void main() {
     test('yunzhuo preempts grpc', () {
       arbiter.command(const A.standUp(), ControlSource.grpc);
       expect(arbiter.owner, ControlSource.grpc);
-      final accepted = arbiter.command(const A.standUp(), ControlSource.yunzhuo);
+      final accepted = arbiter.command(
+        const A.standUp(),
+        ControlSource.yunzhuo,
+      );
       expect(accepted, isTrue);
       expect(arbiter.owner, ControlSource.yunzhuo);
     });
@@ -121,21 +128,72 @@ void main() {
     });
   });
 
+  group('resolveProfileDir', () {
+    test('prefers primary env var over legacy env var', () {
+      expect(
+        resolveProfileDir(
+          primaryEnvVar: 'HAN_DOG_PROFILE_DIR',
+          legacyEnvVars: const ['HAN_DOG_PROFILES_DIR'],
+          environment: const {
+            'HAN_DOG_PROFILE_DIR': '/primary/profiles',
+            'HAN_DOG_PROFILES_DIR': '/legacy/profiles',
+          },
+        ),
+        '/primary/profiles',
+      );
+    });
+
+    test('accepts deployed legacy env var name', () {
+      expect(
+        resolveProfileDir(
+          primaryEnvVar: 'HAN_DOG_PROFILE_DIR',
+          legacyEnvVars: const ['HAN_DOG_PROFILES_DIR'],
+          environment: const {'HAN_DOG_PROFILES_DIR': '/legacy/profiles'},
+        ),
+        '/legacy/profiles',
+      );
+    });
+
+    test('falls back to han_dog/profiles when launched from repo root', () {
+      final tempDir = Directory.systemTemp.createTempSync(
+        'brainstem_profile_dir',
+      );
+      final nestedProfiles = Directory(
+        '${tempDir.path}${Platform.pathSeparator}han_dog'
+        '${Platform.pathSeparator}profiles',
+      )..createSync(recursive: true);
+      try {
+        expect(nestedProfiles.existsSync(), isTrue);
+        expect(
+          resolveProfileDir(
+            primaryEnvVar: 'HAN_DOG_PROFILE_DIR',
+            legacyEnvVars: const ['HAN_DOG_PROFILES_DIR'],
+            environment: const {},
+            workingDirectory: tempDir.path,
+          ),
+          'han_dog/profiles',
+        );
+      } finally {
+        tempDir.deleteSync(recursive: true);
+      }
+    });
+  });
+
   // ─── RobotProfile.fromJson() ─────────────────────────────────
 
   group('RobotProfile.fromJson', () {
     Map<String, dynamic> validJson() => {
-          'name': 'test',
-          'modelPath': 'model.onnx',
-          'standingPose': List.filled(16, 0.0),
-          'sittingPose': List.filled(16, 0.0),
-          'inferKp': List.filled(16, 20.0),
-          'inferKd': List.filled(16, 0.5),
-          'standUpKp': List.filled(16, 30.0),
-          'standUpKd': List.filled(16, 1.0),
-          'sitDownKp': List.filled(16, 25.0),
-          'sitDownKd': List.filled(16, 0.8),
-        };
+      'name': 'test',
+      'modelPath': 'model.onnx',
+      'standingPose': List.filled(16, 0.0),
+      'sittingPose': List.filled(16, 0.0),
+      'inferKp': List.filled(16, 20.0),
+      'inferKd': List.filled(16, 0.5),
+      'standUpKp': List.filled(16, 30.0),
+      'standUpKd': List.filled(16, 1.0),
+      'sitDownKp': List.filled(16, 25.0),
+      'sitDownKd': List.filled(16, 0.8),
+    };
 
     test('valid JSON parses successfully', () {
       final profile = RobotProfile.fromJson(validJson());
@@ -158,8 +216,13 @@ void main() {
       final json = validJson()..remove('name');
       expect(
         () => RobotProfile.fromJson(json),
-        throwsA(isA<FormatException>()
-            .having((e) => e.message, 'message', contains('"name"'))),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('"name"'),
+          ),
+        ),
       );
     });
 
@@ -167,40 +230,61 @@ void main() {
       final json = validJson()..remove('modelPath');
       expect(
         () => RobotProfile.fromJson(json),
-        throwsA(isA<FormatException>()
-            .having((e) => e.message, 'message', contains('"modelPath"'))),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('"modelPath"'),
+          ),
+        ),
       );
     });
 
     test('missing inferKp throws FormatException', () {
       final json = validJson()..remove('inferKp');
-      expect(() => RobotProfile.fromJson(json), throwsA(isA<FormatException>()));
-    });
-
-    test('inferKp with 15 elements throws FormatException mentioning length', () {
-      final json = validJson()..['inferKp'] = List.filled(15, 0.0);
       expect(
         () => RobotProfile.fromJson(json),
-        throwsA(isA<FormatException>().having(
-          (e) => e.message,
-          'message',
-          allOf(contains('"inferKp"'), contains('16')),
-        )),
+        throwsA(isA<FormatException>()),
       );
     });
+
+    test(
+      'inferKp with 15 elements throws FormatException mentioning length',
+      () {
+        final json = validJson()..['inferKp'] = List.filled(15, 0.0);
+        expect(
+          () => RobotProfile.fromJson(json),
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'message',
+              allOf(contains('"inferKp"'), contains('16')),
+            ),
+          ),
+        );
+      },
+    );
 
     test('standingPose with wrong length throws FormatException', () {
       final json = validJson()..['standingPose'] = List.filled(8, 0.0);
       expect(
         () => RobotProfile.fromJson(json),
-        throwsA(isA<FormatException>()
-            .having((e) => e.message, 'message', contains('"standingPose"'))),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('"standingPose"'),
+          ),
+        ),
       );
     });
 
     test('name with non-string type throws FormatException', () {
       final json = validJson()..['name'] = 42;
-      expect(() => RobotProfile.fromJson(json), throwsA(isA<FormatException>()));
+      expect(
+        () => RobotProfile.fromJson(json),
+        throwsA(isA<FormatException>()),
+      );
     });
 
     test('optional numeric fields use defaults when absent', () {
@@ -218,12 +302,15 @@ void main() {
       expect(profile.actionScale.$4, closeTo(5.0, 1e-9));
     });
 
-    test('jointVelocityScale defaults to (0.05, 0.05, 0.05, 0.05) when absent', () {
-      final profile = RobotProfile.fromJson(validJson());
-      expect(profile.jointVelocityScale.$1, closeTo(0.05, 1e-9));
-      expect(profile.jointVelocityScale.$2, closeTo(0.05, 1e-9));
-      expect(profile.jointVelocityScale.$3, closeTo(0.05, 1e-9));
-      expect(profile.jointVelocityScale.$4, closeTo(0.05, 1e-9));
-    });
+    test(
+      'jointVelocityScale defaults to (0.05, 0.05, 0.05, 0.05) when absent',
+      () {
+        final profile = RobotProfile.fromJson(validJson());
+        expect(profile.jointVelocityScale.$1, closeTo(0.05, 1e-9));
+        expect(profile.jointVelocityScale.$2, closeTo(0.05, 1e-9));
+        expect(profile.jointVelocityScale.$3, closeTo(0.05, 1e-9));
+        expect(profile.jointVelocityScale.$4, closeTo(0.05, 1e-9));
+      },
+    );
   });
 }

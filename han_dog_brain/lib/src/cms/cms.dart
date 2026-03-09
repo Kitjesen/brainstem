@@ -40,13 +40,20 @@ class M extends Cms<S, A> {
   /// 监听过渡行为（有限流：StandUp、SitDown 或 Gesture）。
   /// 行为完成时触发 [Done]。
   StreamSubscription<History> _listenTransition(Command target) {
-    final stream = switch (target) {
-      StandUpCommand() => _brain.standUp.doing,
-      SitDownCommand() => _brain.sitDown.doing,
-      GestureCommand(:final name) => _brain.createGesture(name)?.doing
-          ?? (throw StateError('Unknown gesture: $name')),
-      _ => throw StateError('Invalid transition target: $target'),
-    };
+    final Stream<History> stream;
+    try {
+      stream = switch (target) {
+        StandUpCommand() => _brain.standUp.doing,
+        SitDownCommand() => _brain.sitDown.doing,
+        GestureCommand(:final name) => _brain.createGesture(name)?.doing
+            ?? (throw StateError('Unknown gesture: $name')),
+        _ => throw StateError('Invalid transition target: $target'),
+      };
+    } catch (e, st) {
+      _log.severe('Failed to create transition stream for ${target.runtimeType}', e, st);
+      Future.microtask(() => add(A.fault('Transition setup error: $e')));
+      return const Stream<History>.empty().listen((_) {});
+    }
     return stream.listen(
       _brain.memory.add,
       onError: (Object error, StackTrace st) {
