@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 import 'pcan_basic.g.dart';
+import 'pcan_library.dart';
 
 import 'utils.dart';
 
@@ -13,7 +14,7 @@ PcanStatus canInitialize(
   int hwType,
   int ioPort,
   int interrupt,
-) => CAN_Initialize(
+) => canInitializeRaw(
   channel.value,
   baudRate.value,
   hwType,
@@ -24,25 +25,25 @@ PcanStatus canInitialize(
 PcanStatus canInitializeFD(PcanChannel channel, String params) {
   final pStr = params.toNativeUtf8().cast<ffi.Char>();
   try {
-    return CAN_InitializeFD(channel.value, pStr).asPcanStatus;
+    return canInitializeFDRaw(channel.value, pStr).asPcanStatus;
   } finally {
     calloc.free(pStr);
   }
 }
 
 PcanStatus canUninitialize(PcanChannel channel) =>
-    CAN_Uninitialize(channel.value).asPcanStatus;
+    canUninitializeRaw(channel.value).asPcanStatus;
 
 PcanStatus canReset(PcanChannel channel) =>
-    CAN_Reset(channel.value).asPcanStatus;
+    canResetRaw(channel.value).asPcanStatus;
 
 PcanStatus canGetStatus(PcanChannel channel) =>
-    CAN_GetStatus(channel.value).asPcanStatus;
+    canGetStatusRaw(channel.value).asPcanStatus;
 
 (PcanMessage, PcanTimestamp, PcanStatus) canRead(PcanChannel channel) {
   final msgBuffer = calloc<tagTPCANMsg>();
   final timestampBuffer = calloc<tagTPCANTimestamp>();
-  final status = CAN_Read(
+  final status = canReadRaw(
     channel.value,
     msgBuffer,
     timestampBuffer,
@@ -69,7 +70,7 @@ PcanStatus canGetStatus(PcanChannel channel) =>
 (PcanMessageFD, PcanTimestamp, PcanStatus) canReadFD(PcanChannel channel) {
   final msgBuffer = calloc<tagTPCANMsgFD>();
   final timestampBuffer = calloc<tagTPCANTimestamp>();
-  final status = CAN_ReadFD(
+  final status = canReadFDRaw(
     channel.value,
     msgBuffer,
     timestampBuffer.cast(),
@@ -103,7 +104,7 @@ PcanStatus canWrite(PcanChannel channel, PcanMessage message) {
     msgBuffer.ref.DATA[i] = message.data[i];
   }
 
-  final status = CAN_Write(channel.value, msgBuffer).asPcanStatus;
+  final status = canWriteRaw(channel.value, msgBuffer).asPcanStatus;
   calloc.free(msgBuffer);
   return status;
 }
@@ -118,7 +119,7 @@ PcanStatus canWriteFD(PcanChannel channel, PcanMessageFD message) {
     msgBuffer.ref.DATA[i] = message.data[i];
   }
 
-  final status = CAN_WriteFD(channel.value, msgBuffer).asPcanStatus;
+  final status = canWriteFDRaw(channel.value, msgBuffer).asPcanStatus;
   calloc.free(msgBuffer);
   return status;
 }
@@ -128,14 +129,14 @@ PcanStatus canFilterMessages(
   int fromId,
   int toId,
   PcanMode mode,
-) => CAN_FilterMessages(channel.value, fromId, toId, mode.value).asPcanStatus;
+) => canFilterMessagesRaw(channel.value, fromId, toId, mode.value).asPcanStatus;
 
 PcanStatus canGetValue(
   PcanChannel channel,
   PcanParameter parameter,
   ffi.Pointer<ffi.Void> buffer,
   int bufferLength,
-) => CAN_GetValue(
+) => canGetValueRaw(
   channel.value,
   parameter.value,
   buffer,
@@ -147,7 +148,7 @@ PcanStatus canSetValue(
   PcanParameter parameter,
   ffi.Pointer<ffi.Void> buffer,
   int bufferLength,
-) => CAN_SetValue(
+) => canSetValueRaw(
   channel.value,
   parameter.value,
   buffer,
@@ -158,7 +159,7 @@ PcanStatus canSetValue(
   // https://documentation.help/PCAN-Basic/CAN_GetErrorText.html
   final textPtr = calloc<ffi.Char>(256);
   try {
-    final status = CAN_GetErrorText(
+    final status = canGetErrorTextRaw(
       error.value,
       language.value,
       textPtr.cast(),
@@ -173,7 +174,7 @@ PcanStatus canSetValue(
 (PcanChannel, PcanStatus) lookUpChannel(String parameters) {
   final foundChannelPtr = calloc<ffi.Uint16>();
   final parametersPtr = parameters.toNativeUtf8().cast<ffi.Char>();
-  final statusCode = CAN_LookUpChannel(parametersPtr, foundChannelPtr);
+  final statusCode = canLookUpChannelRaw(parametersPtr, foundChannelPtr);
   final status = statusCode.asPcanStatus;
   final channel = PcanChannel.fromValue(foundChannelPtr.value);
   calloc.free(foundChannelPtr);

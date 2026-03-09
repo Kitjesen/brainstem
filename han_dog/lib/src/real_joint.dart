@@ -129,6 +129,9 @@ class RealJoint implements JointService, MotorService {
       onError: (Object error, StackTrace st) {
         _log.severe('PCAN leg $legId stream error', error, st);
       },
+      onDone: () {
+        _log.warning('PCAN leg $legId stream closed unexpectedly');
+      },
     );
   }
 

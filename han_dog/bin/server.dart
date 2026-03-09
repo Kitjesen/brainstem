@@ -134,7 +134,9 @@ Future<void> main() async {
 
   // ── 优雅关机 ───────────────────────────────────────────────
   ProcessSignal.sigint.watch().listen((_) => _shutdown(m, brain, clock, server));
-  ProcessSignal.sigterm.watch().listen((_) => _shutdown(m, brain, clock, server));
+  if (!Platform.isWindows) {
+    ProcessSignal.sigterm.watch().listen((_) => _shutdown(m, brain, clock, server));
+  }
 }
 
 Future<void> _shutdown(

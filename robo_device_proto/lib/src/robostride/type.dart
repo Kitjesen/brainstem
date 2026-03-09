@@ -49,7 +49,8 @@ enum RSRunMode {
 enum RSStatus {
   reset(0),
   calibration(1),
-  motor(2);
+  motor(2),
+  unknown(3);
 
   final int value;
   const RSStatus(this.value);
@@ -57,7 +58,7 @@ enum RSStatus {
   static RSStatus fromValue(int value) {
     return .values.firstWhere(
       (status) => status.value == value,
-      orElse: () => throw ArgumentError('Invalid status value: $value'),
+      orElse: () => .unknown,
     );
   }
 }

@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:robo_device_proto/device_proto.dart';
+import 'package:robo_device_proto/robo_device_proto.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -16,7 +16,7 @@ void main() {
         .map((e) => int.parse(e, radix: 16))
         .toList();
 
-    final state = Hi91State.fromBytes(.fromList(bytes));
+    final state = Hi91State.fromBytes(Uint8List.fromList(bytes));
     expect(
       state,
       isA<Hi91State>()

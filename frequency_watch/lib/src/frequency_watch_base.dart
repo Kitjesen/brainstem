@@ -43,9 +43,9 @@ class FrequencyWatch {
       median: median,
       p95: p95,
       avg: avg,
-      medianHz: 1e6 / median,
-      p95Hz: 1e6 / p95,
-      avgHz: 1e6 / avg,
+      medianHz: median > 0 ? 1e6 / median : 0.0,
+      p95Hz: p95 > 0 ? 1e6 / p95 : 0.0,
+      avgHz: avg > 0 ? 1e6 / avg : 0.0,
     );
   }
 

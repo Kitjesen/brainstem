@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:robo_device_proto/device_proto.dart';
+import 'package:robo_device_proto/robo_device_proto.dart';
 import 'package:robo_device_proto/src/robostride/internal.dart';
 import 'package:test/test.dart';
 import 'package:meta/meta.dart';
@@ -82,6 +82,24 @@ void main() {
       data1: _b([0x99, 0x7a, 0x7f, 0xd7, 0x7f, 0xff, 0x01, 0x22]),
     ),
     isA<RSStateReport>()
+        .having((e) => e.canId, 'canId', 0x7f)
+        .having((e) => e.hostId, 'hostId', 0xfd)
+        .having((e) => e.position, 'position', closeTo(2.5, 0.01))
+        .having((e) => e.velocity, 'velocity', closeTo(0.0, 0.05))
+        .having((e) => e.torque, 'torque', closeTo(0.0, 0.05))
+        .having((e) => e.temperature, 'temperature', closeTo(29.0, 0.05))
+        .having((e) => e.errors, 'errors', 0),
+  );
+
+  check(
+    'motion control ACK (mode 0x01)',
+    RSDataFrame(
+      mode: 0x01,
+      data2: 0x7f,
+      canId: 0xfd,
+      data1: _b([0x99, 0x7a, 0x7f, 0xd7, 0x7f, 0xff, 0x01, 0x22]),
+    ),
+    isA<RSStateResponse>()
         .having((e) => e.canId, 'canId', 0x7f)
         .having((e) => e.hostId, 'hostId', 0xfd)
         .having((e) => e.position, 'position', closeTo(2.5, 0.01))

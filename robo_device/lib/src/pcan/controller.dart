@@ -76,7 +76,13 @@ class PcanController<E, S> {
         return;
       }
       _consecutiveErrors = 0;
-      _controller.add(_stateConverter(message));
+      try {
+        _controller.add(_stateConverter(message));
+      } on UnimplementedError catch (e) {
+        _logger.fine('Skipping unsupported frame: $e');
+      } on ArgumentError catch (e) {
+        _logger.fine('Skipping malformed frame: $e');
+      }
     });
     return true;
   }
@@ -87,7 +93,9 @@ class PcanController<E, S> {
     _pcan.close();
     _consecutiveErrors = 0;
     _logger.info('PCAN ${_pcan.channel}: reopening...');
-    open();
+    if (!open()) {
+      _logger.severe('PCAN ${_pcan.channel}: reopen failed');
+    }
   }
 
   void add(E event) {

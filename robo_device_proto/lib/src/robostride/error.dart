@@ -20,7 +20,7 @@ extension type RSErrors1(int value) {
     20: .stallOverload,
     21: .uncalibrated,
   };
-  static bool _isPresent(int faultBits, bit) {
+  static bool _isPresent(int faultBits, int bit) {
     return (faultBits & (1 << (bit - 16))) != 0;
   }
 

@@ -93,6 +93,7 @@ class ControlArbiter {
   }
 
   void _acquire(ControlSource source) {
+    if (_disposed) return;
     final changed = _owner != source;
     _owner = source;
     if (changed) {
@@ -110,6 +111,7 @@ class ControlArbiter {
   }
 
   void _doRelease(String reason) {
+    if (_disposed) return;
     if (_owner != null) {
       _log.info('Control released (was $_owner, reason: $reason)');
       _addHistory(null, 'released: $reason (was $_owner)');

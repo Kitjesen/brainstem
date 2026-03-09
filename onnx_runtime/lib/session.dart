@@ -79,7 +79,10 @@ class InferenceSession implements Finalizable {
     return obj;
   }
 
-  void dispose() => Gc.session.detach(this);
+  void dispose() {
+    Gc.session.detach(this);
+    ortApi.ReleaseSession(sesPtr);
+  }
 
   int get inputCounts {
     final countPtr = calloc<Size>();
@@ -130,7 +133,9 @@ class InferenceSession implements Finalizable {
         defaultAllocator,
         namePtr,
       ).guard();
-      return namePtr.value.cast<Utf8>().toDartString();
+      final name = namePtr.value.cast<Utf8>().toDartString();
+      ortApi.AllocatorFree(defaultAllocator, namePtr.value.cast());
+      return name;
     } finally {
       calloc.free(namePtr);
     }
@@ -145,7 +150,9 @@ class InferenceSession implements Finalizable {
         defaultAllocator,
         namePtr,
       ).guard();
-      return namePtr.value.cast<Utf8>().toDartString();
+      final name = namePtr.value.cast<Utf8>().toDartString();
+      ortApi.AllocatorFree(defaultAllocator, namePtr.value.cast());
+      return name;
     } finally {
       calloc.free(namePtr);
     }
@@ -227,9 +234,10 @@ class InferenceSession implements Finalizable {
           shapeLen,
           type.value,
           tempPtr,
-        );
+        ).guard();
 
         valuesPtr[i] = value.fill(tempPtr.value, type);
+        calloc.free(shape);
       }
       calloc.free(tempPtr);
       return valuesPtr;

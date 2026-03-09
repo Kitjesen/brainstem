@@ -54,7 +54,11 @@ sealed class RSState with _$RSState {
         radix: 10,
       ),
     ),
-    0x02 => .response(
+    // 0x01: motion control ACK (motor echoes back the control command)
+    // 0x02: general motor response
+    // Both share identical data2/data1 layout: position, velocity, torque,
+    // temperature in data1; canId, errors, status packed in data2.
+    0x01 || 0x02 => .response(
       canId: (frame.data2) & 0xFF,
       hostId: frame.canId,
       position: uint16ToFloat(
@@ -102,7 +106,7 @@ sealed class RSState with _$RSState {
       canId: frame.data2 & 0xFF,
       errors: .new(frame.data2),
     ),
-    _ => throw Exception('Unknown RSState mode: ${frame.mode}'),
+    _ => throw UnimplementedError('Unknown RSState mode: 0x${frame.mode.toRadixString(16)}'),
   };
 
   factory RSState.fromCanFrame(CanFrame frame) =>
