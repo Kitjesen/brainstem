@@ -17,9 +17,12 @@ import 'package:protobuf/well_known_types/google/protobuf/duration.pb.dart'
     as $4;
 import 'package:protobuf/well_known_types/google/protobuf/empty.pb.dart' as $0;
 
+import 'cms.pbenum.dart';
 import 'common.pb.dart' as $1;
 
 export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+
+export 'cms.pbenum.dart';
 
 /// 单次推理周期的完整观测数据（RL policy 的输入/输出）。
 class History extends $pb.GeneratedMessage {
@@ -830,9 +833,87 @@ class ProfileInfo extends $pb.GeneratedMessage {
   void clearCurrentDescription() => $_clearField(4);
 }
 
+class CmsState extends $pb.GeneratedMessage {
+  factory CmsState({
+    CmsStateKind? kind,
+    CmsTransitionKind? transition,
+    $core.String? gestureName,
+  }) {
+    final result = create();
+    if (kind != null) result.kind = kind;
+    if (transition != null) result.transition = transition;
+    if (gestureName != null) result.gestureName = gestureName;
+    return result;
+  }
+
+  CmsState._();
+
+  factory CmsState.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CmsState.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CmsState',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
+      createEmptyInstance: create)
+    ..aE<CmsStateKind>(1, _omitFieldNames ? '' : 'kind',
+        enumValues: CmsStateKind.values)
+    ..aE<CmsTransitionKind>(2, _omitFieldNames ? '' : 'transition',
+        enumValues: CmsTransitionKind.values)
+    ..aOS(3, _omitFieldNames ? '' : 'gestureName')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CmsState clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CmsState copyWith(void Function(CmsState) updates) =>
+      super.copyWith((message) => updates(message as CmsState)) as CmsState;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CmsState create() => CmsState._();
+  @$core.override
+  CmsState createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static CmsState getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<CmsState>(create);
+  static CmsState? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  CmsStateKind get kind => $_getN(0);
+  @$pb.TagNumber(1)
+  set kind(CmsStateKind value) => $_setField(1, value);
+  @$pb.TagNumber(1)
+  $core.bool hasKind() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearKind() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  CmsTransitionKind get transition => $_getN(1);
+  @$pb.TagNumber(2)
+  set transition(CmsTransitionKind value) => $_setField(2, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTransition() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTransition() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get gestureName => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set gestureName($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasGestureName() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearGestureName() => $_clearField(3);
+}
+
 enum Command_Data { idle, standUp, sitDown, walk, notSet }
 
-/// 运动指令。
 class Command extends $pb.GeneratedMessage {
   factory Command({
     $0.Empty? idle,

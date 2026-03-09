@@ -61,6 +61,7 @@ class GrpcService extends ChangeNotifier {
   static const _jointThrottleMs = 20; // 50Hz max UI update rate for joints
 
   // Streams
+  StreamSubscription? _stateSub;
   StreamSubscription? _historySub;
   StreamSubscription? _imuSub;
   StreamSubscription? _jointSub;
@@ -297,6 +298,7 @@ class GrpcService extends ChangeNotifier {
       // Fetch params and profile info
       _fetchParams();
       _fetchProfile();
+      _fetchCmsState();
 
       // Start streaming
       _startStreams();
@@ -408,9 +410,11 @@ class GrpcService extends ChangeNotifier {
 
   /// 取消流订阅并关闭 channel/client（不重置重连状态）。
   void _teardownConnection() {
+    _stateSub?.cancel();
     _historySub?.cancel();
     _imuSub?.cancel();
     _jointSub?.cancel();
+    _stateSub = null;
     _historySub = null;
     _imuSub = null;
     _jointSub = null;
@@ -460,6 +464,7 @@ class GrpcService extends ChangeNotifier {
       _startStreams();
       _fetchParams();
       _fetchProfile();
+      _fetchCmsState();
     } catch (e) {
       _log('✕', 'Reconnect', 'failed: $e');
       _connected = false;
@@ -476,6 +481,35 @@ class GrpcService extends ChangeNotifier {
     _availableProfiles = List<String>.from(info.available);
     _profileDescriptions = List<String>.from(info.descriptions);
     notifyListeners();
+  }
+
+  void _applyCmsState(CmsState state) {
+    _cmsState = switch (state.kind) {
+      CmsStateKind.CMS_STATE_KIND_ZERO => 'Zero',
+      CmsStateKind.CMS_STATE_KIND_GROUNDED => 'Grounded',
+      CmsStateKind.CMS_STATE_KIND_STANDING => 'Standing',
+      CmsStateKind.CMS_STATE_KIND_WALKING => 'Walking',
+      CmsStateKind.CMS_STATE_KIND_TRANSITIONING =>
+        switch (state.transition) {
+          CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP => 'StandUp',
+          CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN => 'SitDown',
+          _ => 'Transitioning',
+        },
+      _ => 'Unknown',
+    };
+  }
+
+  Future<void> _fetchCmsState() async {
+    if (_client == null) return;
+    try {
+      _log('→', 'GetCmsState');
+      final state = await _client!.getCmsState(Empty());
+      _applyCmsState(state);
+      _log('←', 'GetCmsState', _cmsState);
+      notifyListeners();
+    } catch (e) {
+      _log('✕', 'GetCmsState', e.toString());
+    }
   }
 
   Future<void> _fetchProfile() async {
@@ -524,12 +558,28 @@ class GrpcService extends ChangeNotifier {
   void _startStreams() {
     if (_client == null) return;
 
+    // CMS state stream
+    _stateSub = _client!.listenCmsState(Empty()).listen(
+      (state) {
+        _applyCmsState(state);
+        _touchData();
+        _scheduleNotify();
+      },
+      onError: (Object e, StackTrace st) {
+        _log('✕', 'ListenCmsState', e.toString());
+        _handleStreamError('CmsState', e);
+      },
+      onDone: () {
+        _log('◼', 'ListenCmsState', '服务端关闭了 CmsState 流');
+        _handleStreamDone('CmsState');
+      },
+    );
+
     // History stream
     _historySub = _client!.listenHistory(Empty()).listen(
       (history) {
         _latestHistory = history;
         _historyCount++;
-        _updateCmsState(history.command);
         _updateFrequency();
         _touchData();
         _scheduleNotify();
@@ -673,29 +723,6 @@ class GrpcService extends ChangeNotifier {
     }
   }
 
-  void _updateCmsState(Command cmd) {
-    switch (cmd.whichData()) {
-      case Command_Data.idle:
-        // Derive FSM state from transitions:
-        // - After StandUp or Walking completes → robot is now Standing
-        // - After SitDown completes → back to Idle/Grounded
-        if (_cmsState == 'StandUp' || _cmsState == 'Walking') {
-          _cmsState = 'Standing';
-        } else if (_cmsState == 'SitDown') {
-          _cmsState = 'Idle';
-        }
-        // If already 'Standing' or 'Idle' → no change
-      case Command_Data.standUp:
-        _cmsState = 'StandUp';
-      case Command_Data.sitDown:
-        _cmsState = 'SitDown';
-      case Command_Data.walk:
-        _cmsState = 'Walking';
-      case Command_Data.notSet:
-        break;
-    }
-  }
-
   // --- Commands ---
   // All motion commands use proper GrpcError.code checks instead of string matching.
 
@@ -731,11 +758,7 @@ class GrpcService extends ChangeNotifier {
       _log('←', 'StandUp', 'OK');
     } catch (e) {
       _log('✕', 'StandUp', e.toString());
-      if (_isFailedPrecondition(e)) {
-        onErrorNotify?.call('StandUp 被拒绝: 遥控器优先');
-      } else {
-        onErrorNotify?.call('StandUp 失败: ${_formatGrpcError(e)}');
-      }
+      onErrorNotify?.call('StandUp 失败: ${_formatGrpcError(e)}');
     }
   }
 
@@ -747,11 +770,7 @@ class GrpcService extends ChangeNotifier {
       _log('←', 'SitDown', 'OK');
     } catch (e) {
       _log('✕', 'SitDown', e.toString());
-      if (_isFailedPrecondition(e)) {
-        onErrorNotify?.call('SitDown 被拒绝: 遥控器优先');
-      } else {
-        onErrorNotify?.call('SitDown 失败: ${_formatGrpcError(e)}');
-      }
+      onErrorNotify?.call('SitDown 失败: ${_formatGrpcError(e)}');
     }
   }
 
@@ -770,9 +789,9 @@ class GrpcService extends ChangeNotifier {
         _walkStart = null;
       }
     } catch (e) {
-      // Walk commands are sent at high frequency; only log FAILED_PRECONDITION once
+      // Walk commands are sent at high frequency; avoid toast spam and keep logs concise.
       if (_isFailedPrecondition(e)) {
-        _log('✕', 'Walk', '被拒绝: 遥控器优先');
+        _log('✕', 'Walk', _formatGrpcError(e));
       }
     }
   }

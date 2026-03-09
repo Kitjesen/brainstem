@@ -64,6 +64,8 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   /// 广播流缓存：支持多客户端。
   late final _historyBroadcast = _brain.historyStream.asBroadcastStream();
+  late final _cmsStateBroadcast =
+      _m.stream.map(_toProtoCmsState).asBroadcastStream();
 
   UnifiedCmsServer({
     required Brain brain,
@@ -119,7 +121,6 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     final sinceMs = _lastCommandAt != null
         ? now.difference(_lastCommandAt!).inMilliseconds
         : null;
-    _lastCommandAt = now;
 
     final a = arbiter;
     if (a != null) {
@@ -133,6 +134,7 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     } else {
       _m.add(action);
     }
+    _lastCommandAt = now;
     _log.finest('${action.runtimeType} dispatched'
         '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
     gains?.applyCommand(action);
@@ -140,6 +142,91 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   /// Walk 指令向量最大幅值。遥控器各轴 [-1, 1]，最大幅值 √3 ≈ 1.73；
   /// 设 3.0 为上界，阻止异常大值进入观测特征空间。
+  void _ensureCommandAllowed(A action) {
+    final state = _m.state;
+    switch (action) {
+      case CmdWalk():
+        if (state is Zero) {
+          throw GrpcError.failedPrecondition('CMS not initialized');
+        }
+        if (state case Transitioning(:final target)) {
+          throw GrpcError.failedPrecondition(
+            'Transition in progress: ${_describeTransitionTarget(target)}',
+          );
+        }
+        if (state is Grounded) {
+          throw GrpcError.failedPrecondition(
+            'Walk requires Standing or Walking state',
+          );
+        }
+        return;
+      case CmdStandUp():
+      case CmdSitDown():
+        if (state is Zero) {
+          throw GrpcError.failedPrecondition('CMS not initialized');
+        }
+        if (state case Transitioning(:final target)) {
+          throw GrpcError.failedPrecondition(
+            'Transition in progress: ${_describeTransitionTarget(target)}',
+          );
+        }
+        return;
+      case CmdGesture():
+        if (state is Zero) {
+          throw GrpcError.failedPrecondition('CMS not initialized');
+        }
+        if (state case Transitioning(:final target)) {
+          throw GrpcError.failedPrecondition(
+            'Transition in progress: ${_describeTransitionTarget(target)}',
+          );
+        }
+        if (state is! Standing) {
+          throw GrpcError.failedPrecondition('Gesture requires Standing state');
+        }
+        return;
+      default:
+        return;
+    }
+  }
+
+  String _describeTransitionTarget(Command target) => switch (target) {
+        StandUpCommand() => 'standUp',
+        SitDownCommand() => 'sitDown',
+        GestureCommand(:final name) => 'gesture($name)',
+        _ => target.runtimeType.toString(),
+      };
+
+  proto.CmsState _toProtoCmsState(S state) => switch (state) {
+        Zero() => proto.CmsState(
+            kind: proto.CmsStateKind.CMS_STATE_KIND_ZERO,
+          ),
+        Grounded() => proto.CmsState(
+            kind: proto.CmsStateKind.CMS_STATE_KIND_GROUNDED,
+          ),
+        Standing() => proto.CmsState(
+            kind: proto.CmsStateKind.CMS_STATE_KIND_STANDING,
+          ),
+        Walking() => proto.CmsState(
+            kind: proto.CmsStateKind.CMS_STATE_KIND_WALKING,
+          ),
+        Transitioning(target: StandUpCommand()) => proto.CmsState(
+            kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
+            transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP,
+          ),
+        Transitioning(target: SitDownCommand()) => proto.CmsState(
+            kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
+            transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
+          ),
+        Transitioning(target: GestureCommand(:final name)) => proto.CmsState(
+            kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
+            transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_GESTURE,
+            gestureName: name,
+          ),
+        Transitioning() => proto.CmsState(
+            kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
+          ),
+      };
+
   static const _walkDirMaxMagnitude = 3.0;
 
   @override
@@ -159,12 +246,14 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
         'exceeds max $_walkDirMaxMagnitude',
       );
     }
+    _ensureCommandAllowed(A.walk(dir));
     _dispatch(A.walk(dir));
     return proto.Empty();
   }
 
   @override
   Future<proto.Empty> standUp(ServiceCall call, proto.Empty request) async {
+    _ensureCommandAllowed(const A.standUp());
     _dispatch(const A.standUp());
     _log.info('StandUp command received');
     return proto.Empty();
@@ -172,6 +261,7 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   @override
   Future<proto.Empty> sitDown(ServiceCall call, proto.Empty request) async {
+    _ensureCommandAllowed(const A.sitDown());
     _dispatch(const A.sitDown());
     _log.info('SitDown command received');
     return proto.Empty();
@@ -189,6 +279,7 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     if (library == null || !library.contains(name)) {
       throw GrpcError.notFound('Unknown gesture: $name');
     }
+    _ensureCommandAllowed(A.gesture(name));
     _dispatch(A.gesture(name));
     _log.info('Gesture command received: $name');
   }
@@ -293,6 +384,12 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   }
 
   @override
+  Future<proto.CmsState> getCmsState(
+      ServiceCall call, proto.Empty request) async {
+    return _toProtoCmsState(_m.state);
+  }
+
+  @override
   Future<proto.Params> getParams(
       ServiceCall call, proto.Empty request) async {
     return proto.Params(
@@ -318,6 +415,13 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
         kd: gains?.kd,
       ),
     );
+  }
+
+  @override
+  Stream<proto.CmsState> listenCmsState(
+      ServiceCall call, proto.Empty request) async* {
+    yield _toProtoCmsState(_m.state);
+    yield* _cmsStateBroadcast;
   }
 
   @override

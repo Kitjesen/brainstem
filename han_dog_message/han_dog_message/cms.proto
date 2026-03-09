@@ -50,9 +50,11 @@ service Cms {
 
   // 获取服务启动时间（UTC）。
   rpc GetStartTime(google.protobuf.Empty) returns (google.protobuf.Timestamp);
+  rpc GetCmsState(google.protobuf.Empty) returns (CmsState);
 
   // 实时推理历史流：每个推理周期（~20ms）发送一帧。
   rpc ListenHistory(google.protobuf.Empty) returns (stream History);
+  rpc ListenCmsState(google.protobuf.Empty) returns (stream CmsState);
   // 实时 IMU 数据流。
   rpc ListenImu(google.protobuf.Empty) returns (stream Imu);
   // 实时关节数据流（单关节上报或全关节快照）。
@@ -166,6 +168,27 @@ message ProfileInfo {
 }
 
 // 运动指令。
+enum CmsStateKind {
+  CMS_STATE_KIND_ZERO = 0;
+  CMS_STATE_KIND_GROUNDED = 1;
+  CMS_STATE_KIND_STANDING = 2;
+  CMS_STATE_KIND_WALKING = 3;
+  CMS_STATE_KIND_TRANSITIONING = 4;
+}
+
+enum CmsTransitionKind {
+  CMS_TRANSITION_KIND_NONE = 0;
+  CMS_TRANSITION_KIND_STAND_UP = 1;
+  CMS_TRANSITION_KIND_SIT_DOWN = 2;
+  CMS_TRANSITION_KIND_GESTURE = 3;
+}
+
+message CmsState {
+  CmsStateKind kind = 1;
+  CmsTransitionKind transition = 2;
+  string gesture_name = 3;
+}
+
 message Command {
   oneof data {
     // 空闲：保持当前姿态，不进行推理。

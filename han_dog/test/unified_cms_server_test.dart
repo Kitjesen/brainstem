@@ -98,9 +98,16 @@ void main() {
     });
 
     test('合法方向 → 调用 m.add()', () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(() => m.state).thenReturn(Standing(sub));
+
       final server = _simServer(brain, m);
       await server.walk(call, proto.Vector3(x: 0.5, y: 0, z: 0));
       verify(() => m.add(any())).called(1);
+
+      await sub.cancel();
+      await historyCtrl.close();
     });
   });
 
@@ -226,6 +233,91 @@ void main() {
 
       await sub.cancel();
       await ctrl.close();
+    });
+  });
+
+  group('motion preconditions', () {
+    test('Grounded walk returns failedPrecondition', () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(() => m.state).thenReturn(Grounded(sub));
+
+      final server = _simServer(brain, m);
+      await expectLater(
+        server.walk(call, proto.Vector3(x: 0.5, y: 0, z: 0)),
+        throwsA(isA<GrpcError>()
+            .having((e) => e.code, 'code', StatusCode.failedPrecondition)),
+      );
+
+      await sub.cancel();
+      await historyCtrl.close();
+    });
+
+    test('Transitioning standUp returns failedPrecondition', () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(() => m.state).thenReturn(
+        Transitioning(const StandUpCommand(), sub, null),
+      );
+
+      final server = _simServer(brain, m);
+      await expectLater(
+        server.standUp(call, proto.Empty()),
+        throwsA(isA<GrpcError>()
+            .having((e) => e.code, 'code', StatusCode.failedPrecondition)),
+      );
+
+      await sub.cancel();
+      await historyCtrl.close();
+    });
+  });
+
+  group('cms state', () {
+    test('getCmsState returns authoritative grounded state', () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(() => m.state).thenReturn(Grounded(sub));
+
+      final server = _simServer(brain, m);
+      final state = await server.getCmsState(call, proto.Empty());
+
+      expect(state.kind, proto.CmsStateKind.CMS_STATE_KIND_GROUNDED);
+      expect(
+        state.transition,
+        proto.CmsTransitionKind.CMS_TRANSITION_KIND_NONE,
+      );
+
+      await sub.cancel();
+      await historyCtrl.close();
+    });
+
+    test('listenCmsState yields initial and subsequent state changes', () async {
+      final historyCtrl = StreamController<History>.broadcast();
+      final initialSub = historyCtrl.stream.listen((_) {});
+      final nextSub = historyCtrl.stream.listen((_) {});
+      final stateCtrl = StreamController<S>.broadcast();
+      when(() => m.state).thenReturn(Grounded(initialSub));
+      when(() => m.stream).thenAnswer((_) => stateCtrl.stream);
+
+      final server = _simServer(brain, m);
+      final statesFuture =
+          server.listenCmsState(call, proto.Empty()).take(2).toList();
+      await Future<void>.delayed(Duration.zero);
+      stateCtrl.add(Transitioning(const Command.sitDown(), nextSub, null));
+      final states = await statesFuture;
+
+      expect(states, hasLength(2));
+      expect(states.first.kind, proto.CmsStateKind.CMS_STATE_KIND_GROUNDED);
+      expect(states.last.kind, proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING);
+      expect(
+        states.last.transition,
+        proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
+      );
+
+      await initialSub.cancel();
+      await nextSub.cancel();
+      await historyCtrl.close();
+      await stateCtrl.close();
     });
   });
 }

@@ -15,6 +15,41 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+@$core.Deprecated('Use cmsStateKindDescriptor instead')
+const CmsStateKind$json = {
+  '1': 'CmsStateKind',
+  '2': [
+    {'1': 'CMS_STATE_KIND_ZERO', '2': 0},
+    {'1': 'CMS_STATE_KIND_GROUNDED', '2': 1},
+    {'1': 'CMS_STATE_KIND_STANDING', '2': 2},
+    {'1': 'CMS_STATE_KIND_WALKING', '2': 3},
+    {'1': 'CMS_STATE_KIND_TRANSITIONING', '2': 4},
+  ],
+};
+
+/// Descriptor for `CmsStateKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List cmsStateKindDescriptor = $convert.base64Decode(
+    'CgxDbXNTdGF0ZUtpbmQSFwoTQ01TX1NUQVRFX0tJTkRfWkVSTxAAEhsKF0NNU19TVEFURV9LSU'
+    '5EX0dST1VOREVEEAESGwoXQ01TX1NUQVRFX0tJTkRfU1RBTkRJTkcQAhIaChZDTVNfU1RBVEVf'
+    'S0lORF9XQUxLSU5HEAMSIAocQ01TX1NUQVRFX0tJTkRfVFJBTlNJVElPTklORxAE');
+
+@$core.Deprecated('Use cmsTransitionKindDescriptor instead')
+const CmsTransitionKind$json = {
+  '1': 'CmsTransitionKind',
+  '2': [
+    {'1': 'CMS_TRANSITION_KIND_NONE', '2': 0},
+    {'1': 'CMS_TRANSITION_KIND_STAND_UP', '2': 1},
+    {'1': 'CMS_TRANSITION_KIND_SIT_DOWN', '2': 2},
+    {'1': 'CMS_TRANSITION_KIND_GESTURE', '2': 3},
+  ],
+};
+
+/// Descriptor for `CmsTransitionKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List cmsTransitionKindDescriptor = $convert.base64Decode(
+    'ChFDbXNUcmFuc2l0aW9uS2luZBIcChhDTVNfVFJBTlNJVElPTl9LSU5EX05PTkUQABIgChxDTV'
+    'NfVFJBTlNJVElPTl9LSU5EX1NUQU5EX1VQEAESIAocQ01TX1RSQU5TSVRJT05fS0lORF9TSVRf'
+    'RE9XThACEh8KG0NNU19UUkFOU0lUSU9OX0tJTkRfR0VTVFVSRRAD');
+
 @$core.Deprecated('Use historyDescriptor instead')
 const History$json = {
   '1': 'History',
@@ -297,6 +332,36 @@ final $typed_data.Uint8List profileInfoDescriptor = $convert.base64Decode(
     'CgtQcm9maWxlSW5mbxIYCgdjdXJyZW50GAEgASgJUgdjdXJyZW50EhwKCWF2YWlsYWJsZRgCIA'
     'MoCVIJYXZhaWxhYmxlEiIKDGRlc2NyaXB0aW9ucxgDIAMoCVIMZGVzY3JpcHRpb25zEi8KE2N1'
     'cnJlbnRfZGVzY3JpcHRpb24YBCABKAlSEmN1cnJlbnREZXNjcmlwdGlvbg==');
+
+@$core.Deprecated('Use cmsStateDescriptor instead')
+const CmsState$json = {
+  '1': 'CmsState',
+  '2': [
+    {
+      '1': 'kind',
+      '3': 1,
+      '4': 1,
+      '5': 14,
+      '6': '.han_dog.CmsStateKind',
+      '10': 'kind'
+    },
+    {
+      '1': 'transition',
+      '3': 2,
+      '4': 1,
+      '5': 14,
+      '6': '.han_dog.CmsTransitionKind',
+      '10': 'transition'
+    },
+    {'1': 'gesture_name', '3': 3, '4': 1, '5': 9, '10': 'gestureName'},
+  ],
+};
+
+/// Descriptor for `CmsState`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List cmsStateDescriptor = $convert.base64Decode(
+    'CghDbXNTdGF0ZRIpCgRraW5kGAEgASgOMhUuaGFuX2RvZy5DbXNTdGF0ZUtpbmRSBGtpbmQSOg'
+    'oKdHJhbnNpdGlvbhgCIAEoDjIaLmhhbl9kb2cuQ21zVHJhbnNpdGlvbktpbmRSCnRyYW5zaXRp'
+    'b24SIQoMZ2VzdHVyZV9uYW1lGAMgASgJUgtnZXN0dXJlTmFtZQ==');
 
 @$core.Deprecated('Use commandDescriptor instead')
 const Command$json = {

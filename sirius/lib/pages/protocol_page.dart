@@ -27,7 +27,13 @@ class _ProtocolPageState extends State<ProtocolPage> {
   String _filter = '';
 
   // 状态机节点顺序（每次 build 无需重建）
-  static const _cmsStates = ['Idle', 'StandUp', 'SitDown', 'Walking'];
+  static const _cmsStates = [
+    'Grounded',
+    'StandUp',
+    'Standing',
+    'Walking',
+    'SitDown',
+  ];
 
   /// 过滤后日志缓存，仅在 filter 或日志长度变化时重算
   List<ProtocolLogEntry>? _cachedLog;
@@ -215,8 +221,9 @@ class _ProtocolPageState extends State<ProtocolPage> {
 
   // 状态颜色映射（每次 build 无需重建）
   static const _stateColors = {
-    'Idle': AppTheme.yellow,
+    'Grounded': AppTheme.yellow,
     'StandUp': AppTheme.teal,
+    'Standing': AppTheme.brand,
     'SitDown': AppTheme.orange,
     'Walking': AppTheme.green,
     'Unknown': AppTheme.red,
@@ -282,10 +289,12 @@ class _ProtocolPageState extends State<ProtocolPage> {
 
   IconData _stateIcon(String state) {
     switch (state) {
-      case 'Idle':
+      case 'Grounded':
         return Icons.pause_circle_outline_rounded;
       case 'StandUp':
         return Icons.arrow_upward_rounded;
+      case 'Standing':
+        return Icons.accessibility_new_rounded;
       case 'SitDown':
         return Icons.arrow_downward_rounded;
       case 'Walking':

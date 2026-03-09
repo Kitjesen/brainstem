@@ -209,10 +209,10 @@ class _DashboardPageState extends State<DashboardPage> {
     final cs = Theme.of(c).colorScheme;
     final state = g.cmsState;
     // 5 CMS states matching han_dog_brain S class: Zero->Grounded, StandUp(transitioning), Standing, Walking, SitDown(transitioning)
-    const states = ['Idle', 'StandUp', 'Standing', 'Walking', 'SitDown'];
+    const states = ['Grounded', 'StandUp', 'Standing', 'Walking', 'SitDown'];
     const stateLabels = ['待机', '起立', '站立', '行走', '坐下'];
     const stateIcons = [Icons.pause_circle_outlined, Icons.publish_rounded, Icons.accessibility_new_rounded, Icons.directions_walk_rounded, Icons.get_app_rounded];
-    Color sc(String s) { switch (s) { case 'Walking': return AppTheme.brand; case 'StandUp': return AppTheme.green; case 'Standing': return AppTheme.brand; case 'SitDown': return AppTheme.orange; case 'Idle': return cs.onSurface.withValues(alpha: 0.3); default: return AppTheme.red; } }
+    Color sc(String s) { switch (s) { case 'Walking': return AppTheme.brand; case 'StandUp': return AppTheme.green; case 'Standing': return AppTheme.brand; case 'SitDown': return AppTheme.orange; case 'Grounded': return cs.onSurface.withValues(alpha: 0.3); default: return AppTheme.red; } }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

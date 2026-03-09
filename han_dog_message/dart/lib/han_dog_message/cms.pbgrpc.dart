@@ -110,6 +110,13 @@ class CmsClient extends $grpc.Client {
     return $createUnaryCall(_$getStartTime, request, options: options);
   }
 
+  $grpc.ResponseFuture<$2.CmsState> getCmsState(
+    $0.Empty request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getCmsState, request, options: options);
+  }
+
   /// 实时推理历史流：每个推理周期（~20ms）发送一帧。
   $grpc.ResponseStream<$2.History> listenHistory(
     $0.Empty request, {
@@ -117,6 +124,15 @@ class CmsClient extends $grpc.Client {
   }) {
     return $createStreamingCall(
         _$listenHistory, $async.Stream.fromIterable([request]),
+        options: options);
+  }
+
+  $grpc.ResponseStream<$2.CmsState> listenCmsState(
+    $0.Empty request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createStreamingCall(
+        _$listenCmsState, $async.Stream.fromIterable([request]),
         options: options);
   }
 
@@ -198,10 +214,18 @@ class CmsClient extends $grpc.Client {
       '/han_dog.Cms/GetStartTime',
       ($0.Empty value) => value.writeToBuffer(),
       $3.Timestamp.fromBuffer);
+  static final _$getCmsState = $grpc.ClientMethod<$0.Empty, $2.CmsState>(
+      '/han_dog.Cms/GetCmsState',
+      ($0.Empty value) => value.writeToBuffer(),
+      $2.CmsState.fromBuffer);
   static final _$listenHistory = $grpc.ClientMethod<$0.Empty, $2.History>(
       '/han_dog.Cms/ListenHistory',
       ($0.Empty value) => value.writeToBuffer(),
       $2.History.fromBuffer);
+  static final _$listenCmsState = $grpc.ClientMethod<$0.Empty, $2.CmsState>(
+      '/han_dog.Cms/ListenCmsState',
+      ($0.Empty value) => value.writeToBuffer(),
+      $2.CmsState.fromBuffer);
   static final _$listenImu = $grpc.ClientMethod<$0.Empty, $2.Imu>(
       '/han_dog.Cms/ListenImu',
       ($0.Empty value) => value.writeToBuffer(),
@@ -286,6 +310,13 @@ abstract class CmsServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.Empty.fromBuffer(value),
         ($3.Timestamp value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.Empty, $2.CmsState>(
+        'GetCmsState',
+        getCmsState_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.Empty.fromBuffer(value),
+        ($2.CmsState value) => value.writeToBuffer()));
     $addMethod($grpc.ServiceMethod<$0.Empty, $2.History>(
         'ListenHistory',
         listenHistory_Pre,
@@ -293,6 +324,13 @@ abstract class CmsServiceBase extends $grpc.Service {
         true,
         ($core.List<$core.int> value) => $0.Empty.fromBuffer(value),
         ($2.History value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.Empty, $2.CmsState>(
+        'ListenCmsState',
+        listenCmsState_Pre,
+        false,
+        true,
+        ($core.List<$core.int> value) => $0.Empty.fromBuffer(value),
+        ($2.CmsState value) => value.writeToBuffer()));
     $addMethod($grpc.ServiceMethod<$0.Empty, $2.Imu>(
         'ListenImu',
         listenImu_Pre,
@@ -387,12 +425,28 @@ abstract class CmsServiceBase extends $grpc.Service {
   $async.Future<$3.Timestamp> getStartTime(
       $grpc.ServiceCall call, $0.Empty request);
 
+  $async.Future<$2.CmsState> getCmsState_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.Empty> $request) async {
+    return getCmsState($call, await $request);
+  }
+
+  $async.Future<$2.CmsState> getCmsState(
+      $grpc.ServiceCall call, $0.Empty request);
+
   $async.Stream<$2.History> listenHistory_Pre(
       $grpc.ServiceCall $call, $async.Future<$0.Empty> $request) async* {
     yield* listenHistory($call, await $request);
   }
 
   $async.Stream<$2.History> listenHistory(
+      $grpc.ServiceCall call, $0.Empty request);
+
+  $async.Stream<$2.CmsState> listenCmsState_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.Empty> $request) async* {
+    yield* listenCmsState($call, await $request);
+  }
+
+  $async.Stream<$2.CmsState> listenCmsState(
       $grpc.ServiceCall call, $0.Empty request);
 
   $async.Stream<$2.Imu> listenImu_Pre(
