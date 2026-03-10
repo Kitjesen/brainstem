@@ -167,7 +167,12 @@ class RealControlDog {
           return;
         }
         _log.info('R2 → switchProfile');
-        onProfileSwitch?.call();
+        try {
+          onProfileSwitch?.call();
+        } catch (e, st) {
+          _log.severe('onProfileSwitch callback error', e, st);
+          arbiter.fault('Profile switch error: $e');
+        }
       },
       onError: (Object e, StackTrace st) =>
           onStreamError(e, st, 'switchProfile'),

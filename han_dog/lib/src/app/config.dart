@@ -112,8 +112,8 @@ class HanDogConfig {
     if (startupTimeoutSec < 1) {
       errors.add('HAN_DOG_STARTUP_TIMEOUT=${startupTimeoutSec}s 至少需 1s');
     }
-    if (jointLimitRad <= 0) {
-      errors.add('HAN_DOG_JOINT_LIMIT_RAD=$jointLimitRad 必须为正数');
+    if (jointLimitRad <= 0 || !jointLimitRad.isFinite) {
+      errors.add('HAN_DOG_JOINT_LIMIT_RAD=$jointLimitRad 必须为有限正数');
     }
     if (sensorLowThreshold < 1) {
       errors.add('HAN_DOG_SENSOR_LOW_THRESHOLD=$sensorLowThreshold 至少需 1');

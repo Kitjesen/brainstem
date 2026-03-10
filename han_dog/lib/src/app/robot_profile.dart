@@ -86,13 +86,21 @@ class RobotProfile {
     if (v.length != 16) {
       throw FormatException('Field "$key" must have 16 elements, got ${v.length}');
     }
-    final doubles = v.map((e) => (e as num).toDouble()).toList();
-    for (int i = 0; i < doubles.length; i++) {
-      if (!doubles[i].isFinite) {
+    final doubles = <double>[];
+    for (int i = 0; i < v.length; i++) {
+      final e = v[i];
+      if (e is! num) {
         throw FormatException(
-          'Field "$key" contains non-finite value at index $i: ${doubles[i]}',
+          'Field "$key" element at index $i must be a number, got ${e.runtimeType}: $e',
         );
       }
+      final d = e.toDouble();
+      if (!d.isFinite) {
+        throw FormatException(
+          'Field "$key" contains non-finite value at index $i: $d',
+        );
+      }
+      doubles.add(d);
     }
     return JointsMatrix.fromList(doubles);
   }
@@ -109,13 +117,21 @@ class RobotProfile {
     if (v.length < 4) {
       throw FormatException('Field "$key" must have at least 4 elements, got ${v.length}');
     }
-    final list = v.map((e) => (e as num).toDouble()).toList();
-    for (int i = 0; i < 4; i++) {
-      if (!list[i].isFinite) {
+    final list = <double>[];
+    for (int i = 0; i < v.length; i++) {
+      final e = v[i];
+      if (e is! num) {
         throw FormatException(
-          'Field "$key" contains non-finite value at index $i: ${list[i]}',
+          'Field "$key" element at index $i must be a number, got ${e.runtimeType}: $e',
         );
       }
+      final d = e.toDouble();
+      if (i < 4 && !d.isFinite) {
+        throw FormatException(
+          'Field "$key" contains non-finite value at index $i: $d',
+        );
+      }
+      list.add(d);
     }
     return (list[0], list[1], list[2], list[3]);
   }
