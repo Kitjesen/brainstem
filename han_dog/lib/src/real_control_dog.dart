@@ -68,7 +68,7 @@ class RealControlDog {
         _log.severe('State stream error', error, st);
       },
       onDone: () {
-        _log.fine('State stream closed (arbiter disposed)');
+        _log.warning('State stream closed — kp/kd auto-switching disabled');
       },
     ));
 
@@ -101,6 +101,7 @@ class RealControlDog {
         );
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'direction'),
+      onDone: () => _log.warning('Controller direction stream closed'),
     ));
     _subscriptions.add(controller.standup.listen(
       (_) {
@@ -110,6 +111,7 @@ class RealControlDog {
         sendCommand(const A.standUp(), 'standUp');
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'standup'),
+      onDone: () => _log.warning('Controller standup stream closed'),
     ));
     _subscriptions.add(controller.sitdown.listen(
       (_) {
@@ -119,6 +121,7 @@ class RealControlDog {
         sendCommand(const A.sitDown(), 'sitDown');
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'sitdown'),
+      onDone: () => _log.warning('Controller sitdown stream closed'),
     ));
     _subscriptions.add(controller.enabled.listen(
       (enabled) {
@@ -130,6 +133,7 @@ class RealControlDog {
         }
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'enabled'),
+      onDone: () => _log.warning('Controller enabled stream closed'),
     ));
     _subscriptions.add(controller.red.listen(
       (_) {
@@ -139,6 +143,7 @@ class RealControlDog {
         joint.disable();
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'red'),
+      onDone: () => _log.warning('Controller red stream closed'),
     ));
     _subscriptions.add(controller.idle.listen(
       (_) {
@@ -148,6 +153,7 @@ class RealControlDog {
         sendCommand(const A.standUp(), 'standUp(R1)');
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'idle(R1)'),
+      onDone: () => _log.warning('Controller idle(R1) stream closed'),
     ));
     _subscriptions.add(controller.calibrate.listen(
       (_) {
@@ -159,6 +165,7 @@ class RealControlDog {
           ..saveParameters();
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'calibrate'),
+      onDone: () => _log.warning('Controller calibrate stream closed'),
     ));
     _subscriptions.add(controller.switchProfile.listen(
       (_) {
@@ -176,6 +183,7 @@ class RealControlDog {
       },
       onError: (Object e, StackTrace st) =>
           onStreamError(e, st, 'switchProfile'),
+      onDone: () => _log.warning('Controller switchProfile stream closed'),
     ));
   }
 

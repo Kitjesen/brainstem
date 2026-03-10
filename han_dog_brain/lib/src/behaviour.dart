@@ -286,9 +286,9 @@ class Walk extends Behaviour {
     if (!_disposed) {
       try {
         _observationController.add(List<double>.from(obs));
-      } catch (_) {
-        // Controller may have been closed between the _disposed check and
-        // the add() call during profile switch; safe to ignore.
+      } on StateError catch (_) {
+        // Controller closed between _disposed check and add() during
+        // profile switch; safe to ignore.
       }
     }
     final sw = Stopwatch()..start();

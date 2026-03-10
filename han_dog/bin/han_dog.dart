@@ -184,9 +184,17 @@ Future<void> _run() async {
   _log.info('CMS initialized: ${m.state}');
 
   final arbiter = ControlArbiter(m, timeout: _cfg.arbiterTimeout);
-  _subs.add(arbiter.ownerStream.listen((owner) {
-    _log.info('Arbiter control owner: ${owner ?? "none"}');
-  }));
+  _subs.add(arbiter.ownerStream.listen(
+    (owner) {
+      _log.info('Arbiter control owner: ${owner ?? "none"}');
+    },
+    onError: (Object error, StackTrace st) {
+      _log.severe('Arbiter owner stream error', error, st);
+    },
+    onDone: () {
+      _log.warning('Arbiter owner stream closed');
+    },
+  ));
   // IMU 串口断联 → 立即触发 FSM Fault，防止机器人用陈旧读数盲推理。
   imu.onDisconnect = (reason) => arbiter.fault(reason);
 

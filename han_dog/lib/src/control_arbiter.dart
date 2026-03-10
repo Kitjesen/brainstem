@@ -130,6 +130,7 @@ class ControlArbiter {
     if (_disposed) return;
     _disposed = true;
     _releaseTimer?.cancel();
+    _owner = null;
     _ownerController.close();
   }
 }
