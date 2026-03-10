@@ -283,7 +283,14 @@ class Walk extends Behaviour {
       _log.severe('Walk._run: ONNX session is null — model not loaded');
       throw StateError('Walk: ONNX model not loaded. Call loadModel() first.');
     }
-    if (!_disposed) _observationController.add(List<double>.from(obs));
+    if (!_disposed) {
+      try {
+        _observationController.add(List<double>.from(obs));
+      } catch (_) {
+        // Controller may have been closed between the _disposed check and
+        // the add() call during profile switch; safe to ignore.
+      }
+    }
     final sw = Stopwatch()..start();
     try {
       final (_, outputValues) = session.run({

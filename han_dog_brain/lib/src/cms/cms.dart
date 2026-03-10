@@ -69,7 +69,15 @@ class M extends Cms<S, A> {
   /// 监听行走行为（由时钟驱动的无限流）。
   /// 正常运行时 onDone 不应触发；若触发说明时钟流中断，强制触发 Fault 保持 FSM 一致性。
   StreamSubscription<History> _listenWalk(Vector3 direction) {
-    return _brain.walk.doing(direction).listen(
+    final Stream<History> stream;
+    try {
+      stream = _brain.walk.doing(direction);
+    } catch (e, st) {
+      _log.severe('Failed to create walk stream', e, st);
+      Future.microtask(() => add(A.fault('Walk setup error: $e')));
+      return const Stream<History>.empty().listen((_) {});
+    }
+    return stream.listen(
       _brain.memory.add,
       onError: (Object error, StackTrace st) {
         _log.severe('Walk stream error', error, st);

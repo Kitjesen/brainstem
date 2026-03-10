@@ -139,9 +139,12 @@ class RealController {
       },
       onError: (Object error, StackTrace st) {
         _log.severe('Port stream error', error, st);
+        // 向下游广播错误，使 RealControlDog 等订阅者触发 Fault。
+        // broadcast stream 不会因 addError 终止，reopen() 仍可恢复。
+        if (!_disposed) _stateController.addError(error, st);
       },
       onDone: () {
-        _log.info('Port stream closed');
+        _log.warning('Port stream closed unexpectedly');
       },
     );
   }
