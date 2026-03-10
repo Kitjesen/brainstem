@@ -32,6 +32,7 @@ class _ProtocolPageState extends State<ProtocolPage> {
     'StandUp',
     'Standing',
     'Walking',
+    'Gesture',
     'SitDown',
   ];
 
@@ -64,8 +65,9 @@ class _ProtocolPageState extends State<ProtocolPage> {
       return;
     }
     final ts = DateTime.now();
-    final stamp = '${ts.year}${ts.month.toString().padLeft(2,'0')}${ts.day.toString().padLeft(2,'0')}_'
-        '${ts.hour.toString().padLeft(2,'0')}${ts.minute.toString().padLeft(2,'0')}';
+    final stamp =
+        '${ts.year}${ts.month.toString().padLeft(2, '0')}${ts.day.toString().padLeft(2, '0')}_'
+        '${ts.hour.toString().padLeft(2, '0')}${ts.minute.toString().padLeft(2, '0')}';
     final path = await FilePicker.platform.saveFile(
       dialogTitle: '导出协议日志',
       fileName: 'grpc_log_$stamp.txt',
@@ -73,16 +75,22 @@ class _ProtocolPageState extends State<ProtocolPage> {
       allowedExtensions: ['txt'],
     );
     if (path == null || !mounted) return;
-    final lines = log.reversed.map((e) {
-      return '${_fmtTime(e.time)}  ${e.direction}  ${e.method.padRight(20)}  ${e.summary}';
-    }).join('\n');
-    await File(path).writeAsString('# Sirius gRPC 协议日志\n# 导出时间: ${DateTime.now()}\n\n$lines\n');
+    final lines = log.reversed
+        .map((e) {
+          return '${_fmtTime(e.time)}  ${e.direction}  ${e.method.padRight(20)}  ${e.summary}';
+        })
+        .join('\n');
+    await File(path).writeAsString(
+      '# Sirius gRPC 协议日志\n# 导出时间: ${DateTime.now()}\n\n$lines\n',
+    );
     if (mounted) AppToast.showSuccess(context, '日志已导出');
   }
 
   List<ProtocolLogEntry> get _filteredLog {
     final rawLog = widget.grpc.protocolLog;
-    if (_filter == _lastFilter && rawLog.length == _lastLogLen && _cachedLog != null) {
+    if (_filter == _lastFilter &&
+        rawLog.length == _lastLogLen &&
+        _cachedLog != null) {
       return _cachedLog!;
     }
     _lastFilter = _filter;
@@ -92,9 +100,11 @@ class _ProtocolPageState extends State<ProtocolPage> {
     } else {
       final lowerFilter = _filter.toLowerCase();
       _cachedLog = rawLog
-          .where((e) =>
-              e.method.toLowerCase().contains(lowerFilter) ||
-              e.summary.toLowerCase().contains(lowerFilter))
+          .where(
+            (e) =>
+                e.method.toLowerCase().contains(lowerFilter) ||
+                e.summary.toLowerCase().contains(lowerFilter),
+          )
           .toList();
     }
     return _cachedLog!;
@@ -115,11 +125,14 @@ class _ProtocolPageState extends State<ProtocolPage> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('协议日志', style: tt.headlineLarge),
-                const SizedBox(height: 4),
-                Text('gRPC 通信记录与 CMS 状态机可视化', style: tt.bodySmall),
-              ]),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('协议日志', style: tt.headlineLarge),
+                  const SizedBox(height: 4),
+                  Text('gRPC 通信记录与 CMS 状态机可视化', style: tt.bodySmall),
+                ],
+              ),
               const Spacer(),
               _CallRateWidget(log: grpc.protocolLog),
             ],
@@ -145,9 +158,16 @@ class _ProtocolPageState extends State<ProtocolPage> {
                   decoration: InputDecoration(
                     hintText: '筛选方法名或内容...',
                     hintStyle: tt.bodySmall,
-                    prefixIcon: Icon(Icons.search_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.3)),
+                    prefixIcon: Icon(
+                      Icons.search_rounded,
+                      size: 18,
+                      color: cs.onSurface.withValues(alpha: 0.3),
+                    ),
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
                     filled: true,
                     fillColor: cs.surface,
                     border: OutlineInputBorder(
@@ -168,17 +188,30 @@ class _ProtocolPageState extends State<ProtocolPage> {
               GestureDetector(
                 onTap: _exportLog,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: cs.surface,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: cs.outline, width: 0.5),
                   ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.download_rounded, size: 14, color: AppTheme.brand),
-                    const SizedBox(width: 4),
-                    Text('导出', style: tt.labelMedium?.copyWith(color: AppTheme.brand)),
-                  ]),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.download_rounded,
+                        size: 14,
+                        color: AppTheme.brand,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '导出',
+                        style: tt.labelMedium?.copyWith(color: AppTheme.brand),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -188,7 +221,10 @@ class _ProtocolPageState extends State<ProtocolPage> {
                   setState(() {});
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: cs.surface,
                     borderRadius: BorderRadius.circular(8),
@@ -206,7 +242,12 @@ class _ProtocolPageState extends State<ProtocolPage> {
         Expanded(
           child: log.isEmpty
               ? Center(
-                  child: Text('暂无日志', style: tt.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.3))),
+                  child: Text(
+                    '暂无日志',
+                    style: tt.bodySmall?.copyWith(
+                      color: cs.onSurface.withValues(alpha: 0.3),
+                    ),
+                  ),
                 )
               : ListView.builder(
                   controller: _scrollController,
@@ -220,18 +261,19 @@ class _ProtocolPageState extends State<ProtocolPage> {
   }
 
   // 状态颜色映射（每次 build 无需重建）
-  static const _stateColors = {
+  static final _stateColors = {
     'Grounded': AppTheme.yellow,
     'StandUp': AppTheme.teal,
     'Standing': AppTheme.brand,
-    'SitDown': AppTheme.orange,
     'Walking': AppTheme.green,
+    'Gesture': AppTheme.teal,
+    'SitDown': AppTheme.orange,
     'Unknown': AppTheme.red,
   };
 
   Widget _buildStateMachine(TextTheme tt, ColorScheme cs, GrpcService grpc) {
     const states = _cmsStates;
-    const colors = _stateColors;
+    final colors = _stateColors;
 
     return StatusCard(
       title: 'CMS 状态机',
@@ -255,20 +297,29 @@ class _ProtocolPageState extends State<ProtocolPage> {
                 height: 70,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isActive ? color.withValues(alpha: 0.15) : Colors.transparent,
+                  color: isActive
+                      ? color.withValues(alpha: 0.15)
+                      : Colors.transparent,
                   border: Border.all(
                     color: isActive ? color : cs.outline.withValues(alpha: 0.3),
                     width: isActive ? 2.5 : 1,
                   ),
                   boxShadow: isActive
-                      ? [BoxShadow(color: color.withValues(alpha: 0.2), blurRadius: 12)]
+                      ? [
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.2),
+                            blurRadius: 12,
+                          ),
+                        ]
                       : [],
                 ),
                 child: Center(
                   child: Icon(
                     _stateIcon(state),
                     size: 24,
-                    color: isActive ? color : cs.onSurface.withValues(alpha: 0.3),
+                    color: isActive
+                        ? color
+                        : cs.onSurface.withValues(alpha: 0.3),
                   ),
                 ),
               ),
@@ -295,6 +346,8 @@ class _ProtocolPageState extends State<ProtocolPage> {
         return Icons.arrow_upward_rounded;
       case 'Standing':
         return Icons.accessibility_new_rounded;
+      case 'Gesture':
+        return Icons.auto_awesome_rounded;
       case 'SitDown':
         return Icons.arrow_downward_rounded;
       case 'Walking':
@@ -308,7 +361,8 @@ class _ProtocolPageState extends State<ProtocolPage> {
 class _LogRow extends StatefulWidget {
   final ProtocolLogEntry entry;
   const _LogRow({required this.entry});
-  @override State<_LogRow> createState() => _LogRowState();
+  @override
+  State<_LogRow> createState() => _LogRowState();
 }
 
 class _LogRowState extends State<_LogRow> {
@@ -323,48 +377,90 @@ class _LogRowState extends State<_LogRow> {
 
     Color dirColor;
     switch (entry.direction) {
-      case '→': dirColor = AppTheme.teal; break;
-      case '←': dirColor = AppTheme.green; break;
-      default:  dirColor = AppTheme.red;
+      case '→':
+        dirColor = AppTheme.teal;
+        break;
+      case '←':
+        dirColor = AppTheme.green;
+        break;
+      default:
+        dirColor = AppTheme.red;
     }
 
     final timeStr = _fmtTime(entry.time);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hov = true),
-      onExit: (_) => setState(() { _hov = false; _expanded = false; }),
+      onExit: (_) => setState(() {
+        _hov = false;
+        _expanded = false;
+      }),
       child: GestureDetector(
         onTap: () => setState(() => _expanded = !_expanded),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: _hov ? cs.onSurface.withValues(alpha: 0.04) : Colors.transparent,
+            color: _hov
+                ? cs.onSurface.withValues(alpha: 0.04)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(6),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                SizedBox(
-                  width: 85,
-                  child: Text(timeStr,
-                    style: tt.bodySmall?.copyWith(fontFeatures: [const FontFeature.tabularFigures()],
-                        color: cs.onSurface.withValues(alpha: 0.4), fontSize: 11)),
-                ),
-                SizedBox(width: 20,
-                  child: Text(entry.direction, style: TextStyle(color: dirColor, fontSize: 12, fontWeight: FontWeight.w600))),
-                SizedBox(width: 120,
-                  child: Text(entry.method, style: tt.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-                Expanded(
-                  child: Text(entry.summary,
-                    style: tt.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.5)),
-                    overflow: _expanded ? null : TextOverflow.ellipsis),
-                ),
-                if (_hov)
-                  Icon(_expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-                    size: 14, color: cs.onSurface.withValues(alpha: 0.3)),
-              ]),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 85,
+                    child: Text(
+                      timeStr,
+                      style: tt.bodySmall?.copyWith(
+                        fontFeatures: [const FontFeature.tabularFigures()],
+                        color: cs.onSurface.withValues(alpha: 0.4),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 20,
+                    child: Text(
+                      entry.direction,
+                      style: TextStyle(
+                        color: dirColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 120,
+                    child: Text(
+                      entry.method,
+                      style: tt.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      entry.summary,
+                      style: tt.bodySmall?.copyWith(
+                        color: cs.onSurface.withValues(alpha: 0.5),
+                      ),
+                      overflow: _expanded ? null : TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (_hov)
+                    Icon(
+                      _expanded
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      size: 14,
+                      color: cs.onSurface.withValues(alpha: 0.3),
+                    ),
+                ],
+              ),
               if (_expanded && entry.summary.isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Container(
@@ -375,8 +471,11 @@ class _LogRowState extends State<_LogRow> {
                   ),
                   child: SelectableText(
                     entry.summary,
-                    style: tt.bodySmall?.copyWith(fontSize: 11, color: cs.onSurface.withValues(alpha: 0.6),
-                        fontFeatures: [const FontFeature.tabularFigures()]),
+                    style: tt.bodySmall?.copyWith(
+                      fontSize: 11,
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                      fontFeatures: [const FontFeature.tabularFigures()],
+                    ),
                   ),
                 ),
               ],
@@ -409,7 +508,8 @@ class _CallRateWidget extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final counts = _buckets();
     final peak = counts.reduce(math.max);
-    final recentRate = counts.sublist(counts.length - 5).reduce((a, b) => a + b) / 5.0;
+    final recentRate =
+        counts.sublist(counts.length - 5).reduce((a, b) => a + b) / 5.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -417,11 +517,23 @@ class _CallRateWidget extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text('调用/秒', style: TextStyle(fontSize: 8, color: cs.onSurface.withValues(alpha: 0.35))),
+            Text(
+              '调用/秒',
+              style: TextStyle(
+                fontSize: 8,
+                color: cs.onSurface.withValues(alpha: 0.35),
+              ),
+            ),
             const SizedBox(width: 6),
-            Text(recentRate.toStringAsFixed(1),
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                color: AppTheme.brand, fontFeatures: const [FontFeature.tabularFigures()])),
+            Text(
+              recentRate.toStringAsFixed(1),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.brand,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),
@@ -429,7 +541,12 @@ class _CallRateWidget extends StatelessWidget {
           width: 120,
           height: 28,
           child: CustomPaint(
-            painter: _RateBarPainter(counts: counts, peak: peak, color: AppTheme.brand.withValues(alpha: 0.6), cs: cs),
+            painter: _RateBarPainter(
+              counts: counts,
+              peak: peak,
+              color: AppTheme.brand.withValues(alpha: 0.6),
+              cs: cs,
+            ),
           ),
         ),
       ],
@@ -442,7 +559,12 @@ class _RateBarPainter extends CustomPainter {
   final int peak;
   final Color color;
   final ColorScheme cs;
-  const _RateBarPainter({required this.counts, required this.peak, required this.color, required this.cs});
+  const _RateBarPainter({
+    required this.counts,
+    required this.peak,
+    required this.color,
+    required this.cs,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -450,20 +572,37 @@ class _RateBarPainter extends CustomPainter {
     final barW = size.width / counts.length;
     final maxH = size.height;
     final effectivePeak = peak < 1 ? 1 : peak;
-    final paint = Paint()..color = color..style = PaintingStyle.fill;
-    final fadePaint = Paint()..color = cs.onSurface.withValues(alpha: 0.06)..style = PaintingStyle.fill;
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final fadePaint = Paint()
+      ..color = cs.onSurface.withValues(alpha: 0.06)
+      ..style = PaintingStyle.fill;
     for (int i = 0; i < counts.length; i++) {
       final x = i * barW + 1;
       final w = barW - 2;
       // Background bar
-      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x, 0, w, maxH), const Radius.circular(1.5)), fadePaint);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, 0, w, maxH),
+          const Radius.circular(1.5),
+        ),
+        fadePaint,
+      );
       // Filled bar
       final h = (counts[i] / effectivePeak) * maxH;
       if (h > 0) {
-        canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x, maxH - h, w, h), const Radius.circular(1.5)), paint);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(x, maxH - h, w, h),
+            const Radius.circular(1.5),
+          ),
+          paint,
+        );
       }
     }
   }
 
-  @override bool shouldRepaint(covariant _RateBarPainter old) => true;
+  @override
+  bool shouldRepaint(covariant _RateBarPainter old) => true;
 }

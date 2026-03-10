@@ -94,9 +94,9 @@ class GrpcService extends ChangeNotifier {
   DateTime? _connectTime;
 
   // Session statistics
-  int _walkCmdCount = 0;     // total walk commands sent
-  int _walkActiveMs = 0;     // accumulated ms while walking
-  DateTime? _walkStart;      // when current walk segment started
+  int _walkCmdCount = 0; // total walk commands sent
+  int _walkActiveMs = 0; // accumulated ms while walking
+  DateTime? _walkStart; // when current walk segment started
   double _maxTorqueEver = 0; // max single-joint torque seen this session
 
   // ── Coalesced notifications (max 60Hz) ──
@@ -131,17 +131,21 @@ class GrpcService extends ChangeNotifier {
   String get currentProfile => _currentProfile;
   String get currentProfileDescription => _currentProfileDescription;
   List<String> get availableProfiles => List.unmodifiable(_availableProfiles);
-  List<String> get profileDescriptions => List.unmodifiable(_profileDescriptions);
+  List<String> get profileDescriptions =>
+      List.unmodifiable(_profileDescriptions);
   bool get hasProfiles => _availableProfiles.isNotEmpty;
   CmsClient? get client => _client;
   DateTime? get serverStartTime => _serverStartTime;
   DateTime? get connectTime => _connectTime;
-  int get uptimeSeconds => _connectTime != null ? DateTime.now().difference(_connectTime!).inSeconds : 0;
+  int get uptimeSeconds => _connectTime != null
+      ? DateTime.now().difference(_connectTime!).inSeconds
+      : 0;
 
   // Session statistics getters
   int get walkCmdCount => _walkCmdCount;
-  int get _walkElapsedMs =>
-      _walkStart != null ? DateTime.now().difference(_walkStart!).inMilliseconds : 0;
+  int get _walkElapsedMs => _walkStart != null
+      ? DateTime.now().difference(_walkStart!).inMilliseconds
+      : 0;
   int get walkActiveMs => _walkActiveMs + _walkElapsedMs;
   double get maxTorqueEver => _maxTorqueEver;
 
@@ -169,7 +173,10 @@ class GrpcService extends ChangeNotifier {
     if (_stale) return 'D';
     if (rttHistory.isEmpty) return '—';
     var sum = 0.0, max = 0.0;
-    for (final v in rttHistory) { sum += v; if (v > max) max = v; }
+    for (final v in rttHistory) {
+      sum += v;
+      if (v > max) max = v;
+    }
     final avg = sum / rttHistory.length;
     // Penalty for reconnects this session
     final penalty = _reconnectAttempts * 5.0;
@@ -182,7 +189,11 @@ class GrpcService extends ChangeNotifier {
   }
 
   static const _gradeDesc = {
-    'A': '极佳', 'B': '良好', 'C': '一般', 'D': '较差', 'F': '不可用',
+    'A': '极佳',
+    'B': '良好',
+    'C': '一般',
+    'D': '较差',
+    'F': '不可用',
   };
 
   /// Quality grade description
@@ -199,7 +210,10 @@ class GrpcService extends ChangeNotifier {
   }
 
   void _log(String direction, String method, [String summary = '']) {
-    protocolLog.insert(0, ProtocolLogEntry(DateTime.now(), direction, method, summary));
+    protocolLog.insert(
+      0,
+      ProtocolLogEntry(DateTime.now(), direction, method, summary),
+    );
     if (protocolLog.length > _maxLogEntries) {
       protocolLog.removeLast();
     }
@@ -278,7 +292,9 @@ class GrpcService extends ChangeNotifier {
       // Test connection by getting start time
       _log('→', 'GetStartTime');
       final ts = await _client!.getStartTime(Empty());
-      _serverStartTime = DateTime.fromMillisecondsSinceEpoch(ts.seconds.toInt() * 1000);
+      _serverStartTime = DateTime.fromMillisecondsSinceEpoch(
+        ts.seconds.toInt() * 1000,
+      );
       _connectTime = DateTime.now();
       _log('←', 'GetStartTime', 'OK');
 
@@ -372,7 +388,11 @@ class GrpcService extends ChangeNotifier {
     if (_reconnectAttempts > _maxReconnectAttempts) {
       _reconnectLimitReached = true;
       _reconnecting = false;
-      _log('⛔', 'Reconnect', 'max attempts ($_maxReconnectAttempts) reached — stopping auto-reconnect');
+      _log(
+        '⛔',
+        'Reconnect',
+        'max attempts ($_maxReconnectAttempts) reached — stopping auto-reconnect',
+      );
       onErrorNotify?.call('自动重连已达上限（$_maxReconnectAttempts 次），请手动重新连接');
       notifyListeners();
       return;
@@ -450,7 +470,9 @@ class GrpcService extends ChangeNotifier {
 
       // Verify connection
       final ts = await _client!.getStartTime(Empty());
-      _serverStartTime = DateTime.fromMillisecondsSinceEpoch(ts.seconds.toInt() * 1000);
+      _serverStartTime = DateTime.fromMillisecondsSinceEpoch(
+        ts.seconds.toInt() * 1000,
+      );
 
       _connected = true;
       _reconnecting = false;
@@ -489,12 +511,12 @@ class GrpcService extends ChangeNotifier {
       CmsStateKind.CMS_STATE_KIND_GROUNDED => 'Grounded',
       CmsStateKind.CMS_STATE_KIND_STANDING => 'Standing',
       CmsStateKind.CMS_STATE_KIND_WALKING => 'Walking',
-      CmsStateKind.CMS_STATE_KIND_TRANSITIONING =>
-        switch (state.transition) {
-          CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP => 'StandUp',
-          CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN => 'SitDown',
-          _ => 'Transitioning',
-        },
+      CmsStateKind.CMS_STATE_KIND_TRANSITIONING => switch (state.transition) {
+        CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP => 'StandUp',
+        CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN => 'SitDown',
+        CmsTransitionKind.CMS_TRANSITION_KIND_GESTURE => 'Gesture',
+        _ => 'Transitioning',
+      },
       _ => 'Unknown',
     };
   }
@@ -518,7 +540,11 @@ class GrpcService extends ChangeNotifier {
       _log('→', 'GetProfile');
       final info = await _client!.getProfile(Empty());
       _applyProfileInfo(info);
-      _log('←', 'GetProfile', 'current=${info.current}, ${info.available.length}个策略');
+      _log(
+        '←',
+        'GetProfile',
+        'current=${info.current}, ${info.available.length}个策略',
+      );
     } catch (e) {
       _log('✕', 'GetProfile', e.toString());
       // 非致命错误，服务端可能未配置策略
@@ -559,84 +585,92 @@ class GrpcService extends ChangeNotifier {
     if (_client == null) return;
 
     // CMS state stream
-    _stateSub = _client!.listenCmsState(Empty()).listen(
-      (state) {
-        _applyCmsState(state);
-        _touchData();
-        _scheduleNotify();
-      },
-      onError: (Object e, StackTrace st) {
-        _log('✕', 'ListenCmsState', e.toString());
-        _handleStreamError('CmsState', e);
-      },
-      onDone: () {
-        _log('◼', 'ListenCmsState', '服务端关闭了 CmsState 流');
-        _handleStreamDone('CmsState');
-      },
-    );
+    _stateSub = _client!
+        .listenCmsState(Empty())
+        .listen(
+          (state) {
+            _applyCmsState(state);
+            _touchData();
+            _scheduleNotify();
+          },
+          onError: (Object e, StackTrace st) {
+            _log('✕', 'ListenCmsState', e.toString());
+            _handleStreamError('CmsState', e);
+          },
+          onDone: () {
+            _log('◼', 'ListenCmsState', '服务端关闭了 CmsState 流');
+            _handleStreamDone('CmsState');
+          },
+        );
 
     // History stream
-    _historySub = _client!.listenHistory(Empty()).listen(
-      (history) {
-        _latestHistory = history;
-        _historyCount++;
-        _updateFrequency();
-        _touchData();
-        _scheduleNotify();
-      },
-      onError: (Object e, StackTrace st) {
-        _log('✕', 'ListenHistory', e.toString());
-        _handleStreamError('History', e);
-      },
-      onDone: () {
-        _log('⚠', 'ListenHistory', '服务端关闭了 History 流');
-        _handleStreamDone('History');
-      },
-    );
+    _historySub = _client!
+        .listenHistory(Empty())
+        .listen(
+          (history) {
+            _latestHistory = history;
+            _historyCount++;
+            _updateFrequency();
+            _touchData();
+            _scheduleNotify();
+          },
+          onError: (Object e, StackTrace st) {
+            _log('✕', 'ListenHistory', e.toString());
+            _handleStreamError('History', e);
+          },
+          onDone: () {
+            _log('⚠', 'ListenHistory', '服务端关闭了 History 流');
+            _handleStreamDone('History');
+          },
+        );
 
     // IMU stream
-    _imuSub = _client!.listenImu(Empty()).listen(
-      (imu) {
-        _latestImu = imu;
-        _imuCount++;
-        _updateFrequency();
-        _touchData();
-        _scheduleNotify();
-      },
-      onError: (Object e, StackTrace st) {
-        _log('✕', 'ListenImu', e.toString());
-        _handleStreamError('IMU', e);
-      },
-      onDone: () {
-        _log('⚠', 'ListenImu', '服务端关闭了 IMU 流');
-        _handleStreamDone('IMU');
-      },
-    );
+    _imuSub = _client!
+        .listenImu(Empty())
+        .listen(
+          (imu) {
+            _latestImu = imu;
+            _imuCount++;
+            _updateFrequency();
+            _touchData();
+            _scheduleNotify();
+          },
+          onError: (Object e, StackTrace st) {
+            _log('✕', 'ListenImu', e.toString());
+            _handleStreamError('IMU', e);
+          },
+          onDone: () {
+            _log('⚠', 'ListenImu', '服务端关闭了 IMU 流');
+            _handleStreamDone('IMU');
+          },
+        );
 
     // Joint stream — handles both SingleJoint and AllJoints
     // UnifiedCmsServer sends individual SingleJoint per motor report in hardware mode,
     // or AllJoints batches in simulation mode.
-    _jointSub = _client!.listenJoint(Empty()).listen(
-      (joint) {
-        _jointCount++;
-        _updateFrequency();
-        _touchData();
+    _jointSub = _client!
+        .listenJoint(Empty())
+        .listen(
+          (joint) {
+            _jointCount++;
+            _updateFrequency();
+            _touchData();
 
-        if (joint.hasSingleJoint()) {
-          _handleSingleJoint(joint.singleJoint);
-        } else if (joint.hasAllJoints()) {
-          _handleAllJoints(joint.allJoints);
-        }
-      },
-      onError: (Object e, StackTrace st) {
-        _log('✕', 'ListenJoint', e.toString());
-        _handleStreamError('Joint', e);
-      },
-      onDone: () {
-        _log('⚠', 'ListenJoint', '服务端关闭了 Joint 流');
-        _handleStreamDone('Joint');
-      },
-    );
+            if (joint.hasSingleJoint()) {
+              _handleSingleJoint(joint.singleJoint);
+            } else if (joint.hasAllJoints()) {
+              _handleAllJoints(joint.allJoints);
+            }
+          },
+          onError: (Object e, StackTrace st) {
+            _log('✕', 'ListenJoint', e.toString());
+            _handleStreamError('Joint', e);
+          },
+          onDone: () {
+            _log('⚠', 'ListenJoint', '服务端关闭了 Joint 流');
+            _handleStreamDone('Joint');
+          },
+        );
   }
 
   /// Common reconnect trigger: guard intentional disconnect, then schedule.
@@ -686,9 +720,15 @@ class GrpcService extends ChangeNotifier {
     final pos = allJoints.position.values;
     final vel = allJoints.velocity.values;
     final trq = allJoints.torque.values;
-    for (int i = 0; i < 16 && i < pos.length; i++) { _jointPositions[i] = pos[i]; }
-    for (int i = 0; i < 16 && i < vel.length; i++) { _jointVelocities[i] = vel[i]; }
-    for (int i = 0; i < 16 && i < trq.length; i++) { _jointTorques[i] = trq[i]; }
+    for (int i = 0; i < 16 && i < pos.length; i++) {
+      _jointPositions[i] = pos[i];
+    }
+    for (int i = 0; i < 16 && i < vel.length; i++) {
+      _jointVelocities[i] = vel[i];
+    }
+    for (int i = 0; i < 16 && i < trq.length; i++) {
+      _jointTorques[i] = trq[i];
+    }
 
     _updateTorqueHistory(allJoints);
     _scheduleNotify();
@@ -708,7 +748,8 @@ class GrpcService extends ChangeNotifier {
     if (joints.torque.values.length < 12) return;
     for (int leg = 0; leg < 4; leg++) {
       final base = leg * 3;
-      final avg = (joints.torque.values[base].abs() +
+      final avg =
+          (joints.torque.values[base].abs() +
               joints.torque.values[base + 1].abs() +
               joints.torque.values[base + 2].abs()) /
           3;
@@ -800,15 +841,20 @@ class GrpcService extends ChangeNotifier {
 
   void _startRttTimer() {
     _rttTimer?.cancel();
-    _rttTimer = Timer.periodic(const Duration(seconds: 1), (_) => _measureRtt());
+    _rttTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _measureRtt(),
+    );
   }
 
   Future<void> _measureRtt() async {
     if (_client == null || !_connected) return;
     final sw = Stopwatch()..start();
     try {
-      await _client!.getStartTime(Empty(),
-          options: CallOptions(timeout: const Duration(seconds: 2)));
+      await _client!.getStartTime(
+        Empty(),
+        options: CallOptions(timeout: const Duration(seconds: 2)),
+      );
       sw.stop();
       _lastRttMs = sw.elapsedMilliseconds.toDouble();
       rttHistory.add(_lastRttMs);
