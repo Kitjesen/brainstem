@@ -96,6 +96,7 @@ class RealImu implements ImuService {
     if (_disposed) return;
     _disposed = true;
     _log.info('IMU disposing: $portName');
+    onDisconnect = null; // 防止 dispose 后回调触发 Fault
     subs.cancel();
     _broadcastController.close();
     port.dispose();

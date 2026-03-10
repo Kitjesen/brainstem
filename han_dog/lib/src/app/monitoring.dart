@@ -54,6 +54,9 @@ StreamSubscription<void> startSensorMonitoring({
   },
   onError: (Object error, StackTrace st) {
     _log.severe('Sensor monitoring tick error', error, st);
+  },
+  onDone: () {
+    _log.warning('Sensor monitoring tick stream ended');
   });
 }
 
@@ -83,6 +86,9 @@ StreamSubscription<void> startJointLimitMonitoring({
     },
     onError: (Object error, StackTrace st) {
       _log.severe('Joint limit monitoring tick error', error, st);
+    },
+    onDone: () {
+      _log.warning('Joint limit monitoring tick stream ended');
     },
   );
 }
@@ -117,6 +123,9 @@ StreamSubscription<void> startControllerMonitoring({
   },
   onError: (Object error, StackTrace st) {
     _log.severe('Controller monitoring tick error', error, st);
+  },
+  onDone: () {
+    _log.warning('Controller monitoring tick stream ended');
   });
 }
 

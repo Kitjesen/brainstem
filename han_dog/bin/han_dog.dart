@@ -161,7 +161,12 @@ Future<void> _run() async {
 
   // ──── 4. FSM + 仲裁器 ──────────────────────────────────────
   final M m = M(brain)..add(Init());
-  _subs.add(m.stream.listen((s) => _log.info('CMS state: $s')));
+  _subs.add(m.stream.listen(
+    (s) => _log.info('CMS state: $s'),
+    onError: (Object error, StackTrace st) {
+      _log.severe('CMS state stream error', error, st);
+    },
+  ));
   try {
     await m.stream
         .firstWhere((s) => s is Grounded)

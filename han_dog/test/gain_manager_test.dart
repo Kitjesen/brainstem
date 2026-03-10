@@ -136,6 +136,52 @@ void main() {
     });
   });
 
+  group('switchGains NaN/Inf rejection', () {
+    test('rejects NaN in inferKp', () {
+      final gm = _make();
+      final bad = JointsMatrix.fromList(
+          List.generate(16, (i) => i == 0 ? double.nan : 1.0));
+      expect(
+        () => gm.switchGains(
+          inferKp: bad, inferKd: _kdInfer,
+          standUpKp: _kpStandUp, standUpKd: _kdStandUp,
+          sitDownKp: _kpSitDown, sitDownKd: _kdSitDown,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('rejects Infinity in sitDownKd', () {
+      final gm = _make();
+      final bad = JointsMatrix.fromList(
+          List.generate(16, (i) => i == 5 ? double.infinity : 2.0));
+      expect(
+        () => gm.switchGains(
+          inferKp: _kpInfer, inferKd: _kdInfer,
+          standUpKp: _kpStandUp, standUpKd: _kdStandUp,
+          sitDownKp: _kpSitDown, sitDownKd: bad,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('does not mutate state on rejection', () {
+      final gm = _make();
+      final origInferKp = gm.inferKp;
+      final bad = JointsMatrix.fromList(
+          List.generate(16, (i) => double.nan));
+      try {
+        gm.switchGains(
+          inferKp: bad, inferKd: _kdInfer,
+          standUpKp: _kpStandUp, standUpKd: _kdStandUp,
+          sitDownKp: _kpSitDown, sitDownKd: _kdSitDown,
+        );
+      } on ArgumentError catch (_) {}
+      // State unchanged
+      expect(identical(gm.inferKp, origInferKp), isTrue);
+    });
+  });
+
   group('Gesture command', () {
     test('uses standUp gains', () {
       final gm = _make();

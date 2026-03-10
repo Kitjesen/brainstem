@@ -51,6 +51,16 @@ class GainManager {
     required JointsMatrix sitDownKp,
     required JointsMatrix sitDownKd,
   }) {
+    // 增益矩阵含 NaN/Inf 会导致电机收到非法指令，必须在此拦截。
+    for (final (name, m) in [
+      ('inferKp', inferKp), ('inferKd', inferKd),
+      ('standUpKp', standUpKp), ('standUpKd', standUpKd),
+      ('sitDownKp', sitDownKp), ('sitDownKd', sitDownKd),
+    ]) {
+      if (m.hasNonFinite) {
+        throw ArgumentError('switchGains rejected: $name contains NaN/Inf');
+      }
+    }
     this.inferKp = inferKp;
     this.inferKd = inferKd;
     this.standUpKp = standUpKp;

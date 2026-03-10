@@ -225,7 +225,7 @@ class RealJoint implements JointService, MotorService {
     _disposed = true;
     _log.info('RealJoint disposing');
     for (final sub in subscriptions) {
-      sub.cancel();
+      try { sub.cancel(); } catch (_) {}
     }
     _reportController.close();
     close();
