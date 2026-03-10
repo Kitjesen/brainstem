@@ -103,14 +103,14 @@ class HanDogConfig {
     if (grpcPort < 1 || grpcPort > 65535) {
       errors.add('HAN_DOG_PORT=$grpcPort 超出范围 [1-65535]');
     }
-    if (arbiterTimeoutSec < 1) {
-      errors.add('HAN_DOG_ARBITER_TIMEOUT=${arbiterTimeoutSec}s 至少需 1s');
+    if (arbiterTimeoutSec < 1 || arbiterTimeoutSec > 60) {
+      errors.add('HAN_DOG_ARBITER_TIMEOUT=${arbiterTimeoutSec}s 需在 [1, 60] 范围内');
     }
-    if (shutdownTimeoutSec < 1) {
-      errors.add('HAN_DOG_SHUTDOWN_TIMEOUT=${shutdownTimeoutSec}s 至少需 1s');
+    if (shutdownTimeoutSec < 1 || shutdownTimeoutSec > 300) {
+      errors.add('HAN_DOG_SHUTDOWN_TIMEOUT=${shutdownTimeoutSec}s 需在 [1, 300] 范围内');
     }
-    if (startupTimeoutSec < 1) {
-      errors.add('HAN_DOG_STARTUP_TIMEOUT=${startupTimeoutSec}s 至少需 1s');
+    if (startupTimeoutSec < 1 || startupTimeoutSec > 300) {
+      errors.add('HAN_DOG_STARTUP_TIMEOUT=${startupTimeoutSec}s 需在 [1, 300] 范围内');
     }
     if (jointLimitRad <= 0 || !jointLimitRad.isFinite) {
       errors.add('HAN_DOG_JOINT_LIMIT_RAD=$jointLimitRad 必须为有限正数');

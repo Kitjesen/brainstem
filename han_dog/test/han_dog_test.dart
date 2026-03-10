@@ -302,6 +302,50 @@ void main() {
       expect(profile.actionScale.$4, closeTo(5.0, 1e-9));
     });
 
+    test('NaN in inferKp array throws FormatException', () {
+      final json = validJson()
+        ..['inferKp'] = List.generate(16, (i) => i == 0 ? double.nan : 1.0);
+      expect(
+        () => RobotProfile.fromJson(json),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('non-finite'),
+          ),
+        ),
+      );
+    });
+
+    test('null element in inferKd array throws FormatException', () {
+      final json = validJson()
+        ..['inferKd'] = List.generate(16, (i) => i == 3 ? null : 1.0);
+      expect(
+        () => RobotProfile.fromJson(json),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('must be a number'),
+          ),
+        ),
+      );
+    });
+
+    test('NaN imuGyroscopeScale throws FormatException', () {
+      final json = validJson()..['imuGyroscopeScale'] = double.nan;
+      expect(
+        () => RobotProfile.fromJson(json),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('finite'),
+          ),
+        ),
+      );
+    });
+
     test(
       'jointVelocityScale defaults to (0.05, 0.05, 0.05, 0.05) when absent',
       () {

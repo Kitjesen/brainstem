@@ -355,7 +355,8 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
       return h.toProto(timestamp: _elapsed(), kp: gains?.kp, kd: gains?.kd);
     } on TimeoutException {
       throw GrpcError.deadlineExceeded('Inference timed out');
-    } on StateError catch (e) {
+    } on StateError catch (e, st) {
+      _log.severe('tick: StateError during inference', e, st);
       throw GrpcError.internal(e.message);
     } catch (e, st) {
       _log.severe('tick: unexpected inference error', e, st);

@@ -75,7 +75,9 @@ class RealControlDog {
     // 遥控器事件 → 通过仲裁器发送（ControlSource.yunzhuo）
     void onStreamError(Object error, StackTrace st, String name) {
       _log.severe('Controller $name stream error', error, st);
-      arbiter.fault('Controller $name stream error: $error');
+      if (!_disposed) {
+        arbiter.fault('Controller $name stream error: $error');
+      }
     }
 
     void sendCommand(A action, String label) {

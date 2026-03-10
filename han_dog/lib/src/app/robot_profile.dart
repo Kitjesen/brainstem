@@ -60,7 +60,7 @@ class RobotProfile {
       standUpKd: _joints16(json, 'standUpKd'),
       sitDownKp: _joints16(json, 'sitDownKp'),
       sitDownKd: _joints16(json, 'sitDownKd'),
-      imuGyroscopeScale: (json['imuGyroscopeScale'] as num?)?.toDouble() ?? 0.25,
+      imuGyroscopeScale: _finiteDouble(json, 'imuGyroscopeScale', 0.25),
       jointVelocityScale: _tuple4(json['jointVelocityScale'], 'jointVelocityScale',
           defaultValue: (0.05, 0.05, 0.05, 0.05)),
       actionScale: _tuple4(json['actionScale'], 'actionScale',
@@ -75,6 +75,21 @@ class RobotProfile {
       throw FormatException('Field "$key" must be a string, got ${v.runtimeType}');
     }
     return v;
+  }
+
+  static double _finiteDouble(
+      Map<String, dynamic> json, String key, double defaultValue) {
+    final v = json[key];
+    if (v == null) return defaultValue;
+    if (v is! num) {
+      throw FormatException(
+          'Field "$key" must be a number, got ${v.runtimeType}');
+    }
+    final d = v.toDouble();
+    if (!d.isFinite) {
+      throw FormatException('Field "$key" must be finite, got $d');
+    }
+    return d;
   }
 
   static JointsMatrix _joints16(Map<String, dynamic> json, String key) {
