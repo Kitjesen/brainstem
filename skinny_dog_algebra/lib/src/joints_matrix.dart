@@ -92,7 +92,12 @@ class JointsMatrix with JointsViewMixin<double> {
     required double calfMax,
     required double footMin,
     required double footMax,
-  }) =>
+  }) {
+    assert(hipMin <= hipMax, 'hipMin ($hipMin) > hipMax ($hipMax)');
+    assert(thighMin <= thighMax, 'thighMin ($thighMin) > thighMax ($thighMax)');
+    assert(calfMin <= calfMax, 'calfMin ($calfMin) > calfMax ($calfMax)');
+    assert(footMin <= footMax, 'footMin ($footMin) > footMax ($footMax)');
+    return
       .fromList([
         frHip.clamp(hipMin, hipMax),
         frThigh.clamp(thighMin, thighMax),
@@ -111,6 +116,7 @@ class JointsMatrix with JointsViewMixin<double> {
         rrFoot.clamp(footMin, footMax),
         rlFoot.clamp(footMin, footMax),
       ]);
+  }
 
   /// Returns true if any value is NaN or infinite.
   bool get hasNonFinite => values.any((v) => v.isNaN || v.isInfinite);
