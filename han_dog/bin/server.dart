@@ -153,13 +153,16 @@ Future<void> main() async {
   _log.info('CMS gRPC server listening on :$_port');
 
   // ── 优雅关机 ───────────────────────────────────────────────
-  ProcessSignal.sigint.watch().listen(
-    (_) => _shutdown(m, brain, clock, server),
-  );
+  var shuttingDown = false;
+  Future<void> onSignal(ProcessSignal sig) async {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    await _shutdown(m, brain, clock, server);
+  }
+
+  ProcessSignal.sigint.watch().listen(onSignal);
   if (!Platform.isWindows) {
-    ProcessSignal.sigterm.watch().listen(
-      (_) => _shutdown(m, brain, clock, server),
-    );
+    ProcessSignal.sigterm.watch().listen(onSignal);
   }
 }
 
@@ -203,26 +206,34 @@ Future<void> _shutdown(
 ) async {
   _log.info('Shutdown signal received — starting graceful shutdown');
 
-  // 1. 已经在 Grounded 时无需再等待新的状态事件。
-  if (m.state is Grounded) {
-    _log.info('FSM already Grounded');
-  } else {
-    m.add(const A.sitDown());
-    try {
+  // 硬超时：防止任意步骤挂起导致进程永久卡死
+  Timer(const Duration(seconds: 15), () {
+    _log.severe('Shutdown exceeded 15s hard deadline — forcing exit(1)');
+    exit(1);
+  });
+
+  // 1. 安全着陆
+  try {
+    if (m.state is Grounded) {
+      _log.info('FSM already Grounded');
+    } else {
+      m.add(const A.sitDown());
       await m.stream
           .firstWhere((s) => s is Grounded)
           .timeout(const Duration(seconds: 10));
       _log.info('FSM reached Grounded — safe to power off');
-    } on TimeoutException {
-      _log.warning('Shutdown timeout: FSM did not reach Grounded in 10s');
     }
+  } on TimeoutException {
+    _log.warning('Shutdown timeout: FSM did not reach Grounded in 10s');
+  } catch (e) {
+    _log.warning('Shutdown FSM error: $e, proceeding with cleanup');
   }
 
   // 2. 释放资源
-  await m.close();
+  try { await m.close(); } catch (_) {}
   brain.dispose();
   await clock.close();
-  await server.shutdown();
+  try { await server.shutdown().timeout(const Duration(seconds: 3)); } catch (_) {}
   _log.info('Shutdown complete');
   exit(0);
 }

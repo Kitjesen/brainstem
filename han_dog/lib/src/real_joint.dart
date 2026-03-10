@@ -182,7 +182,13 @@ class RealJoint implements JointService, MotorService {
   void sendAction(JointsMatrix action) => realActionExt(action);
 
   void realActionExt(JointsMatrix action) {
-    // action = action * actionRatio;
+    // 最后一道安全门：NaN/Inf 绝不能到达 CAN 总线。
+    if (action.hasNonFinite || kpExt.hasNonFinite || kdExt.hasNonFinite) {
+      _log.severe('realActionExt rejected: non-finite values detected '
+          '(action=${action.hasNonFinite}, kp=${kpExt.hasNonFinite}, '
+          'kd=${kdExt.hasNonFinite})');
+      return;
+    }
     _realActionExt(action, kpExt, kdExt);
   }
 
