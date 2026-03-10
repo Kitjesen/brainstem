@@ -4,12 +4,38 @@ from google.protobuf import empty_pb2 as _empty_pb2
 from han_dog_message import common_pb2 as _common_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from google.protobuf import duration_pb2 as _duration_pb2
+from google.protobuf.internal import containers as _containers
+from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from collections.abc import Mapping as _Mapping
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
 from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
+
+class CmsStateKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    CMS_STATE_KIND_ZERO: _ClassVar[CmsStateKind]
+    CMS_STATE_KIND_GROUNDED: _ClassVar[CmsStateKind]
+    CMS_STATE_KIND_STANDING: _ClassVar[CmsStateKind]
+    CMS_STATE_KIND_WALKING: _ClassVar[CmsStateKind]
+    CMS_STATE_KIND_TRANSITIONING: _ClassVar[CmsStateKind]
+
+class CmsTransitionKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    CMS_TRANSITION_KIND_NONE: _ClassVar[CmsTransitionKind]
+    CMS_TRANSITION_KIND_STAND_UP: _ClassVar[CmsTransitionKind]
+    CMS_TRANSITION_KIND_SIT_DOWN: _ClassVar[CmsTransitionKind]
+    CMS_TRANSITION_KIND_GESTURE: _ClassVar[CmsTransitionKind]
+CMS_STATE_KIND_ZERO: CmsStateKind
+CMS_STATE_KIND_GROUNDED: CmsStateKind
+CMS_STATE_KIND_STANDING: CmsStateKind
+CMS_STATE_KIND_WALKING: CmsStateKind
+CMS_STATE_KIND_TRANSITIONING: CmsStateKind
+CMS_TRANSITION_KIND_NONE: CmsTransitionKind
+CMS_TRANSITION_KIND_STAND_UP: CmsTransitionKind
+CMS_TRANSITION_KIND_SIT_DOWN: CmsTransitionKind
+CMS_TRANSITION_KIND_GESTURE: CmsTransitionKind
 
 class History(_message.Message):
     __slots__ = ("gyroscope", "projected_gravity", "command", "joint_position", "joint_velocity", "action", "next_action", "timestamp", "kp", "kd")
@@ -86,6 +112,34 @@ class Params(_message.Message):
     ROBOT_FIELD_NUMBER: _ClassVar[int]
     robot: _common_pb2.RobotModel
     def __init__(self, robot: _Optional[_Union[_common_pb2.RobotModel, _Mapping]] = ...) -> None: ...
+
+class ProfileRequest(_message.Message):
+    __slots__ = ("name",)
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    def __init__(self, name: _Optional[str] = ...) -> None: ...
+
+class ProfileInfo(_message.Message):
+    __slots__ = ("current", "available", "descriptions", "current_description")
+    CURRENT_FIELD_NUMBER: _ClassVar[int]
+    AVAILABLE_FIELD_NUMBER: _ClassVar[int]
+    DESCRIPTIONS_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    current: str
+    available: _containers.RepeatedScalarFieldContainer[str]
+    descriptions: _containers.RepeatedScalarFieldContainer[str]
+    current_description: str
+    def __init__(self, current: _Optional[str] = ..., available: _Optional[_Iterable[str]] = ..., descriptions: _Optional[_Iterable[str]] = ..., current_description: _Optional[str] = ...) -> None: ...
+
+class CmsState(_message.Message):
+    __slots__ = ("kind", "transition", "gesture_name")
+    KIND_FIELD_NUMBER: _ClassVar[int]
+    TRANSITION_FIELD_NUMBER: _ClassVar[int]
+    GESTURE_NAME_FIELD_NUMBER: _ClassVar[int]
+    kind: CmsStateKind
+    transition: CmsTransitionKind
+    gesture_name: str
+    def __init__(self, kind: _Optional[_Union[CmsStateKind, str]] = ..., transition: _Optional[_Union[CmsTransitionKind, str]] = ..., gesture_name: _Optional[str] = ...) -> None: ...
 
 class Command(_message.Message):
     __slots__ = ("idle", "stand_up", "sit_down", "walk")

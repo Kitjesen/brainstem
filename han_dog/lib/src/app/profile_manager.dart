@@ -75,29 +75,40 @@ class ProfileManager {
         sitDownCounts: p.sitDownCounts,
       );
 
-      // 2. GestureLibrary
+      // 2. GestureLibrary（保存旧值以便回滚）
+      final prevGestureLibrary = brain.gestureLibrary;
       brain.gestureLibrary = GestureLibrary(standingPose: p.standingPose)
         ..registerDefaults();
 
       // 3. GainManager（gRPC 服务用）
-      _switchGains(p);
+      try {
+        _switchGains(p);
+      } catch (_) {
+        // 增益切换失败：回滚 GestureLibrary 到切换前的状态
+        brain.gestureLibrary = prevGestureLibrary;
+        rethrow;
+      }
 
       _current = name;
       _log.info('Switched to profile: $name (model=${p.modelPath})');
     } catch (e, st) {
       _log.warning(
-          'Profile switch failed ($prevName → $name): $e; attempting gain rollback',
+          'Profile switch failed ($prevName → $name): $e; attempting rollback',
           e, st);
       try {
         _switchGains(prevProfile);
-        _log.info('Gain rollback to "$prevName" succeeded');
+        brain.gestureLibrary = GestureLibrary(
+            standingPose: prevProfile.standingPose)
+          ..registerDefaults();
+        _log.info('Rollback to "$prevName" succeeded');
       } catch (rollbackE, rollbackSt) {
         // Rollback failed: log as SEVERE and continue with rethrow of original.
         // _current is NOT updated, so the name stays consistent, but gains
-        // may be in an indeterminate state — operator must intervene.
+        // and gestureLibrary may be in an indeterminate state — operator must
+        // intervene.
         _log.severe(
-          'CRITICAL: gain rollback to "$prevName" also failed after '
-          'profile switch error — robot gains may be indeterminate. '
+          'CRITICAL: rollback to "$prevName" also failed after '
+          'profile switch error — robot state may be indeterminate. '
           'Original error was: $e',
           rollbackE,
           rollbackSt,

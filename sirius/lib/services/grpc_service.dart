@@ -430,6 +430,10 @@ class GrpcService extends ChangeNotifier {
 
   /// 取消流订阅并关闭 channel/client（不重置重连状态）。
   void _teardownConnection() {
+    _pendingNotify?.cancel();
+    _pendingNotify = null;
+    _rttTimer?.cancel();
+    _rttTimer = null;
     _stateSub?.cancel();
     _historySub?.cancel();
     _imuSub?.cancel();

@@ -34,11 +34,19 @@ class GestureDefinition {
   final String? description;
   final List<Keyframe> keyframes;
 
-  const GestureDefinition({
+  GestureDefinition({
     required this.name,
     this.description,
     required this.keyframes,
-  });
+  }) {
+    if (keyframes.isEmpty) {
+      throw ArgumentError.value(
+        keyframes,
+        'keyframes',
+        'GestureDefinition "$name" must have at least one keyframe',
+      );
+    }
+  }
 
   Map<String, dynamic> toJson() => {
     'name': name,

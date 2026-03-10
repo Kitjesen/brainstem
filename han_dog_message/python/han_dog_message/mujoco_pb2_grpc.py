@@ -7,7 +7,7 @@ from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from han_dog_message import common_pb2 as han__dog__message_dot_common__pb2
 from han_dog_message import mujoco_pb2 as han__dog__message_dot_mujoco__pb2
 
-GRPC_GENERATED_VERSION = '1.76.0'
+GRPC_GENERATED_VERSION = '1.78.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -28,7 +28,9 @@ if _version_not_supported:
 
 
 class MujocoStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """MuJoCo 物理仿真服务。
+    由 Python 端实现，Dart 端作为客户端调用。
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -49,16 +51,20 @@ class MujocoStub(object):
 
 
 class MujocoServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """MuJoCo 物理仿真服务。
+    由 Python 端实现，Dart 端作为客户端调用。
+    """
 
     def SetModel(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """初始化仿真器：设置机器人模型和初始姿态。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def Step(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """执行一步物理仿真：传入目标关节角度，返回仿真后的传感器状态。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -85,7 +91,9 @@ def add_MujocoServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class Mujoco(object):
-    """Missing associated documentation comment in .proto file."""
+    """MuJoCo 物理仿真服务。
+    由 Python 端实现，Dart 端作为客户端调用。
+    """
 
     @staticmethod
     def SetModel(request,
@@ -143,7 +151,9 @@ class Mujoco(object):
 
 
 class MujocoViewerStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """MuJoCo 可视化服务。
+    用于将仿真/真机数据回放到 MuJoCo viewer 中。
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -159,10 +169,13 @@ class MujocoViewerStub(object):
 
 
 class MujocoViewerServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """MuJoCo 可视化服务。
+    用于将仿真/真机数据回放到 MuJoCo viewer 中。
+    """
 
     def Play(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """播放一帧：将广义坐标/速度发送到 viewer 进行渲染。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -184,7 +197,9 @@ def add_MujocoViewerServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class MujocoViewer(object):
-    """Missing associated documentation comment in .proto file."""
+    """MuJoCo 可视化服务。
+    用于将仿真/真机数据回放到 MuJoCo viewer 中。
+    """
 
     @staticmethod
     def Play(request,

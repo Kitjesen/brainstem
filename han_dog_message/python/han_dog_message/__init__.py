@@ -16,6 +16,11 @@ from .cms_pb2 import (
     AllJoints,
     Params,
     History,
+    CmsState,
+    CmsStateKind,
+    CmsTransitionKind,
+    ProfileRequest,
+    ProfileInfo,
     Command,
 )
 
@@ -55,6 +60,11 @@ __all__ = [
     "SingleJoint",
     "AllJoints",
     "Params",
+    "CmsState",
+    "CmsStateKind",
+    "CmsTransitionKind",
+    "ProfileRequest",
+    "ProfileInfo",
     "Command",
     # mujoco
     "MujocoViewerServicer",

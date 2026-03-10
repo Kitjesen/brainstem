@@ -64,8 +64,9 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   /// 广播流缓存：支持多客户端。
   late final _historyBroadcast = _brain.historyStream.asBroadcastStream();
-  late final _cmsStateBroadcast =
-      _m.stream.map(_toProtoCmsState).asBroadcastStream();
+  late final _cmsStateBroadcast = _m.stream
+      .map(_toProtoCmsState)
+      .asBroadcastStream();
 
   UnifiedCmsServer({
     required Brain brain,
@@ -78,8 +79,8 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     this.robotType = proto.RobotType.MINI,
     this.imuStreamFactory,
     this.jointStreamFactory,
-  })  : _brain = brain,
-        _m = m;
+  }) : _brain = brain,
+       _m = m;
 
   proto.Duration _elapsed() =>
       proto.Duration.fromDart(DateTime.now().difference(_startTime));
@@ -125,8 +126,10 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     final a = arbiter;
     if (a != null) {
       if (!a.command(action, ControlSource.grpc)) {
-        _log.warning('${action.runtimeType} rejected: ${a.owner} has priority'
-            '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
+        _log.warning(
+          '${action.runtimeType} rejected: ${a.owner} has priority'
+          '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}',
+        );
         throw GrpcError.failedPrecondition(
           'Control rejected: ${a.owner} has priority',
         );
@@ -135,8 +138,10 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
       _m.add(action);
     }
     _lastCommandAt = now;
-    _log.finest('${action.runtimeType} dispatched'
-        '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
+    _log.finest(
+      '${action.runtimeType} dispatched'
+      '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}',
+    );
     gains?.applyCommand(action);
   }
 
@@ -190,42 +195,40 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   }
 
   String _describeTransitionTarget(Command target) => switch (target) {
-        StandUpCommand() => 'standUp',
-        SitDownCommand() => 'sitDown',
-        GestureCommand(:final name) => 'gesture($name)',
-        _ => target.runtimeType.toString(),
-      };
+    StandUpCommand() => 'standUp',
+    SitDownCommand() => 'sitDown',
+    GestureCommand(:final name) => 'gesture($name)',
+    _ => target.runtimeType.toString(),
+  };
 
   proto.CmsState _toProtoCmsState(S state) => switch (state) {
-        Zero() => proto.CmsState(
-            kind: proto.CmsStateKind.CMS_STATE_KIND_ZERO,
-          ),
-        Grounded() => proto.CmsState(
-            kind: proto.CmsStateKind.CMS_STATE_KIND_GROUNDED,
-          ),
-        Standing() => proto.CmsState(
-            kind: proto.CmsStateKind.CMS_STATE_KIND_STANDING,
-          ),
-        Walking() => proto.CmsState(
-            kind: proto.CmsStateKind.CMS_STATE_KIND_WALKING,
-          ),
-        Transitioning(target: StandUpCommand()) => proto.CmsState(
-            kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
-            transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP,
-          ),
-        Transitioning(target: SitDownCommand()) => proto.CmsState(
-            kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
-            transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
-          ),
-        Transitioning(target: GestureCommand(:final name)) => proto.CmsState(
-            kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
-            transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_GESTURE,
-            gestureName: name,
-          ),
-        Transitioning() => proto.CmsState(
-            kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
-          ),
-      };
+    Zero() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_ZERO),
+    Grounded() => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_GROUNDED,
+    ),
+    Standing() => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_STANDING,
+    ),
+    Walking() => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_WALKING,
+    ),
+    Transitioning(target: StandUpCommand()) => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
+      transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP,
+    ),
+    Transitioning(target: SitDownCommand()) => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
+      transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
+    ),
+    Transitioning(target: GestureCommand(:final name)) => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
+      transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_GESTURE,
+      gestureName: name,
+    ),
+    Transitioning() => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
+    ),
+  };
 
   static const _walkDirMaxMagnitude = 3.0;
 
@@ -285,8 +288,7 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   }
 
   /// 获取可用动作列表。
-  List<String> get gestureNames =>
-      _brain.gestureLibrary?.names ?? const [];
+  List<String> get gestureNames => _brain.gestureLibrary?.names ?? const [];
 
   // ═══════════════════════════════════════════════════════════
   //  策略切换
@@ -294,7 +296,9 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   @override
   Future<proto.ProfileInfo> getProfile(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     final pm = profileManager;
     if (pm == null) throw GrpcError.unimplemented('Profiles not configured');
     return proto.ProfileInfo(
@@ -307,7 +311,9 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   @override
   Future<proto.ProfileInfo> switchProfile(
-      ServiceCall call, proto.ProfileRequest request) async {
+    ServiceCall call,
+    proto.ProfileRequest request,
+  ) async {
     final pm = profileManager;
     if (pm == null) throw GrpcError.unimplemented('Profiles not configured');
     if (_m.state is! Grounded) {
@@ -346,11 +352,7 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     try {
       final h = await _brain.tick();
       _log.finest('tick: inferenceUs=${_brain.lastInferenceUs}');
-      return h.toProto(
-        timestamp: _elapsed(),
-        kp: gains?.kp,
-        kd: gains?.kd,
-      );
+      return h.toProto(timestamp: _elapsed(), kp: gains?.kp, kd: gains?.kd);
     } on TimeoutException {
       throw GrpcError.deadlineExceeded('Inference timed out');
     } on StateError catch (e) {
@@ -379,24 +381,26 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   @override
   Future<proto.Timestamp> getStartTime(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     return proto.Timestamp.fromDateTime(_startTime.toUtc());
   }
 
   @override
   Future<proto.CmsState> getCmsState(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     return _toProtoCmsState(_m.state);
   }
 
   @override
-  Future<proto.Params> getParams(
-      ServiceCall call, proto.Empty request) async {
+  Future<proto.Params> getParams(ServiceCall call, proto.Empty request) async {
     return proto.Params(
       robot: proto.RobotModel(
         type: robotType,
-        initialJointPosition:
-            proto.Matrix4(values: _brain.standingPose.values),
+        initialJointPosition: proto.Matrix4(values: _brain.standingPose.values),
       ),
     );
   }
@@ -406,50 +410,46 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   // ═══════════════════════════════════════════════════════════
 
   @override
-  Stream<proto.History> listenHistory(
-      ServiceCall call, proto.Empty request) {
+  Stream<proto.History> listenHistory(ServiceCall call, proto.Empty request) {
     return _historyBroadcast.map(
-      (h) => h.toProto(
-        timestamp: _elapsed(),
-        kp: gains?.kp,
-        kd: gains?.kd,
-      ),
+      (h) => h.toProto(timestamp: _elapsed(), kp: gains?.kp, kd: gains?.kd),
     );
   }
 
   @override
   Stream<proto.CmsState> listenCmsState(
-      ServiceCall call, proto.Empty request) async* {
+    ServiceCall call,
+    proto.Empty request,
+  ) async* {
     yield _toProtoCmsState(_m.state);
     yield* _cmsStateBroadcast;
   }
 
   @override
-  Stream<proto.Imu> listenImu(
-      ServiceCall call, proto.Empty request) {
+  Stream<proto.Imu> listenImu(ServiceCall call, proto.Empty request) {
     // 硬件模式：使用外部注入的硬件数据流
     final factory = imuStreamFactory;
     if (factory != null) return factory();
 
     // 仿真模式：时钟驱动，读取 ImuService 当前状态
-    return _brain.ts.map((_) => imuSnapshot(
-          _brain.imu,
-          quaternion: simInjector?.quaternion ?? _identityQ,
-          timestamp: _elapsed(),
-        ));
+    return _brain.ts.map(
+      (_) => imuSnapshot(
+        _brain.imu,
+        quaternion: simInjector?.quaternion ?? _identityQ,
+        timestamp: _elapsed(),
+      ),
+    );
   }
 
   @override
-  Stream<proto.Joint> listenJoint(
-      ServiceCall call, proto.Empty request) {
+  Stream<proto.Joint> listenJoint(ServiceCall call, proto.Empty request) {
     // 硬件模式：使用外部注入的硬件数据流
     final factory = jointStreamFactory;
     if (factory != null) return factory();
 
     // 仿真模式：时钟驱动，读取 JointService 当前状态
-    return _brain.ts.map((_) => jointSnapshot(
-          _brain.joint,
-          timestamp: _elapsed(),
-        ));
+    return _brain.ts.map(
+      (_) => jointSnapshot(_brain.joint, timestamp: _elapsed()),
+    );
   }
 }

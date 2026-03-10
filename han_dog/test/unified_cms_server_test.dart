@@ -21,25 +21,22 @@ class _MockServiceCall extends Mock implements ServiceCall {}
 final _zeros16 = JointsMatrix.fromList(List.filled(16, 0.0));
 
 RobotProfile _profile(String name) => RobotProfile(
-      name: name,
-      description: '$name 策略说明',
-      modelPath: '$name.onnx',
-      standingPose: _zeros16,
-      sittingPose: _zeros16,
-      inferKp: _zeros16,
-      inferKd: _zeros16,
-      standUpKp: _zeros16,
-      standUpKd: _zeros16,
-      sitDownKp: _zeros16,
-      sitDownKd: _zeros16,
-    );
+  name: name,
+  description: '$name 策略说明',
+  modelPath: '$name.onnx',
+  standingPose: _zeros16,
+  sittingPose: _zeros16,
+  inferKp: _zeros16,
+  inferKd: _zeros16,
+  standUpKp: _zeros16,
+  standUpKd: _zeros16,
+  sitDownKp: _zeros16,
+  sitDownKd: _zeros16,
+);
 
 /// 创建仿真模式服务器（无 arbiter，无 simInjector）。
-UnifiedCmsServer _simServer(_MockBrain brain, _MockM m) => UnifiedCmsServer(
-      brain: brain,
-      m: m,
-      mode: CmsMode.simulation,
-    );
+UnifiedCmsServer _simServer(_MockBrain brain, _MockM m) =>
+    UnifiedCmsServer(brain: brain, m: m, mode: CmsMode.simulation);
 
 void main() {
   late _MockBrain brain;
@@ -51,7 +48,8 @@ void main() {
     registerFallbackValue(JointsMatrix.zero());
     registerFallbackValue(GestureLibrary(standingPose: JointsMatrix.zero()));
     registerFallbackValue(
-        StandardObservationBuilder(standingPose: JointsMatrix.zero()));
+      StandardObservationBuilder(standingPose: JointsMatrix.zero()),
+    );
   });
 
   setUp(() {
@@ -74,8 +72,13 @@ void main() {
       final server = _simServer(brain, m);
       await expectLater(
         server.walk(call, proto.Vector3(x: double.nan, y: 0, z: 0)),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.invalidArgument)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.invalidArgument,
+          ),
+        ),
       );
     });
 
@@ -83,8 +86,13 @@ void main() {
       final server = _simServer(brain, m);
       await expectLater(
         server.walk(call, proto.Vector3(x: double.infinity, y: 0, z: 0)),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.invalidArgument)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.invalidArgument,
+          ),
+        ),
       );
     });
 
@@ -92,8 +100,13 @@ void main() {
       final server = _simServer(brain, m);
       await expectLater(
         server.walk(call, proto.Vector3(x: 3.1, y: 0, z: 0)),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.invalidArgument)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.invalidArgument,
+          ),
+        ),
       );
     });
 
@@ -122,8 +135,13 @@ void main() {
       );
       await expectLater(
         server.tick(call, proto.Empty()),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.failedPrecondition)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.failedPrecondition,
+          ),
+        ),
       );
     });
 
@@ -132,8 +150,13 @@ void main() {
       final server = _simServer(brain, m);
       await expectLater(
         server.tick(call, proto.Empty()),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.failedPrecondition)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.failedPrecondition,
+          ),
+        ),
       );
     });
   });
@@ -146,8 +169,13 @@ void main() {
       final server = _simServer(brain, m);
       await expectLater(
         server.step(call, proto.SimState()),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.failedPrecondition)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.failedPrecondition,
+          ),
+        ),
       );
     });
   });
@@ -160,18 +188,20 @@ void main() {
       // profileManager 默认为 null
       await expectLater(
         server.getProfile(call, proto.Empty()),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.unimplemented)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.unimplemented,
+          ),
+        ),
       );
     });
 
     test('已配置 profileManager → 返回正确的 ProfileInfo', () async {
       final server = _simServer(brain, m);
       server.profileManager = ProfileManager(
-        profiles: {
-          'mini': _profile('mini'),
-          'fast': _profile('fast'),
-        },
+        profiles: {'mini': _profile('mini'), 'fast': _profile('fast')},
         brain: brain,
         initial: 'mini',
       );
@@ -192,8 +222,13 @@ void main() {
       final server = _simServer(brain, m);
       await expectLater(
         server.switchProfile(call, proto.ProfileRequest(name: 'mini')),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.unimplemented)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.unimplemented,
+          ),
+        ),
       );
     });
 
@@ -207,8 +242,13 @@ void main() {
       );
       await expectLater(
         server.switchProfile(call, proto.ProfileRequest(name: 'mini')),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.failedPrecondition)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.failedPrecondition,
+          ),
+        ),
       );
     });
 
@@ -227,8 +267,13 @@ void main() {
 
       await expectLater(
         server.switchProfile(call, proto.ProfileRequest(name: 'fast_walk')),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.invalidArgument)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.invalidArgument,
+          ),
+        ),
       );
 
       await sub.cancel();
@@ -245,8 +290,13 @@ void main() {
       final server = _simServer(brain, m);
       await expectLater(
         server.walk(call, proto.Vector3(x: 0.5, y: 0, z: 0)),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.failedPrecondition)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.failedPrecondition,
+          ),
+        ),
       );
 
       await sub.cancel();
@@ -256,15 +306,20 @@ void main() {
     test('Transitioning standUp returns failedPrecondition', () async {
       final historyCtrl = StreamController<History>();
       final sub = historyCtrl.stream.listen((_) {});
-      when(() => m.state).thenReturn(
-        Transitioning(const StandUpCommand(), sub, null),
-      );
+      when(
+        () => m.state,
+      ).thenReturn(Transitioning(const StandUpCommand(), sub, null));
 
       final server = _simServer(brain, m);
       await expectLater(
         server.standUp(call, proto.Empty()),
-        throwsA(isA<GrpcError>()
-            .having((e) => e.code, 'code', StatusCode.failedPrecondition)),
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.failedPrecondition,
+          ),
+        ),
       );
 
       await sub.cancel();
@@ -291,33 +346,41 @@ void main() {
       await historyCtrl.close();
     });
 
-    test('listenCmsState yields initial and subsequent state changes', () async {
-      final historyCtrl = StreamController<History>.broadcast();
-      final initialSub = historyCtrl.stream.listen((_) {});
-      final nextSub = historyCtrl.stream.listen((_) {});
-      final stateCtrl = StreamController<S>.broadcast();
-      when(() => m.state).thenReturn(Grounded(initialSub));
-      when(() => m.stream).thenAnswer((_) => stateCtrl.stream);
+    test(
+      'listenCmsState yields initial and subsequent state changes',
+      () async {
+        final historyCtrl = StreamController<History>.broadcast();
+        final initialSub = historyCtrl.stream.listen((_) {});
+        final nextSub = historyCtrl.stream.listen((_) {});
+        final stateCtrl = StreamController<S>.broadcast();
+        when(() => m.state).thenReturn(Grounded(initialSub));
+        when(() => m.stream).thenAnswer((_) => stateCtrl.stream);
 
-      final server = _simServer(brain, m);
-      final statesFuture =
-          server.listenCmsState(call, proto.Empty()).take(2).toList();
-      await Future<void>.delayed(Duration.zero);
-      stateCtrl.add(Transitioning(const Command.sitDown(), nextSub, null));
-      final states = await statesFuture;
+        final server = _simServer(brain, m);
+        final statesFuture = server
+            .listenCmsState(call, proto.Empty())
+            .take(2)
+            .toList();
+        await Future<void>.delayed(Duration.zero);
+        stateCtrl.add(Transitioning(const Command.sitDown(), nextSub, null));
+        final states = await statesFuture;
 
-      expect(states, hasLength(2));
-      expect(states.first.kind, proto.CmsStateKind.CMS_STATE_KIND_GROUNDED);
-      expect(states.last.kind, proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING);
-      expect(
-        states.last.transition,
-        proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
-      );
+        expect(states, hasLength(2));
+        expect(states.first.kind, proto.CmsStateKind.CMS_STATE_KIND_GROUNDED);
+        expect(
+          states.last.kind,
+          proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
+        );
+        expect(
+          states.last.transition,
+          proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
+        );
 
-      await initialSub.cancel();
-      await nextSub.cancel();
-      await historyCtrl.close();
-      await stateCtrl.close();
-    });
+        await initialSub.cancel();
+        await nextSub.cancel();
+        await historyCtrl.close();
+        await stateCtrl.close();
+      },
+    );
   });
 }

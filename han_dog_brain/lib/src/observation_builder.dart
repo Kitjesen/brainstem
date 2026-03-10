@@ -53,7 +53,7 @@ class StandardObservationBuilder implements ObservationBuilder {
     final jointPosition = (h.jointPosition - standingPose).discardFoot();
     final jointVelocity = h.jointVelocity * jointVelocityScale;
     final action = (h.action - standingPose) / actionScale;
-    return [
+    final obs = [
       gyroscope.x, gyroscope.y, gyroscope.z,
       pg.x, pg.y, pg.z,
       direction.x, direction.y, direction.z,
@@ -61,5 +61,10 @@ class StandardObservationBuilder implements ObservationBuilder {
       ...jointVelocity.values,
       ...action.values,
     ];
+    // 防御 NaN/Inf 传入 ONNX（IMU 硬件故障、actionScale 为零等）
+    for (int i = 0; i < obs.length; i++) {
+      if (!obs[i].isFinite) obs[i] = 0.0;
+    }
+    return obs;
   }
 }

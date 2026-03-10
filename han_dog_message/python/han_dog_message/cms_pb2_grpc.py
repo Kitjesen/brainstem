@@ -8,7 +8,7 @@ from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__
 from han_dog_message import cms_pb2 as han__dog__message_dot_cms__pb2
 from han_dog_message import common_pb2 as han__dog__message_dot_common__pb2
 
-GRPC_GENERATED_VERSION = '1.76.0'
+GRPC_GENERATED_VERSION = '1.78.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -29,7 +29,18 @@ if _version_not_supported:
 
 
 class CmsStub(object):
-    """Missing associated documentation comment in .proto file."""
+    """四足机器人命令与监控服务。
+
+    控制类 RPC（受仲裁器限制，遥控器优先级更高）：
+    Enable / Disable / Walk / StandUp / SitDown
+
+    仿真类 RPC（仅在 sim 模式下使用）：
+    Tick / Step
+
+    监控类 RPC（不受仲裁限制，任何客户端均可订阅）：
+    ListenHistory / ListenImu / ListenJoint / GetStartTime / GetParams
+    ──── 硬件控制 ────
+    """
 
     def __init__(self, channel):
         """Constructor.
@@ -77,10 +88,20 @@ class CmsStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_timestamp__pb2.Timestamp.FromString,
                 _registered_method=True)
+        self.GetCmsState = channel.unary_unary(
+                '/han_dog.Cms/GetCmsState',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=han__dog__message_dot_cms__pb2.CmsState.FromString,
+                _registered_method=True)
         self.ListenHistory = channel.unary_stream(
                 '/han_dog.Cms/ListenHistory',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=han__dog__message_dot_cms__pb2.History.FromString,
+                _registered_method=True)
+        self.ListenCmsState = channel.unary_stream(
+                '/han_dog.Cms/ListenCmsState',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=han__dog__message_dot_cms__pb2.CmsState.FromString,
                 _registered_method=True)
         self.ListenImu = channel.unary_stream(
                 '/han_dog.Cms/ListenImu',
@@ -97,79 +118,146 @@ class CmsStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=han__dog__message_dot_cms__pb2.Params.FromString,
                 _registered_method=True)
+        self.SwitchProfile = channel.unary_unary(
+                '/han_dog.Cms/SwitchProfile',
+                request_serializer=han__dog__message_dot_cms__pb2.ProfileRequest.SerializeToString,
+                response_deserializer=han__dog__message_dot_cms__pb2.ProfileInfo.FromString,
+                _registered_method=True)
+        self.GetProfile = channel.unary_unary(
+                '/han_dog.Cms/GetProfile',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=han__dog__message_dot_cms__pb2.ProfileInfo.FromString,
+                _registered_method=True)
 
 
 class CmsServicer(object):
-    """Missing associated documentation comment in .proto file."""
+    """四足机器人命令与监控服务。
+
+    控制类 RPC（受仲裁器限制，遥控器优先级更高）：
+    Enable / Disable / Walk / StandUp / SitDown
+
+    仿真类 RPC（仅在 sim 模式下使用）：
+    Tick / Step
+
+    监控类 RPC（不受仲裁限制，任何客户端均可订阅）：
+    ListenHistory / ListenImu / ListenJoint / GetStartTime / GetParams
+    ──── 硬件控制 ────
+    """
 
     def Enable(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """使能所有电机（硬件级操作，不经仲裁）。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def Disable(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """禁用所有电机（硬件级操作，不经仲裁）。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def Walk(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """──── 运动指令（经仲裁器，可能被拒绝） ────
+
+        行走：传入方向向量 (x=前后, y=左右, z=旋转)，范围 [-1, 1]。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def StandUp(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """从坐姿过渡到站立姿态。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def SitDown(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """从站立过渡到坐姿。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def Tick(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """──── 仿真专用 ────
+
+        推进一个仿真步（sim 模式），返回当前 History。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def Step(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """向控制器注入仿真传感器数据。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def GetStartTime(self, request, context):
+        """──── 查询与监控 ────
+
+        获取服务启动时间（UTC）。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetCmsState(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def ListenHistory(self, request, context):
+        """实时推理历史流：每个推理周期（~20ms）发送一帧。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListenCmsState(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def ListenImu(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """实时 IMU 数据流。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def ListenJoint(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """实时关节数据流（单关节上报或全关节快照）。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def GetParams(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """获取机器人模型参数。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SwitchProfile(self, request, context):
+        """──── 策略切换 ────
+
+        切换到指定策略。机器人必须在 Grounded 状态。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetProfile(self, request, context):
+        """获取当前策略信息。
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -217,10 +305,20 @@ def add_CmsServicer_to_server(servicer, server):
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=google_dot_protobuf_dot_timestamp__pb2.Timestamp.SerializeToString,
             ),
+            'GetCmsState': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetCmsState,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=han__dog__message_dot_cms__pb2.CmsState.SerializeToString,
+            ),
             'ListenHistory': grpc.unary_stream_rpc_method_handler(
                     servicer.ListenHistory,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=han__dog__message_dot_cms__pb2.History.SerializeToString,
+            ),
+            'ListenCmsState': grpc.unary_stream_rpc_method_handler(
+                    servicer.ListenCmsState,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=han__dog__message_dot_cms__pb2.CmsState.SerializeToString,
             ),
             'ListenImu': grpc.unary_stream_rpc_method_handler(
                     servicer.ListenImu,
@@ -237,6 +335,16 @@ def add_CmsServicer_to_server(servicer, server):
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=han__dog__message_dot_cms__pb2.Params.SerializeToString,
             ),
+            'SwitchProfile': grpc.unary_unary_rpc_method_handler(
+                    servicer.SwitchProfile,
+                    request_deserializer=han__dog__message_dot_cms__pb2.ProfileRequest.FromString,
+                    response_serializer=han__dog__message_dot_cms__pb2.ProfileInfo.SerializeToString,
+            ),
+            'GetProfile': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetProfile,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=han__dog__message_dot_cms__pb2.ProfileInfo.SerializeToString,
+            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'han_dog.Cms', rpc_method_handlers)
@@ -246,7 +354,18 @@ def add_CmsServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class Cms(object):
-    """Missing associated documentation comment in .proto file."""
+    """四足机器人命令与监控服务。
+
+    控制类 RPC（受仲裁器限制，遥控器优先级更高）：
+    Enable / Disable / Walk / StandUp / SitDown
+
+    仿真类 RPC（仅在 sim 模式下使用）：
+    Tick / Step
+
+    监控类 RPC（不受仲裁限制，任何客户端均可订阅）：
+    ListenHistory / ListenImu / ListenJoint / GetStartTime / GetParams
+    ──── 硬件控制 ────
+    """
 
     @staticmethod
     def Enable(request,
@@ -465,6 +584,33 @@ class Cms(object):
             _registered_method=True)
 
     @staticmethod
+    def GetCmsState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/han_dog.Cms/GetCmsState',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            han__dog__message_dot_cms__pb2.CmsState.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def ListenHistory(request,
             target,
             options=(),
@@ -481,6 +627,33 @@ class Cms(object):
             '/han_dog.Cms/ListenHistory',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             han__dog__message_dot_cms__pb2.History.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListenCmsState(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/han_dog.Cms/ListenCmsState',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            han__dog__message_dot_cms__pb2.CmsState.FromString,
             options,
             channel_credentials,
             insecure,
@@ -562,6 +735,60 @@ class Cms(object):
             '/han_dog.Cms/GetParams',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             han__dog__message_dot_cms__pb2.Params.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SwitchProfile(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/han_dog.Cms/SwitchProfile',
+            han__dog__message_dot_cms__pb2.ProfileRequest.SerializeToString,
+            han__dog__message_dot_cms__pb2.ProfileInfo.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetProfile(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/han_dog.Cms/GetProfile',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            han__dog__message_dot_cms__pb2.ProfileInfo.FromString,
             options,
             channel_credentials,
             insecure,

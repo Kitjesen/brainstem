@@ -86,7 +86,15 @@ class RobotProfile {
     if (v.length != 16) {
       throw FormatException('Field "$key" must have 16 elements, got ${v.length}');
     }
-    return JointsMatrix.fromList(v.map((e) => (e as num).toDouble()).toList());
+    final doubles = v.map((e) => (e as num).toDouble()).toList();
+    for (int i = 0; i < doubles.length; i++) {
+      if (!doubles[i].isFinite) {
+        throw FormatException(
+          'Field "$key" contains non-finite value at index $i: ${doubles[i]}',
+        );
+      }
+    }
+    return JointsMatrix.fromList(doubles);
   }
 
   static (double, double, double, double) _tuple4(
@@ -102,6 +110,13 @@ class RobotProfile {
       throw FormatException('Field "$key" must have at least 4 elements, got ${v.length}');
     }
     final list = v.map((e) => (e as num).toDouble()).toList();
+    for (int i = 0; i < 4; i++) {
+      if (!list[i].isFinite) {
+        throw FormatException(
+          'Field "$key" contains non-finite value at index $i: ${list[i]}',
+        );
+      }
+    }
     return (list[0], list[1], list[2], list[3]);
   }
 
