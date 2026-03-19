@@ -190,8 +190,8 @@ class RealControlDog {
     ));
     _subscriptions.add(controller.switchProfile.listen(
       (_) {
-        if (arbiter.state is! Grounded) {
-          _log.warning('R2 profile switch rejected: not grounded (${arbiter.state})');
+        if (arbiter.state is! Grounded && arbiter.state is! Standing) {
+          _log.warning('R2 profile switch rejected: must be grounded or standing (${arbiter.state})');
           return;
         }
         _log.info('R2 → switchProfile');

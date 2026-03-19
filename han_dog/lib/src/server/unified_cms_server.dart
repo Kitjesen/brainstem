@@ -235,8 +235,11 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
       ServiceCall call, proto.ProfileRequest request) async {
     final pm = profileManager;
     if (pm == null) throw GrpcError.unimplemented('Profiles not configured');
-    if (_m.state is! Grounded) {
-      throw GrpcError.failedPrecondition('Must be in Grounded state');
+    final wasStanding = _m.state is Standing;
+    if (_m.state is! Grounded && !wasStanding) {
+      throw GrpcError.failedPrecondition(
+        'Must be in Grounded or Standing state',
+      );
     }
     try {
       await pm.switchTo(request.name);
@@ -245,7 +248,13 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     } on StateError catch (e) {
       throw GrpcError.failedPrecondition(e.message);
     }
-    _log.info('Profile switched to: ${pm.currentName}');
+    // Standing 时切换后，触发 StandUp 过渡到新 standingPose
+    if (wasStanding) {
+      _dispatch(const A.standUp());
+      _log.info('Profile switched to ${pm.currentName} — transitioning to new pose');
+    } else {
+      _log.info('Profile switched to: ${pm.currentName}');
+    }
     return proto.ProfileInfo(
       current: pm.currentName,
       available: pm.names,
