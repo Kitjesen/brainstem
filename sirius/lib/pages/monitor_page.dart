@@ -69,7 +69,7 @@ class _MonitorPageState extends State<MonitorPage> {
         Row(children: [
           Text('实时监控', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: cs.onSurface)),
           const SizedBox(width: 8),
-          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: (g.connected ? AppTheme.green : AppTheme.red).withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: (g.connected ? AppTheme.green : AppTheme.red).withValues(alpha: 0.2), width: 1)), child: Text(g.connected ? '在线' : '离线', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: g.connected ? AppTheme.green : AppTheme.red))),
+          Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3), decoration: BoxDecoration(color: (g.connected ? AppTheme.green : AppTheme.red).withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: (g.connected ? AppTheme.green : AppTheme.red).withValues(alpha: 0.2), width: 1)), child: Text(g.connected ? '已连接' : '未连接', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: g.connected ? AppTheme.green : AppTheme.red))),
           if (overLimit > 0) ...[
             const SizedBox(width: 8),
             Container(
@@ -133,11 +133,12 @@ class _MonitorPageState extends State<MonitorPage> {
   // Indices: FR[0,1,2,12] FL[3,4,5,13] RR[6,7,8,14] RL[9,10,11,15]
   static const _hmLeg = ['FR', 'FL', 'RR', 'RL'];
   static const _hmJoint = ['髋', '大腿', '小腿', '足'];
-  static const _legColors = [
-    Color(0xFF3B82F6), // FR 蓝
-    Color(0xFF10B981), // FL 绿
-    Color(0xFFF59E0B), // RR 橙
-    Color(0xFF8B5CF6), // RL 紫
+  // FR/FL/RR/RL display order, mapped from AppTheme.legColors (FL/FR/RL/RR)
+  static final _legColors = [
+    AppTheme.legColors[1], // FR — blue
+    AppTheme.legColors[0], // FL — emerald
+    AppTheme.legColors[3], // RR — purple
+    AppTheme.legColors[2], // RL — amber
   ];
   static const _hmIdx = [
     [0, 1, 2, 12],
@@ -249,12 +250,12 @@ class _MonitorPageState extends State<MonitorPage> {
   Widget _powerBar(BuildContext ctx, GrpcService g) {
     final cs = Theme.of(ctx).colorScheme;
     const legs = ['FR', 'FL', 'RR', 'RL'];
-    const colors = [Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFF8B5CF6)];
+    final colors = _legColors;
     final j = g.latestJoints;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: cs.outline.withValues(alpha: 0.5), width: 1), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8)]),
+      decoration: BoxDecoration(color: cs.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: cs.outline.withValues(alpha: 0.5), width: 1), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8)]),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         // Power indicator
         Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppTheme.orange.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)), child: Icon(Icons.bolt_rounded, size: 18, color: AppTheme.orange)),
@@ -382,7 +383,7 @@ class _MonitorPageState extends State<MonitorPage> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outline.withValues(alpha: 0.5)),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8)],
       ),
@@ -585,7 +586,7 @@ class _MonitorPageState extends State<MonitorPage> {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outline.withValues(alpha: 0.5), width: 1),
         boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8)],
       ),

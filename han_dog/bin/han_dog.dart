@@ -20,6 +20,9 @@ final _subs = <StreamSubscription<Object?>>[];
 /// 用于异常退出时关闭 gRPC、释放端口
 grpc.Server? _grpcServerForCleanup;
 
+/// 用于异常退出时禁用电机
+RealJoint? _jointForCleanup;
+
 /// 策略热加载定时器（关机时取消）
 Timer? _profileReloadTimer;
 
@@ -31,6 +34,7 @@ void main() {
       _log.severe('Uncaught: $error\n$stack');
       (() async {
         try {
+          _jointForCleanup?.disable();
           await _grpcServerForCleanup?.shutdown();
           _log.info('gRPC port ${_cfg.grpcPort} released.');
         } catch (_) {}
@@ -81,6 +85,11 @@ Future<void> _run() async {
     defaultProfile = profiles.values.first;
   }
   _log.info('Default profile: ${defaultProfile.name} (model=${defaultProfile.modelPath})');
+  final historySize = await _resolveHistorySize(defaultProfile);
+  final modelInputName = await _resolveInputName(defaultProfile);
+  _log.info(
+      'Resolved historySize=$historySize inputName=$modelInputName '
+      '(model=${defaultProfile.modelPath})');
 
   final clock = StreamController<void>.broadcast();
 
@@ -94,10 +103,10 @@ Future<void> _run() async {
 
   // PCAN USB 通道映射（由硬件接线决定）
   final joint = RealJoint(
-    fr: .usbbus2,
-    fl: .usbbus4,
-    rr: .usbbus1,
-    rl: .usbbus3,
+    fr: .usbbus3,
+    fl: .usbbus1,
+    rr: .usbbus4,
+    rl: .usbbus2,
   );
   if (!joint.open()) {
     _log.severe('Joint PCAN open failed');
@@ -120,12 +129,18 @@ Future<void> _run() async {
     clock: clock,
     standingPose: defaultProfile.standingPose,
     sittingPose: defaultProfile.sittingPose,
+    historySize: historySize,
+    standUpCounts: defaultProfile.standUpCounts,
+    sitDownCounts: defaultProfile.sitDownCounts,
   );
   const modelLoadMaxAttempts = 3;
   bool modelLoaded = false;
   for (var attempt = 1; attempt <= modelLoadMaxAttempts; attempt++) {
     try {
-      await brain.loadModel(defaultProfile.modelPath);
+      await brain.loadModel(
+        defaultProfile.modelPath,
+        inputName: modelInputName,
+      );
       _log.info('ONNX model loaded (attempt $attempt).');
       modelLoaded = true;
       break;
@@ -161,12 +176,9 @@ Future<void> _run() async {
 
   // ──── 4. FSM + 仲裁器 ──────────────────────────────────────
   final M m = M(brain)..add(Init());
-  _subs.add(m.stream.listen(
-    (s) => _log.info('CMS state: $s'),
-    onError: (Object error, StackTrace st) {
-      _log.severe('CMS state stream error', error, st);
-    },
-  ));
+  _subs.add(m.stream.listen((s) {
+    _log.info('CMS state: $s');
+  }));
   try {
     await m.stream
         .firstWhere((s) => s is Grounded)
@@ -184,25 +196,54 @@ Future<void> _run() async {
   _log.info('CMS initialized: ${m.state}');
 
   final arbiter = ControlArbiter(m, timeout: _cfg.arbiterTimeout);
-  _subs.add(arbiter.ownerStream.listen(
-    (owner) {
-      _log.info('Arbiter control owner: ${owner ?? "none"}');
-    },
-    onError: (Object error, StackTrace st) {
-      _log.severe('Arbiter owner stream error', error, st);
-    },
-    onDone: () {
-      _log.warning('Arbiter owner stream closed');
-    },
-  ));
-  // IMU 串口断联 → 立即触发 FSM Fault，防止机器人用陈旧读数盲推理。
-  imu.onDisconnect = (reason) => arbiter.fault(reason);
+  _subs.add(arbiter.ownerStream.listen((owner) {
+    _log.info('Arbiter control owner: ${owner ?? "none"}');
+  }));
+  // IMU 串口断联 → 记录警告。频率监控会在持续低频时触发 Fault。
+  imu.onDisconnect = (reason) {
+    _log.warning('IMU disconnect: $reason');
+  };
 
-  // 推理输出 → 电机动作
+  // ──── 4a. Motor health manager ─────────────────────────────
+  final motorHealth = MotorHealthManager(
+    joint: joint,
+    requestFault: (reason) => arbiter.fault(reason),
+  );
+  _subs.add(motorHealth.healthStream.listen((event) {
+    switch (event.severity) {
+      case MotorSeverity.transient:
+        _log.fine('Motor health: $event');
+      case MotorSeverity.healthy:
+        _log.info('Motor health: $event');
+      case MotorSeverity.degraded:
+        _log.warning('Motor health: $event');
+      case MotorSeverity.critical:
+        _log.severe('Motor health: $event');
+    }
+  }));
+  // CMS state → recovery: when Grounded with faulted motors, attempt per-joint
+  // verified recovery instead of blind clear-all.
+  _subs.add(m.stream.listen((s) {
+    if (s is Grounded && motorHealth.hasFaults) {
+      _log.info('Reached Grounded with faulted motors — starting recovery');
+      motorHealth.recoverFaults();
+    }
+  }));
+
+  var motorOutputEnabled = false;
+
+  // 推理输出 → 电机动作 (gated through MotorHealthManager)
   _subs.add(brain.nextActionStream.listen(
     (action) {
-      // TODO(phase3): Enable motor output after data stream validation.
-      // joint.sendAction(action);
+      if (!motorOutputEnabled) return;
+
+      if (arbiter.state is Grounded) {
+        joint.sendAction(joint.position.discardFoot());
+        return;
+      }
+
+      final gated = motorHealth.gateAction(action, joint.position);
+      joint.sendAction(gated);
     },
     onError: (Object error, StackTrace st) {
       _log.severe('Inference stream error: $error', error, st);
@@ -237,6 +278,9 @@ Future<void> _run() async {
     initial: defaultProfile.name,
   );
   controlDog.onProfileSwitch = () => profileManager.toggle();
+  controlDog.onMotorEnableChanged = (enabled) {
+    motorOutputEnabled = enabled;
+  };
   _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
 
   // ──── 4c. 策略热加载（每 30s 扫描 profileDir）────────────────
@@ -304,8 +348,10 @@ Future<void> _run() async {
         ),
   );
   cmsService.profileManager = profileManager;
+  cmsService.joint = joint;
   final grpcServer = await _startGrpc(cmsService);
   _grpcServerForCleanup = grpcServer;
+  _jointForCleanup = joint;
 
   // ──── 7. 信号处理 + 时钟 ───────────────────────────────────
   Timer? clockTimer;
@@ -318,10 +364,11 @@ Future<void> _run() async {
     controller: controller,
     imu: imu,
     brain: brain,
+    motorHealth: motorHealth,
     getClockTimer: () => clockTimer,
   );
 
-  _log.info('gRPC + YUNZHUO 就绪. 电机输出已禁用(仅数据流验证).');
+  _log.info('gRPC + YUNZHUO 就绪. 电机输出受 CH5 使能控制；Grounded 时保持当前姿态.');
 
   clockTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
     clock.add(null);
@@ -330,6 +377,43 @@ Future<void> _run() async {
   if (_cfg.debugTui) {
     startDebugTui(imu: imu, joint: joint, m: m, arbiter: arbiter);
   }
+}
+
+Future<int> _resolveHistorySize(RobotProfile profile) async {
+  final tensorSize = profile.toObservationBuilder().tensorSize;
+  final inferred = await inferHistorySizeFromModel(
+    modelPath: profile.modelPath,
+    tensorSize: tensorSize,
+  );
+  if (inferred != null) {
+    _log.info(
+        'Inferred historySize=$inferred from model input '
+        '(tensorSize=$tensorSize, model=${profile.modelPath})');
+    return inferred;
+  }
+
+  _log.warning(
+      'Unable to infer history size from model ${profile.modelPath}; '
+      'falling back to 1');
+  return 1;
+}
+
+Future<String> _resolveInputName(RobotProfile profile) async {
+  final inferred = await inferInputNameFromModel(
+    modelPath: profile.modelPath,
+  );
+  if (inferred != null && inferred.isNotEmpty) {
+    _log.info(
+      'Inferred inputName=$inferred from model ${profile.modelPath}',
+    );
+    return inferred;
+  }
+
+  _log.warning(
+    'Unable to infer input name from model ${profile.modelPath}; '
+    'falling back to "obs"',
+  );
+  return 'obs';
 }
 
 // ─── 辅助函数 ──────────────────────────────────────────────────
@@ -342,7 +426,17 @@ Future<void> _checkJointReporting(RealJoint joint) async {
     'RR Hip', 'RR Thigh', 'RR Calf', 'RR Foot',
     'RL Hip', 'RL Thigh', 'RL Calf', 'RL Foot',
   ];
-  await Future<void>.delayed(const Duration(seconds: 1));
+  const attempts = 8;
+  for (var attempt = 1; attempt <= attempts; attempt++) {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final received = joint.frequencyWatches.where((e) => e.value > 0).length;
+    if (received == names.length) {
+      _log.info('主动上报: 16/16 关节已收到 (attempt $attempt/$attempts)');
+      return;
+    }
+    // Re-send reporting requests to wake slow motors up sooner.
+    joint.setReporting(true);
+  }
   final noReport = <String>[];
   final hasReport = <String>[];
   for (var i = 0; i < joint.frequencyWatches.length; i++) {
@@ -400,6 +494,7 @@ void _registerShutdown({
   required RealController controller,
   required RealImu imu,
   required Brain brain,
+  required MotorHealthManager motorHealth,
   required Timer? Function() getClockTimer,
 }) {
   var shuttingDown = false;
@@ -413,6 +508,7 @@ void _registerShutdown({
     const hardDeadline = Duration(seconds: 15);
     Timer(hardDeadline, () {
       _log.severe('Shutdown exceeded ${hardDeadline.inSeconds}s hard deadline — forcing exit(1)');
+      _jointForCleanup?.disable();
       exit(1);
     });
 
@@ -458,7 +554,7 @@ void _registerShutdown({
     _subs.clear();
     getClockTimer()?.cancel();
     _profileReloadTimer?.cancel();
-    for (final disposable in [arbiter, controlDog, controller, imu, joint, brain]) {
+    for (final disposable in [motorHealth, arbiter, controlDog, controller, imu, joint, brain]) {
       try { (disposable as dynamic).dispose(); } catch (_) {}
     }
     try { await m.close().timeout(const Duration(seconds: 2)); } catch (_) {}

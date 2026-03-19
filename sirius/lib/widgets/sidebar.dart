@@ -83,11 +83,11 @@ class Sidebar extends StatelessWidget {
             ],
           ),
           child: Column(children: [
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             // 导航项：可滚动，避免窗口较小时溢出
-            Flexible(
+            Expanded(
               child: SingleChildScrollView(
-                physics: const NeverScrollableScrollPhysics(),
+                physics: const ClampingScrollPhysics(),
                 child: Column(
                   children: List.generate(navItems.length, (i) => _NavItem(
                     item: navItems[i], sel: i == selectedIndex,
@@ -97,7 +97,7 @@ class Sidebar extends StatelessWidget {
                 ),
               ),
             ),
-            // 设置区固定在底部
+            // 设置区固定在底部——始终可见，不随导航项滚动
             if (!collapsed) ...[
               const SizedBox(height: 8),
               // Settings button (includes theme, language, text size)
@@ -129,7 +129,6 @@ class Sidebar extends StatelessWidget {
               ),
             ] else ...[
               // Collapsed: just the connected dot
-              const Spacer(),
               Container(
                 width: 8, height: 8,
                 decoration: BoxDecoration(

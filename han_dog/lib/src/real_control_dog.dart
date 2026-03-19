@@ -29,6 +29,9 @@ class RealControlDog {
   /// 策略切换回调（由外部 ProfileManager 设置）。
   void Function()? onProfileSwitch;
 
+  /// 电机使能状态变化回调（由外部设置，用于同步 motorOutputEnabled 标志）。
+  void Function(bool enabled)? onMotorEnableChanged;
+
   final List<StreamSubscription<Object?>> _subscriptions = [];
   Timer? _idleTimer;
 
@@ -89,6 +92,11 @@ class RealControlDog {
     _subscriptions.add(controller.direction.listen(
       (direction) {
         if (direction.x == 0 && direction.y == 0 && direction.z == 0) {
+          // 摇杆归零：如果正在 Walking，立刻发 walk(0,0,0) 让策略减速；
+          // 如果在 Standing，不发 walk 避免误触发 Walking 状态。
+          if (arbiter.state is Walking) {
+            sendCommand(A.walk(Vector3.zero()), 'walk(zero)');
+          }
           _idleTimer ??= Timer(_idleTimeout, () {
             _idleTimer = null;
             sendCommand(const A.idle(), 'idle(timeout)');
@@ -97,10 +105,20 @@ class RealControlDog {
         }
         _idleTimer?.cancel();
         _idleTimer = null;
-        sendCommand(
-          A.walk(Vector3(direction.x, direction.y, direction.z)),
-          'walk',
+        // 坐标修正：摇杆(x=侧移,y=前进) → 训练(obs[6]=forward,obs[7]=left,obs[8]=ccw)
+        // 前推(y+) → forward(+), 左推(x-) → left(+), yaw 取反
+        // lateral 限制在训练范围 ±0.6（训练 lin_vel_y=[-0.6,0.6]）
+        final corrected = Vector3(
+          direction.y,
+          -direction.x,
+          -direction.z,
         );
+        _log.info('WALK raw: x=${direction.x.toStringAsFixed(2)} '
+            'y=${direction.y.toStringAsFixed(2)} z=${direction.z.toStringAsFixed(2)} '
+            '→ fwd=${corrected.x.toStringAsFixed(2)} '
+            'lat=${corrected.y.toStringAsFixed(2)} '
+            'yaw=${corrected.z.toStringAsFixed(2)}');
+        sendCommand(A.walk(corrected), 'walk');
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'direction'),
       onDone: () => _log.warning('Controller direction stream closed'),
@@ -133,6 +151,7 @@ class RealControlDog {
         } else {
           joint.disable();
         }
+        onMotorEnableChanged?.call(enabled);
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'enabled'),
       onDone: () => _log.warning('Controller enabled stream closed'),
@@ -141,8 +160,8 @@ class RealControlDog {
       (_) {
         _idleTimer?.cancel();
         _idleTimer = null;
-        _log.info('红键 → disable motors');
-        joint.disable();
+        _log.info('红键 → disable motors + clear errors');
+        joint.disable(clearErrors: true);
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'red'),
       onDone: () => _log.warning('Controller red stream closed'),

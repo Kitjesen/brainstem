@@ -160,7 +160,7 @@ class _SettingsPanelState extends State<SettingsPanel> with SingleTickerProvider
                       IconButton(
                         onPressed: () => SettingsPanel.hide(),
                         icon: Icon(
-                          Icons.close,
+                          Icons.close_rounded,
                           color: cs.onSurface.withValues(alpha: 0.5),
                           size: 20,
                         ),
@@ -220,7 +220,7 @@ class _SettingsPanelState extends State<SettingsPanel> with SingleTickerProvider
                       children: [
                         IconButton(
                           onPressed: widget.textScale > 0.8 ? widget.onScaleDown : null,
-                          icon: const Icon(Icons.remove_circle_outline),
+                          icon: const Icon(Icons.remove_circle_outline_rounded),
                           color: cs.onSurface.withValues(alpha: 0.6),
                           iconSize: 18,
                           padding: EdgeInsets.zero,
@@ -229,7 +229,7 @@ class _SettingsPanelState extends State<SettingsPanel> with SingleTickerProvider
                         const SizedBox(width: 4),
                         IconButton(
                           onPressed: widget.textScale < 1.4 ? widget.onScaleUp : null,
-                          icon: const Icon(Icons.add_circle_outline),
+                          icon: const Icon(Icons.add_circle_outline_rounded),
                           color: cs.onSurface.withValues(alpha: 0.6),
                           iconSize: 18,
                           padding: EdgeInsets.zero,

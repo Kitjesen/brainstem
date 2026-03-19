@@ -2,6 +2,20 @@ import 'package:han_dog_brain/src/memory.dart';
 import 'package:test/test.dart';
 
 void main() {
+  test('historySize zero throws ArgumentError', () {
+    expect(
+      () => Memory(historySize: 0, initial: 0),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
+  test('historySize negative throws ArgumentError', () {
+    expect(
+      () => Memory(historySize: -1, initial: 0),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
   test('init', () {
     final size = 3;
     final initial = 1;

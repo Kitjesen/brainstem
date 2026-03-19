@@ -207,7 +207,7 @@ class _ImuPageState extends State<ImuPage> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: (g.connected ? AppTheme.green : AppTheme.red).withValues(alpha: 0.2)),
               ),
-              child: Text(g.connected ? '在线' : '离线',
+              child: Text(g.connected ? '已连接' : '未连接',
                   style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: g.connected ? AppTheme.green : AppTheme.red)),
             ),
             const Spacer(),

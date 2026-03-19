@@ -14,7 +14,7 @@ class SiriusApp extends StatefulWidget {
 class _SiriusAppState extends State<SiriusApp> {
   ThemeMode _themeMode = ThemeMode.light;
   double _textScale = 1.0;
-  BrandColor _brandColor = BrandColor.purple;
+  BrandColor _brandColor = BrandColor.graphite;
   Locale _locale = const Locale('zh', '');
 
   void toggleTheme() {
@@ -47,7 +47,7 @@ class _SiriusAppState extends State<SiriusApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sirius',
+      title: '穹沛控制台',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(_brandColor.color),
       darkTheme: AppTheme.dark(_brandColor.color),

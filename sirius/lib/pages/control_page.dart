@@ -520,7 +520,7 @@ class _EmergencyStopButtonState extends State<_EmergencyStopButton> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.emergency,
+                Icons.emergency_rounded,
                 color: Colors.white,
                 size: 28,
               ),

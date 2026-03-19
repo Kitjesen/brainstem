@@ -19,7 +19,7 @@ abstract interface class JointService {
 
 abstract interface class MotorService {
   Future<void> enable();
-  Future<void> disable();
+  Future<void> disable({bool clearErrors = false});
   void sendAction(JointsMatrix action);
 }
 

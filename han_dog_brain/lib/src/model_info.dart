@@ -54,3 +54,27 @@ Future<int?> inferHistorySizeFromModel({
     env.dispose();
   }
 }
+
+/// 从模型文件首个输入张量名称推断输入名。
+///
+/// 当模型无法读取或无输入时返回 `null`。
+Future<String?> inferInputNameFromModel({
+  required String modelPath,
+}) async {
+  final env = OnnxEnv.create(
+    OrtLoggingLevel.ORT_LOGGING_LEVEL_WARNING,
+    'ModelInfo',
+  );
+  InferenceSession? session;
+  try {
+    final modelBytes = await File(modelPath).readAsBytes();
+    session = InferenceSession.create(env, modelBytes);
+    return session.getInputName(0);
+  } catch (e, st) {
+    _log.warning('Failed to infer input name from $modelPath', e, st);
+    return null;
+  } finally {
+    session?.dispose();
+    env.dispose();
+  }
+}

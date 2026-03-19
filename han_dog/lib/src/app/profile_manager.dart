@@ -16,6 +16,7 @@ class ProfileManager {
   final Brain brain;
   final GainManager? gains;
   final RealControlDog? controlDog;
+  final void Function(String reason)? onFault;
   String _current;
 
   bool _switching = false;
@@ -25,6 +26,7 @@ class ProfileManager {
     required this.brain,
     this.gains,
     this.controlDog,
+    this.onFault,
     required String initial,
   })  : _profiles = Map.of(profiles),
         _current = initial;
@@ -102,16 +104,18 @@ class ProfileManager {
           ..registerDefaults();
         _log.info('Rollback to "$prevName" succeeded');
       } catch (rollbackE, rollbackSt) {
-        // Rollback failed: log as SEVERE and continue with rethrow of original.
-        // _current is NOT updated, so the name stays consistent, but gains
-        // and gestureLibrary may be in an indeterminate state — operator must
-        // intervene.
+        // Rollback failed: gains and gestureLibrary may be in an
+        // indeterminate state — trigger fault to force safe shutdown.
         _log.severe(
           'CRITICAL: rollback to "$prevName" also failed after '
-          'profile switch error — robot state may be indeterminate. '
+          'profile switch error — triggering fault. '
           'Original error was: $e',
           rollbackE,
           rollbackSt,
+        );
+        onFault?.call(
+          'Profile switch + rollback both failed: '
+          'original=$e, rollback=$rollbackE',
         );
       }
       rethrow;

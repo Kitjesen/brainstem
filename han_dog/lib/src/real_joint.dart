@@ -10,6 +10,31 @@ import 'package:han_dog_brain/han_dog_brain.dart';
 
 final _log = Logger('han_dog.real_joint');
 
+// ─── Motor fault event ───────────────────────────────────────────────────────
+
+class MotorFaultEvent {
+  final int jointIndex;
+  final Set<RSError> errors;
+  final RSStatus status;
+  final double temperature;
+
+  const MotorFaultEvent({
+    required this.jointIndex,
+    required this.errors,
+    required this.status,
+    required this.temperature,
+  });
+
+  bool get isHealthy => errors.isEmpty;
+
+  @override
+  String toString() =>
+      'MotorFaultEvent(joint=$jointIndex, $errors, status=$status, '
+      'temp=${temperature.toStringAsFixed(1)}°C)';
+}
+
+// ─── Default report sentinel ─────────────────────────────────────────────────
+
 RSStateReport get _defaultReport => .new(
   hostId: 0,
   canId: 0,
@@ -94,6 +119,9 @@ class RealJoint implements JointService, MotorService {
   final _reportController = StreamController<(int, RSStateReport)>.broadcast();
   Stream<(int, RSStateReport)> get reportStream => _reportController.stream;
 
+  final _motorFaultController = StreamController<MotorFaultEvent>.broadcast();
+  Stream<MotorFaultEvent> get motorFaultStream => _motorFaultController.stream;
+
   // Cached JointsMatrix values, invalidated on status update
   JointsMatrix? _cachedThetas;
   JointsMatrix? _cachedOmegas;
@@ -123,6 +151,14 @@ class RealJoint implements JointService, MotorService {
             _cachedOmegas = null;
             frequencyWatches[legId * 4 + targetId - 1].add(1);
             _reportController.add((legId * 4 + targetId - 1, state));
+            final jointIdx =
+                targetId <= 3 ? legId * 3 + (targetId - 1) : 12 + legId;
+            _motorFaultController.add(MotorFaultEvent(
+              jointIndex: jointIdx,
+              errors: state.errors.errors,
+              status: state.status,
+              temperature: state.temperature,
+            ));
           default:
         }
       },
@@ -159,10 +195,10 @@ class RealJoint implements JointService, MotorService {
   }
 
   @override
-  Future<void> disable() async {
+  Future<void> disable({bool clearErrors = false}) async {
     for (final pcan in pcans) {
       for (int i = 1; i <= 4; i++) {
-        pcan.add(.disable(i));
+        pcan.add(.disable(i, clearErrors: clearErrors));
       }
     }
   }
@@ -218,6 +254,41 @@ class RealJoint implements JointService, MotorService {
     rl.add(.control(4, velocity: a.rlFoot, kd: kd.rlFoot));
   }
 
+  // ─── Flat-index helpers ────────────────────────────────────────────────────
+
+  /// Converts JointsMatrix flat index (0–15) to (legId, canId).
+  /// idx 0–11 → legId = idx ~/3, canId = idx%3+1
+  /// idx 12–15 → legId = idx-12, canId = 4
+  (int, int) _flatIndexToLegCan(int idx) {
+    if (idx < 12) return (idx ~/ 3, idx % 3 + 1);
+    return (idx - 12, 4);
+  }
+
+  /// Returns the latest report for flat joint [idx], or null if out of range.
+  RSStateReport? getReport(int idx) {
+    if (idx < 0 || idx >= 16) return null;
+    final (legId, canId) = _flatIndexToLegCan(idx);
+    return status[legId][canId - 1];
+  }
+
+  /// Sends a single disable+clearErrors command to joint [idx].
+  void clearFaultSingle(int idx) {
+    if (idx < 0 || idx >= 16) return;
+    final (legId, canId) = _flatIndexToLegCan(idx);
+    pcans[legId].add(.disable(canId, clearErrors: true));
+  }
+
+  /// Sets zero, signs zero, and saves parameters for all joints.
+  /// Returns true on completion.
+  Future<bool> calibrateAndSave() async {
+    setZeroPosition();
+    setZeroSigned();
+    saveParameters();
+    return true;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+
   bool _disposed = false;
 
   void dispose() {
@@ -228,6 +299,7 @@ class RealJoint implements JointService, MotorService {
       try { sub.cancel(); } catch (_) {}
     }
     _reportController.close();
+    _motorFaultController.close();
     close();
   }
 

@@ -76,7 +76,7 @@ class _BrainPageState extends State<BrainPage> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: (g.connected ? AppTheme.green : AppTheme.red).withValues(alpha: 0.2)),
             ),
-            child: Text(g.connected ? '在线' : '离线',
+            child: Text(g.connected ? '已连接' : '未连接',
                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: g.connected ? AppTheme.green : AppTheme.red)),
           ),
           const SizedBox(width: 8),
@@ -391,7 +391,7 @@ class _ProfileListContent extends StatelessWidget {
     if (!g.hasProfiles) {
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.folder_off_outlined, size: 32, color: cs.onSurface.withValues(alpha: 0.2)),
+          Icon(Icons.folder_off_rounded, size: 32, color: cs.onSurface.withValues(alpha: 0.2)),
           const SizedBox(height: 8),
           Text('机器人未配置策略', style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.35))),
           const SizedBox(height: 4),

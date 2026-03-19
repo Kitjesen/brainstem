@@ -1,3 +1,4 @@
+export 'src/app/motor_health.dart';
 export 'src/app/profile_manager.dart';
 export 'src/app/robot_profile.dart';
 export 'src/control_arbiter.dart';

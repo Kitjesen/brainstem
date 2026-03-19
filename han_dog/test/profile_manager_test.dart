@@ -270,6 +270,43 @@ void main() {
     await firstSwitch;
   });
 
+  test('onFault called when switch AND rollback both fail', () async {
+    // brain.switchProfile fails on switch
+    when(() => brain.switchProfile(
+          observationBuilder: any(named: 'observationBuilder'),
+          standingPose: any(named: 'standingPose'),
+          sittingPose: any(named: 'sittingPose'),
+          modelPath: any(named: 'modelPath'),
+          standUpCounts: any(named: 'standUpCounts'),
+          sitDownCounts: any(named: 'sitDownCounts'),
+        )).thenThrow(Exception('model corrupt'));
+
+    // gains.switchGains fails on rollback
+    when(() => gains.switchGains(
+          inferKp: any(named: 'inferKp'),
+          inferKd: any(named: 'inferKd'),
+          standUpKp: any(named: 'standUpKp'),
+          standUpKd: any(named: 'standUpKd'),
+          sitDownKp: any(named: 'sitDownKp'),
+          sitDownKd: any(named: 'sitDownKd'),
+        )).thenThrow(Exception('gains rollback failed'));
+
+    String? faultReason;
+    final pm = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      gains: gains,
+      controlDog: controlDog,
+      onFault: (reason) => faultReason = reason,
+      initial: 'alpha',
+    );
+
+    await expectLater(() => pm.switchTo('beta'), throwsException);
+
+    expect(faultReason, isNotNull);
+    expect(faultReason, contains('rollback'));
+  });
+
   test('toggle with single profile is a no-op', () async {
     final pm = ProfileManager(
       profiles: {'only': profiles['alpha']!},

@@ -105,8 +105,8 @@ class Brain {
               command: .idle(),
               jointPosition: joint.initialPosition,
               jointVelocity: joint.initialVelocity,
-              action: .zero(),
-              nextAction: .zero(),
+              action: standingPose,
+              nextAction: standingPose,
             ),
       ),
     );
@@ -228,8 +228,8 @@ class Brain {
       command: Command.idle(),
       jointPosition: joint.position,
       jointVelocity: joint.velocity,
-      action: JointsMatrix.zero(),
-      nextAction: JointsMatrix.zero(),
+      action: standingPose,
+      nextAction: standingPose,
     ));
   }
 

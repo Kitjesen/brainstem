@@ -12,7 +12,7 @@ void main() async {
     center: true,
     backgroundColor: Colors.transparent,
     titleBarStyle: TitleBarStyle.hidden,
-    title: 'Sirius',
+    title: '穹沛控制台',
   );
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {

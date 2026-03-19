@@ -95,6 +95,7 @@ void main() {
 
     when(() => joint.enable()).thenAnswer((_) async {});
     when(() => joint.disable()).thenAnswer((_) async {});
+    when(() => joint.disable(clearErrors: true)).thenAnswer((_) async {});
 
     when(() => arbiter.stateStream).thenAnswer((_) => stateCtrl.stream);
     when(() => arbiter.state).thenReturn(const Zero());
@@ -259,12 +260,12 @@ void main() {
       ).called(1);
     });
 
-    test('red → joint.disable()', () async {
+    test('red → joint.disable(clearErrors: true)', () async {
       buildDog();
       redCtrl.add(true);
       await Future<void>.delayed(Duration.zero);
 
-      verify(() => joint.disable()).called(1);
+      verify(() => joint.disable(clearErrors: true)).called(1);
     });
 
     test('enabled true → joint.enable()', () async {

@@ -1,9 +1,9 @@
 @echo off
 REM ========================================
-REM  穹佩控制面板 - Windows App 编译脚本
+REM  穹沛控制面板 - Windows App 编译脚本
 REM ========================================
 echo.
-echo [穹佩] 开始编译 Windows 桌面应用...
+echo [穹沛] 开始编译 Windows 桌面应用...
 echo.
 
 REM 确保 Flutter 在 PATH 中

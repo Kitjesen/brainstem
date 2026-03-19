@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:logging/logging.dart';
 import 'package:onnx_runtime/onnx_runtime.dart';
@@ -234,7 +235,7 @@ class Walk extends Behaviour {
     hipMin: -0.5, hipMax: 0.5,
     thighMin: -1.5, thighMax: 1.5,
     calfMin: -2.5, calfMax: 2.5,
-    footMin: -0.5, footMax: 0.5,
+    footMin: -5.0, footMax: 5.0,
   );
 
   JointsMatrix toRealAction(JointsMatrix action) =>
@@ -247,17 +248,18 @@ class Walk extends Behaviour {
     this.direction = direction;
     final historySize = memory.historySize;
     final tensorSize = observationBuilder.tensorSize;
-    // Pre-allocate flat buffer to avoid per-frame allocation
-    final observationBuffer = List<double>.filled(historySize * tensorSize, 0.0);
+    // Pre-allocate aligned buffer — Float64List guarantees 8-byte alignment,
+    // preventing ARM64 Bus Error (SIGBUS) in ONNX Runtime native code.
+    final observationBuffer = Float64List(historySize * tensorSize);
     return ts.map((_) {
       final holdNext = next(
         command: .walk(this.direction),
         nextAction: .zero(),
       );
       final histories = memory.histories;
-      for (int i = 0; i < historySize - 1; i++) {
+      for (int i = 1; i < historySize; i++) {
         final row = observationBuilder.build(histories[i]);
-        final offset = i * tensorSize;
+        final offset = (i - 1) * tensorSize;
         for (int j = 0; j < tensorSize; j++) {
           observationBuffer[offset + j] = row[j];
         }

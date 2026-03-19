@@ -8,6 +8,7 @@ import 'package:vector_math/vector_math.dart' show Quaternion;
 
 import '../app/profile_manager.dart';
 import '../control_arbiter.dart';
+import '../real_joint.dart';
 import 'gain_manager.dart';
 import 'proto_convert.dart';
 
@@ -47,6 +48,16 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   /// 策略管理器（可选，由外部注入）。
   ProfileManager? profileManager;
 
+  /// Joint controller for calibration.
+  RealJoint? joint;
+
+  /// Walk rate limiting.
+  DateTime? _lastWalkAt;
+  static const _minWalkInterval = Duration(milliseconds: 18);
+
+  /// Calibration lock.
+  bool _calibrating = false;
+
   /// 硬件模式：由外部提供 IMU 数据流。
   final Stream<proto.Imu> Function()? imuStreamFactory;
 
@@ -64,9 +75,6 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   /// 广播流缓存：支持多客户端。
   late final _historyBroadcast = _brain.historyStream.asBroadcastStream();
-  late final _cmsStateBroadcast = _m.stream
-      .map(_toProtoCmsState)
-      .asBroadcastStream();
 
   UnifiedCmsServer({
     required Brain brain,
@@ -79,8 +87,8 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     this.robotType = proto.RobotType.MINI,
     this.imuStreamFactory,
     this.jointStreamFactory,
-  }) : _brain = brain,
-       _m = m;
+  })  : _brain = brain,
+        _m = m;
 
   proto.Duration _elapsed() =>
       proto.Duration.fromDart(DateTime.now().difference(_startTime));
@@ -91,24 +99,14 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   @override
   Future<proto.Empty> enable(ServiceCall call, proto.Empty request) async {
-    try {
-      await motor?.enable();
-    } catch (e, st) {
-      _log.severe('Motor enable failed', e, st);
-      throw GrpcError.internal('Motor enable failed: $e');
-    }
+    await motor?.enable();
     _log.info('Motors enabled');
     return proto.Empty();
   }
 
   @override
   Future<proto.Empty> disable(ServiceCall call, proto.Empty request) async {
-    try {
-      await motor?.disable();
-    } catch (e, st) {
-      _log.severe('Motor disable failed', e, st);
-      throw GrpcError.internal('Motor disable failed: $e');
-    }
+    await motor?.disable();
     _log.info('Motors disabled');
     return proto.Empty();
   }
@@ -122,14 +120,13 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     final sinceMs = _lastCommandAt != null
         ? now.difference(_lastCommandAt!).inMilliseconds
         : null;
+    _lastCommandAt = now;
 
     final a = arbiter;
     if (a != null) {
       if (!a.command(action, ControlSource.grpc)) {
-        _log.warning(
-          '${action.runtimeType} rejected: ${a.owner} has priority'
-          '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}',
-        );
+        _log.warning('${action.runtimeType} rejected: ${a.owner} has priority'
+            '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
         throw GrpcError.failedPrecondition(
           'Control rejected: ${a.owner} has priority',
         );
@@ -137,103 +134,22 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     } else {
       _m.add(action);
     }
-    _lastCommandAt = now;
-    _log.finest(
-      '${action.runtimeType} dispatched'
-      '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}',
-    );
+    _log.finest('${action.runtimeType} dispatched'
+        '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
     gains?.applyCommand(action);
   }
 
   /// Walk 指令向量最大幅值。遥控器各轴 [-1, 1]，最大幅值 √3 ≈ 1.73；
   /// 设 3.0 为上界，阻止异常大值进入观测特征空间。
-  void _ensureCommandAllowed(A action) {
-    final state = _m.state;
-    switch (action) {
-      case CmdWalk():
-        if (state is Zero) {
-          throw GrpcError.failedPrecondition('CMS not initialized');
-        }
-        if (state case Transitioning(:final target)) {
-          throw GrpcError.failedPrecondition(
-            'Transition in progress: ${_describeTransitionTarget(target)}',
-          );
-        }
-        if (state is Grounded) {
-          throw GrpcError.failedPrecondition(
-            'Walk requires Standing or Walking state',
-          );
-        }
-        return;
-      case CmdStandUp():
-      case CmdSitDown():
-        if (state is Zero) {
-          throw GrpcError.failedPrecondition('CMS not initialized');
-        }
-        if (state case Transitioning(:final target)) {
-          throw GrpcError.failedPrecondition(
-            'Transition in progress: ${_describeTransitionTarget(target)}',
-          );
-        }
-        return;
-      case CmdGesture():
-        if (state is Zero) {
-          throw GrpcError.failedPrecondition('CMS not initialized');
-        }
-        if (state case Transitioning(:final target)) {
-          throw GrpcError.failedPrecondition(
-            'Transition in progress: ${_describeTransitionTarget(target)}',
-          );
-        }
-        if (state is! Standing) {
-          throw GrpcError.failedPrecondition('Gesture requires Standing state');
-        }
-        return;
-      default:
-        return;
-    }
-  }
-
-  String _describeTransitionTarget(Command target) => switch (target) {
-    StandUpCommand() => 'standUp',
-    SitDownCommand() => 'sitDown',
-    GestureCommand(:final name) => 'gesture($name)',
-    _ => target.runtimeType.toString(),
-  };
-
-  proto.CmsState _toProtoCmsState(S state) => switch (state) {
-    Zero() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_ZERO),
-    Grounded() => proto.CmsState(
-      kind: proto.CmsStateKind.CMS_STATE_KIND_GROUNDED,
-    ),
-    Standing() => proto.CmsState(
-      kind: proto.CmsStateKind.CMS_STATE_KIND_STANDING,
-    ),
-    Walking() => proto.CmsState(
-      kind: proto.CmsStateKind.CMS_STATE_KIND_WALKING,
-    ),
-    Transitioning(target: StandUpCommand()) => proto.CmsState(
-      kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
-      transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP,
-    ),
-    Transitioning(target: SitDownCommand()) => proto.CmsState(
-      kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
-      transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
-    ),
-    Transitioning(target: GestureCommand(:final name)) => proto.CmsState(
-      kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
-      transition: proto.CmsTransitionKind.CMS_TRANSITION_KIND_GESTURE,
-      gestureName: name,
-    ),
-    Transitioning() => proto.CmsState(
-      kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
-    ),
-  };
-
   static const _walkDirMaxMagnitude = 3.0;
 
   @override
   Future<proto.Empty> walk(ServiceCall call, proto.Vector3 request) async {
+    final now = DateTime.now();
+    if (_lastWalkAt != null && now.difference(_lastWalkAt!) < _minWalkInterval) {
+      throw GrpcError.resourceExhausted('Walk command rate exceeded');
+    }
+    _lastWalkAt = now;
     if (!request.x.isFinite || !request.y.isFinite || !request.z.isFinite) {
       throw GrpcError.invalidArgument('Walk direction contains NaN or Inf');
     }
@@ -249,14 +165,22 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
         'exceeds max $_walkDirMaxMagnitude',
       );
     }
-    _ensureCommandAllowed(A.walk(dir));
+    if (_m.state is Grounded) {
+      throw GrpcError.failedPrecondition(
+        'Cannot walk in Grounded state — stand up first',
+      );
+    }
     _dispatch(A.walk(dir));
     return proto.Empty();
   }
 
   @override
   Future<proto.Empty> standUp(ServiceCall call, proto.Empty request) async {
-    _ensureCommandAllowed(const A.standUp());
+    if (_m.state is Transitioning) {
+      throw GrpcError.failedPrecondition(
+        'Cannot standUp while already transitioning',
+      );
+    }
     _dispatch(const A.standUp());
     _log.info('StandUp command received');
     return proto.Empty();
@@ -264,7 +188,6 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   @override
   Future<proto.Empty> sitDown(ServiceCall call, proto.Empty request) async {
-    _ensureCommandAllowed(const A.sitDown());
     _dispatch(const A.sitDown());
     _log.info('SitDown command received');
     return proto.Empty();
@@ -282,13 +205,13 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     if (library == null || !library.contains(name)) {
       throw GrpcError.notFound('Unknown gesture: $name');
     }
-    _ensureCommandAllowed(A.gesture(name));
     _dispatch(A.gesture(name));
     _log.info('Gesture command received: $name');
   }
 
   /// 获取可用动作列表。
-  List<String> get gestureNames => _brain.gestureLibrary?.names ?? const [];
+  List<String> get gestureNames =>
+      _brain.gestureLibrary?.names ?? const [];
 
   // ═══════════════════════════════════════════════════════════
   //  策略切换
@@ -296,9 +219,7 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   @override
   Future<proto.ProfileInfo> getProfile(
-    ServiceCall call,
-    proto.Empty request,
-  ) async {
+      ServiceCall call, proto.Empty request) async {
     final pm = profileManager;
     if (pm == null) throw GrpcError.unimplemented('Profiles not configured');
     return proto.ProfileInfo(
@@ -311,9 +232,7 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   @override
   Future<proto.ProfileInfo> switchProfile(
-    ServiceCall call,
-    proto.ProfileRequest request,
-  ) async {
+      ServiceCall call, proto.ProfileRequest request) async {
     final pm = profileManager;
     if (pm == null) throw GrpcError.unimplemented('Profiles not configured');
     if (_m.state is! Grounded) {
@@ -352,11 +271,14 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     try {
       final h = await _brain.tick();
       _log.finest('tick: inferenceUs=${_brain.lastInferenceUs}');
-      return h.toProto(timestamp: _elapsed(), kp: gains?.kp, kd: gains?.kd);
+      return h.toProto(
+        timestamp: _elapsed(),
+        kp: gains?.kp,
+        kd: gains?.kd,
+      );
     } on TimeoutException {
       throw GrpcError.deadlineExceeded('Inference timed out');
-    } on StateError catch (e, st) {
-      _log.severe('tick: StateError during inference', e, st);
+    } on StateError catch (e) {
       throw GrpcError.internal(e.message);
     } catch (e, st) {
       _log.severe('tick: unexpected inference error', e, st);
@@ -382,28 +304,83 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
 
   @override
   Future<proto.Timestamp> getStartTime(
-    ServiceCall call,
-    proto.Empty request,
-  ) async {
+      ServiceCall call, proto.Empty request) async {
     return proto.Timestamp.fromDateTime(_startTime.toUtc());
   }
 
   @override
-  Future<proto.CmsState> getCmsState(
-    ServiceCall call,
-    proto.Empty request,
-  ) async {
-    return _toProtoCmsState(_m.state);
-  }
-
-  @override
-  Future<proto.Params> getParams(ServiceCall call, proto.Empty request) async {
+  Future<proto.Params> getParams(
+      ServiceCall call, proto.Empty request) async {
     return proto.Params(
       robot: proto.RobotModel(
         type: robotType,
-        initialJointPosition: proto.Matrix4(values: _brain.standingPose.values),
+        initialJointPosition:
+            proto.Matrix4(values: _brain.standingPose.values),
       ),
     );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  CMS 状态查询
+  // ═══════════════════════════════════════════════════════════
+
+  proto.CmsState _toCmsState(S s) => switch (s) {
+    Zero() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_ZERO),
+    Grounded() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_GROUNDED),
+    Standing() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_STANDING),
+    Walking() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_WALKING),
+    Transitioning(:final target) => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
+      transition: switch (target) {
+        StandUpCommand() => proto.CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP,
+        SitDownCommand() => proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
+        GestureCommand() => proto.CmsTransitionKind.CMS_TRANSITION_KIND_GESTURE,
+        _ => proto.CmsTransitionKind.CMS_TRANSITION_KIND_NONE,
+      },
+      gestureName: target is GestureCommand ? target.name : null,
+    ),
+  };
+
+  @override
+  Future<proto.CmsState> getCmsState(
+      ServiceCall call, proto.Empty request) async {
+    return _toCmsState(_m.state);
+  }
+
+  @override
+  Stream<proto.CmsState> listenCmsState(
+      ServiceCall call, proto.Empty request) async* {
+    yield _toCmsState(_m.state);
+    yield* _m.stream.map(_toCmsState);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  标零
+  // ═══════════════════════════════════════════════════════════
+
+  @override
+  Future<proto.Empty> calibrate(
+      ServiceCall call, proto.Empty request) async {
+    if (_m.state is! Grounded) {
+      throw GrpcError.failedPrecondition('Must be in Grounded state');
+    }
+    final j = joint;
+    if (j == null) {
+      throw GrpcError.unimplemented('Calibration not available');
+    }
+    if (_calibrating) {
+      throw GrpcError.resourceExhausted('Calibration already in progress');
+    }
+    _calibrating = true;
+    try {
+      final ok = await j.calibrateAndSave();
+      if (!ok) {
+        _log.warning('Calibration completed with suspicious results');
+      }
+      return proto.Empty();
+    } finally {
+      _calibrating = false;
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -411,46 +388,43 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   // ═══════════════════════════════════════════════════════════
 
   @override
-  Stream<proto.History> listenHistory(ServiceCall call, proto.Empty request) {
+  Stream<proto.History> listenHistory(
+      ServiceCall call, proto.Empty request) {
     return _historyBroadcast.map(
-      (h) => h.toProto(timestamp: _elapsed(), kp: gains?.kp, kd: gains?.kd),
-    );
-  }
-
-  @override
-  Stream<proto.CmsState> listenCmsState(
-    ServiceCall call,
-    proto.Empty request,
-  ) async* {
-    yield _toProtoCmsState(_m.state);
-    yield* _cmsStateBroadcast;
-  }
-
-  @override
-  Stream<proto.Imu> listenImu(ServiceCall call, proto.Empty request) {
-    // 硬件模式：使用外部注入的硬件数据流
-    final factory = imuStreamFactory;
-    if (factory != null) return factory();
-
-    // 仿真模式：时钟驱动，读取 ImuService 当前状态
-    return _brain.ts.map(
-      (_) => imuSnapshot(
-        _brain.imu,
-        quaternion: simInjector?.quaternion ?? _identityQ,
+      (h) => h.toProto(
         timestamp: _elapsed(),
+        kp: gains?.kp,
+        kd: gains?.kd,
       ),
     );
   }
 
   @override
-  Stream<proto.Joint> listenJoint(ServiceCall call, proto.Empty request) {
+  Stream<proto.Imu> listenImu(
+      ServiceCall call, proto.Empty request) {
+    // 硬件模式：使用外部注入的硬件数据流
+    final factory = imuStreamFactory;
+    if (factory != null) return factory();
+
+    // 仿真模式：时钟驱动，读取 ImuService 当前状态
+    return _brain.ts.map((_) => imuSnapshot(
+          _brain.imu,
+          quaternion: simInjector?.quaternion ?? _identityQ,
+          timestamp: _elapsed(),
+        ));
+  }
+
+  @override
+  Stream<proto.Joint> listenJoint(
+      ServiceCall call, proto.Empty request) {
     // 硬件模式：使用外部注入的硬件数据流
     final factory = jointStreamFactory;
     if (factory != null) return factory();
 
     // 仿真模式：时钟驱动，读取 JointService 当前状态
-    return _brain.ts.map(
-      (_) => jointSnapshot(_brain.joint, timestamp: _elapsed()),
-    );
+    return _brain.ts.map((_) => jointSnapshot(
+          _brain.joint,
+          timestamp: _elapsed(),
+        ));
   }
 }

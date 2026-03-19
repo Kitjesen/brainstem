@@ -50,7 +50,8 @@ class RealImu implements ImuService {
   /// 广播流：支持多个订阅者（gRPC 客户端、App 断线重连等）
   Stream<Iterable<Hi91State>> get stateStream => _broadcastController.stream;
 
-  RealImu([this.portName = '/dev/ttyUSB0']) : port = .new(portName) {
+  RealImu([this.portName = '/dev/ttyUSB0'])
+      : port = .new(portName, readIntervalTimeoutMs: 0) {
     subs = port.state.listen(
       (data) {
         // 转发到广播流（在过滤之前，保证所有数据对外可见）
@@ -64,10 +65,10 @@ class RealImu implements ImuService {
           _degreeToRadius(imuData.gyroscope.y),
           _degreeToRadius(imuData.gyroscope.z),
         );
-        gyroscope = _gyroBuffer;
+        gyroscope = _gyroBuffer.clone();
         _gravBuffer.setValues(0, 0, -1);
         imuData.quaternion.rotate(_gravBuffer);
-        projectedGravity = _gravBuffer;
+        projectedGravity = _gravBuffer.clone();
       },
       onError: (Object error, StackTrace st) {
         _log.severe('IMU port stream error', error, st);

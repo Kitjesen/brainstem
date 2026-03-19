@@ -17,12 +17,14 @@ class OtaPage extends StatefulWidget {
 
 class _OtaPageState extends State<OtaPage> {
   final _ota = OtaService();
-  int _tab = 0; // 0=设备 1=包 2=发布 3=任务
+  int _tab = 0; // 0=设备 1=包 2=发布 3=任务 4=告警 5=健康
   String? _selectedDeviceId;
   int? _selectedReleaseId;
   bool _pushing = false;
   late final TextEditingController _urlCtrl;
   bool _editingUrl = false;
+  List<OtaDeviceHealth> _fleetHealth = [];
+  bool _healthLoading = false;
 
   @override
   void initState() {
@@ -41,6 +43,35 @@ class _OtaPageState extends State<OtaPage> {
   }
 
   void _onUpdate() { if (mounted) setState(() {}); }
+
+  Future<void> _fetchHealth() async {
+    setState(() => _healthLoading = true);
+    try {
+      _fleetHealth = await _ota.fetchFleetHealth();
+    } catch (_) {
+      // health is supplementary, don't block UI
+    }
+    if (mounted) setState(() => _healthLoading = false);
+  }
+
+  Future<void> _ackAlert(int alertId) async {
+    try {
+      await _ota.ackAlert(alertId);
+      await _ota.refresh();
+    } catch (e) {
+      if (mounted) AppToast.showError(context, '确认告警失败：$e');
+    }
+  }
+
+  Future<void> _rollbackRelease(int releaseId) async {
+    try {
+      await _ota.rollbackRelease(releaseId);
+      if (mounted) AppToast.showSuccess(context, '已触发回滚');
+      await _ota.refresh();
+    } catch (e) {
+      if (mounted) AppToast.showError(context, '回滚失败：$e');
+    }
+  }
 
   Future<void> _pushUpgrade() async {
     final did = _selectedDeviceId;
@@ -138,6 +169,16 @@ class _OtaPageState extends State<OtaPage> {
             const SizedBox(width: 6),
             _TabChip(label: '任务', count: _ota.tasks.length, sel: _tab == 3,
                 onTap: () => setState(() => _tab = 3), badge: activeTasks.length),
+            const SizedBox(width: 6),
+            _TabChip(label: '告警', count: _ota.alerts.length, sel: _tab == 4,
+                onTap: () => setState(() => _tab = 4),
+                badge: _ota.alerts.where((a) => !a.acknowledged).length),
+            const SizedBox(width: 6),
+            _TabChip(label: '健康', count: _fleetHealth.length, sel: _tab == 5,
+                onTap: () {
+                  setState(() => _tab = 5);
+                  if (_fleetHealth.isEmpty && !_healthLoading) _fetchHealth();
+                }),
           ]),
         ),
         const SizedBox(height: 10),
@@ -212,9 +253,14 @@ class _OtaPageState extends State<OtaPage> {
         return _ReleasesTab(
           ota: _ota, selectedId: _selectedReleaseId,
           onSelect: (id) => setState(() => _selectedReleaseId = _selectedReleaseId == id ? null : id),
+          onRollback: _rollbackRelease,
         );
       case 3:
-        return _TasksTab(ota: _ota);
+        return _TasksTab(ota: _ota, releases: _ota.releases);
+      case 4:
+        return _AlertsTab(ota: _ota, onAck: _ackAlert);
+      case 5:
+        return _HealthTab(health: _fleetHealth, loading: _healthLoading, onRefresh: _fetchHealth);
       default:
         return const SizedBox.shrink();
     }
@@ -247,7 +293,7 @@ class _ServerBar extends StatelessWidget {
         border: Border.all(color: cs.outline.withValues(alpha: 0.5), width: 0.5),
       ),
       child: Row(children: [
-        Icon(Icons.dns_outlined, size: 13, color: cs.onSurface.withValues(alpha: 0.35)),
+        Icon(Icons.dns_rounded, size: 13, color: cs.onSurface.withValues(alpha: 0.35)),
         const SizedBox(width: 8),
         if (editing)
           Expanded(
@@ -335,7 +381,7 @@ class _ActiveStrip extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            tasks.map((t) => '${_truncateId(t.deviceId)}…${t.progress}%').join(' · '),
+            tasks.map((t) => '${_truncateId(t.deviceId)}…${t.progressPercent}%').join(' · '),
             style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.5)),
             overflow: TextOverflow.ellipsis,
           ),
@@ -479,7 +525,7 @@ class _PushBar extends StatelessWidget {
       ),
       child: Row(children: [
         Icon(
-          canPush ? Icons.rocket_launch_outlined : Icons.cloud_upload_outlined,
+          canPush ? Icons.rocket_launch_rounded : Icons.cloud_upload_rounded,
           size: 13,
           color: canPush ? AppTheme.brand : cs.onSurface.withValues(alpha: 0.25),
         ),
@@ -686,7 +732,7 @@ class _PackageRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(children: [
-        Icon(Icons.inventory_2_outlined, size: 13, color: cs.onSurface.withValues(alpha: 0.3)),
+        Icon(Icons.inventory_2_rounded, size: 13, color: cs.onSurface.withValues(alpha: 0.3)),
         const SizedBox(width: 10),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -724,7 +770,9 @@ class _ReleasesTab extends StatelessWidget {
   final int? selectedId;
   final ValueChanged<int> onSelect;
 
-  const _ReleasesTab({required this.ota, required this.selectedId, required this.onSelect});
+  final Future<void> Function(int releaseId) onRollback;
+
+  const _ReleasesTab({required this.ota, required this.selectedId, required this.onSelect, required this.onRollback});
 
   @override
   Widget build(BuildContext context) {
@@ -738,7 +786,7 @@ class _ReleasesTab extends StatelessWidget {
       itemBuilder: (_, i) {
         final r = ota.releases[i];
         final sel = selectedId == r.id;
-        return _ReleaseRow(release: r, selected: sel, onTap: () => onSelect(r.id));
+        return _ReleaseRow(release: r, selected: sel, onTap: () => onSelect(r.id), onRollback: () => onRollback(r.id));
       },
     );
   }
@@ -748,7 +796,8 @@ class _ReleaseRow extends StatefulWidget {
   final OtaRelease release;
   final bool selected;
   final VoidCallback onTap;
-  const _ReleaseRow({required this.release, required this.selected, required this.onTap});
+  final VoidCallback onRollback;
+  const _ReleaseRow({required this.release, required this.selected, required this.onTap, required this.onRollback});
   @override State<_ReleaseRow> createState() => _ReleaseRowState();
 }
 class _ReleaseRowState extends State<_ReleaseRow> {
@@ -812,6 +861,21 @@ class _ReleaseRowState extends State<_ReleaseRow> {
             const SizedBox(width: 10),
             if (r.createdAt != null)
               Text(_shortDate(r.createdAt!), style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.3))),
+            if (r.isActive) ...[
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: widget.onRollback,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: AppTheme.orange.withValues(alpha: 0.3)),
+                  ),
+                  child: Text('回滚', style: tt.labelSmall?.copyWith(color: AppTheme.orange, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
             if (widget.selected) ...[
               const SizedBox(width: 10),
               Icon(Icons.check_circle_rounded, size: 14, color: AppTheme.brand),
@@ -829,7 +893,8 @@ class _ReleaseRowState extends State<_ReleaseRow> {
 
 class _TasksTab extends StatelessWidget {
   final OtaService ota;
-  const _TasksTab({required this.ota});
+  final List<OtaRelease> releases;
+  const _TasksTab({required this.ota, required this.releases});
 
   @override
   Widget build(BuildContext context) {
@@ -840,29 +905,35 @@ class _TasksTab extends StatelessWidget {
     }
     return ListView.builder(
       itemCount: ota.tasks.length,
-      itemBuilder: (_, i) => _TaskRow(task: ota.tasks[i]),
+      itemBuilder: (_, i) {
+        final t = ota.tasks[i];
+        final ver = releases.where((r) => r.id == t.releaseId).firstOrNull?.version;
+        return _TaskRow(task: t, releaseVersion: ver);
+      },
     );
   }
 }
 
 class _TaskRow extends StatelessWidget {
   final OtaTask task;
-  const _TaskRow({required this.task});
+  final String? _releaseVersion;
+  const _TaskRow({required this.task, String? releaseVersion})
+      : _releaseVersion = releaseVersion;
 
   static const _statusLabel = {
     'pending': '等待中',
     'downloading': '下载中',
-    'deploying': '部署中',
-    'completed': '已完成',
+    'installing': '安装中',
+    'success': '已完成',
     'failed': '失败',
-    'rolling_back': '回滚中',
+    'rolled_back': '已回滚',
   };
 
   static Color _statusColor(String s) {
     switch (s) {
-      case 'completed': return AppTheme.green;
+      case 'success': return AppTheme.green;
       case 'failed': return AppTheme.red;
-      case 'rolling_back': return AppTheme.orange;
+      case 'rolled_back': return AppTheme.orange;
       case 'pending': return AppTheme.yellow;
       default: return AppTheme.brand;
     }
@@ -894,8 +965,8 @@ class _TaskRow extends StatelessWidget {
               style: tt.bodySmall?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
-          if (t.releaseVersion != null) ...[
-            _Chip(label: 'v${t.releaseVersion}', color: AppTheme.teal),
+          if (_releaseVersion != null) ...[
+            _Chip(label: 'v$_releaseVersion', color: AppTheme.teal),
             const SizedBox(width: 8),
           ],
           Container(
@@ -907,22 +978,22 @@ class _TaskRow extends StatelessWidget {
             child: Text(label, style: tt.labelSmall?.copyWith(color: color)),
           ),
           const SizedBox(width: 8),
-          if (t.createdAt != null)
-            Text(_shortDate(t.createdAt!), style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.3))),
+          if (t.startedAt != null)
+            Text(_shortDate(t.startedAt!), style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.3))),
         ]),
-        if (t.isActive && t.progress > 0) ...[
+        if (t.isActive && t.progressPercent > 0) ...[
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
-              value: t.progress / 100.0,
+              value: t.progressPercent / 100.0,
               backgroundColor: cs.onSurface.withValues(alpha: 0.08),
               valueColor: AlwaysStoppedAnimation(color),
               minHeight: 4,
             ),
           ),
           const SizedBox(height: 3),
-          Text('${t.progress}%', style: tt.labelSmall?.copyWith(color: color)),
+          Text('${t.progressPercent}%', style: tt.labelSmall?.copyWith(color: color)),
         ] else if (t.isActive) ...[
           const SizedBox(height: 8),
           LinearProgressIndicator(
@@ -935,6 +1006,231 @@ class _TaskRow extends StatelessWidget {
           const SizedBox(height: 6),
           Text(t.errorMessage!, style: tt.labelSmall?.copyWith(color: AppTheme.red)),
         ],
+      ]),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 告警 tab
+// ════════════════════════════════════════════════════════════════════════════
+
+class _AlertsTab extends StatelessWidget {
+  final OtaService ota;
+  final Future<void> Function(int alertId) onAck;
+  const _AlertsTab({required this.ota, required this.onAck});
+
+  static const _severityIcon = {
+    'critical': Icons.error_rounded,
+    'warning': Icons.warning_amber_rounded,
+    'info': Icons.info_outline_rounded,
+  };
+
+  static Color _severityColor(String s) {
+    switch (s) {
+      case 'critical': return AppTheme.red;
+      case 'warning': return AppTheme.orange;
+      default: return AppTheme.brand;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    if (ota.alerts.isEmpty) {
+      return Center(child: Text('暂无告警', style: tt.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.3))));
+    }
+    return ListView.builder(
+      itemCount: ota.alerts.length,
+      itemBuilder: (_, i) {
+        final a = ota.alerts[i];
+        final color = _severityColor(a.severity);
+        final icon = _severityIcon[a.severity] ?? Icons.info_outline_rounded;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: a.acknowledged ? cs.surface : color.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: a.acknowledged ? cs.outline.withValues(alpha: 0.4) : color.withValues(alpha: 0.3),
+              width: 0.5,
+            ),
+          ),
+          child: Row(children: [
+            Icon(icon, size: 14, color: a.acknowledged ? cs.onSurface.withValues(alpha: 0.3) : color),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  _Chip(label: a.alertType, color: color),
+                  const SizedBox(width: 6),
+                  _Chip(label: a.severity, color: color),
+                  if (a.deviceId != null) ...[
+                    const SizedBox(width: 6),
+                    Text(_truncateId(a.deviceId!, maxLen: 12),
+                        style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.4))),
+                  ],
+                ]),
+                const SizedBox(height: 4),
+                Text(a.message,
+                    style: tt.bodySmall?.copyWith(
+                        color: a.acknowledged ? cs.onSurface.withValues(alpha: 0.5) : cs.onSurface),
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+              ]),
+            ),
+            const SizedBox(width: 10),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              if (a.createdAt != null)
+                Text(_shortDate(a.createdAt!), style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.3))),
+              const SizedBox(height: 4),
+              if (!a.acknowledged)
+                GestureDetector(
+                  onTap: () => onAck(a.id),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.brand.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(5),
+                      border: Border.all(color: AppTheme.brand.withValues(alpha: 0.3)),
+                    ),
+                    child: Text('确认', style: tt.labelSmall?.copyWith(color: AppTheme.brand, fontWeight: FontWeight.w600)),
+                  ),
+                )
+              else
+                Text('已确认', style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.3))),
+            ]),
+          ]),
+        );
+      },
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 健康监控 tab
+// ════════════════════════════════════════════════════════════════════════════
+
+class _HealthTab extends StatelessWidget {
+  final List<OtaDeviceHealth> health;
+  final bool loading;
+  final VoidCallback onRefresh;
+  const _HealthTab({required this.health, required this.loading, required this.onRefresh});
+
+  @override
+  Widget build(BuildContext context) {
+    final tt = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    if (loading && health.isEmpty) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          CircularProgressIndicator(strokeWidth: 1.5, color: AppTheme.brand),
+          const SizedBox(height: 12),
+          Text('正在获取设备健康数据…', style: tt.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.4))),
+        ]),
+      );
+    }
+
+    if (health.isEmpty) {
+      return Center(child: Text('暂无健康数据', style: tt.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.3))));
+    }
+
+    return ListView.builder(
+      itemCount: health.length,
+      itemBuilder: (_, i) {
+        final h = health[i];
+        final t = h.latest;
+        final score = h.healthScore;
+        final scoreColor = score == null
+            ? cs.onSurface.withValues(alpha: 0.3)
+            : score >= 80
+                ? AppTheme.green
+                : score >= 50
+                    ? AppTheme.orange
+                    : AppTheme.red;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: cs.outline.withValues(alpha: 0.4), width: 0.5),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                child: Text(
+                  h.deviceId.length > 24 ? '${h.deviceId.substring(0, 24)}…' : h.deviceId,
+                  style: tt.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              if (score != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: scoreColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Text('${score.toStringAsFixed(0)}分',
+                      style: tt.labelSmall?.copyWith(color: scoreColor, fontWeight: FontWeight.w700)),
+                ),
+              ],
+              if (h.lastSeen != null) ...[
+                const SizedBox(width: 8),
+                Text(_shortDate(h.lastSeen!), style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.3))),
+              ],
+            ]),
+            if (t != null) ...[
+              const SizedBox(height: 8),
+              Row(children: [
+                _MetricChip(label: 'CPU', value: t.cpuLoad1m != null ? t.cpuLoad1m!.toStringAsFixed(1) : '-', cs: cs, tt: tt),
+                const SizedBox(width: 8),
+                _MetricChip(label: '温度', value: t.cpuTemp != null ? '${t.cpuTemp!.toStringAsFixed(0)}°' : '-', cs: cs, tt: tt),
+                const SizedBox(width: 8),
+                _MetricChip(label: '内存', value: t.memUsedPercent != null ? '${t.memUsedPercent!.toStringAsFixed(0)}%' : '-', cs: cs, tt: tt),
+                const SizedBox(width: 8),
+                _MetricChip(label: '磁盘', value: t.diskUsedPercent != null ? '${t.diskUsedPercent!.toStringAsFixed(0)}%' : '-', cs: cs, tt: tt),
+                if (t.batteryPercent != null) ...[
+                  const SizedBox(width: 8),
+                  _MetricChip(label: '电池', value: '${t.batteryPercent!.toStringAsFixed(0)}%', cs: cs, tt: tt),
+                ],
+              ]),
+            ],
+            if (h.alerts.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(spacing: 6, runSpacing: 4, children: h.alerts.map((a) =>
+                _Chip(label: a, color: AppTheme.orange),
+              ).toList()),
+            ],
+          ]),
+        );
+      },
+    );
+  }
+}
+
+class _MetricChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final ColorScheme cs;
+  final TextTheme tt;
+  const _MetricChip({required this.label, required this.value, required this.cs, required this.tt});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: cs.onSurface.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Text(label, style: tt.labelSmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.4))),
+        const SizedBox(width: 4),
+        Text(value, style: tt.labelSmall?.copyWith(fontWeight: FontWeight.w600)),
       ]),
     );
   }

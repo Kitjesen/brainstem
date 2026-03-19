@@ -16,6 +16,8 @@ class SerialPortController<E, S> {
   final _stateConverter =
       stateConverter[S]! as Stream<Iterable<S>> Function(Stream<Uint8List>);
 
+  final int? _readIntervalTimeoutMs;
+
   SerialPortController(
     String portName, {
     int baudRate = 115200,
@@ -24,7 +26,9 @@ class SerialPortController<E, S> {
     StopBits stopbits = .StopOne,
     FlowControl flowControl = .FlowNone,
     int readBufferSize = 4096,
-  }) : _serialPort = SerialPort()
+    int? readIntervalTimeoutMs,
+  }) : _readIntervalTimeoutMs = readIntervalTimeoutMs,
+       _serialPort = SerialPort()
          ..init(
            portName,
            baudRate,
@@ -42,6 +46,9 @@ class SerialPortController<E, S> {
         'open ${_serialPort.portName} failed: ${_serialPort.lastErrorMessage}',
       );
       return false;
+    }
+    if (_readIntervalTimeoutMs != null) {
+      _serialPort.readIntervalTimeout = _readIntervalTimeoutMs;
     }
     _logger.info('${_serialPort.portName} opened successfully.');
     return true;

@@ -170,11 +170,11 @@ class _ParamsPageState extends State<ParamsPage> {
               ),
               const SizedBox(width: 32),
               // Center: battery, latency, CONNECTED
-              Icon(Icons.battery_charging_full, size: 18, color: cs.onSurface.withValues(alpha: 0.6)),
+              Icon(Icons.battery_charging_full_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.6)),
               const SizedBox(width: 4),
               Text('86%', style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.7))),
               const SizedBox(width: 16),
-              Icon(Icons.speed, size: 16, color: cs.onSurface.withValues(alpha: 0.6)),
+              Icon(Icons.speed_rounded, size: 16, color: cs.onSurface.withValues(alpha: 0.6)),
               const SizedBox(width: 4),
               Text('${widget.grpc.connected ? 12 : 0}ms', style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.7))),
               const SizedBox(width: 16),
@@ -197,7 +197,7 @@ class _ParamsPageState extends State<ParamsPage> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      widget.grpc.connected ? '已连接' : '离线',
+                      widget.grpc.connected ? '已连接' : '未连接',
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: widget.grpc.connected ? AppTheme.green : AppTheme.red),
                     ),
                   ],
@@ -234,7 +234,7 @@ class _ParamsPageState extends State<ParamsPage> {
                   decoration: InputDecoration(
                     hintText: '搜索参数...',
                     hintStyle: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.4)),
-                    prefixIcon: Icon(Icons.search, size: 18, color: cs.onSurface.withValues(alpha: 0.4)),
+                    prefixIcon: Icon(Icons.search_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.4)),
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.5))),
@@ -329,7 +329,7 @@ class _ParamsPageState extends State<ParamsPage> {
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning, color: AppTheme.red, size: 24),
+            Icon(Icons.warning_amber_rounded, color: AppTheme.red, size: 24),
             const SizedBox(width: 8),
             const Text('删除预设'),
           ],
@@ -349,7 +349,7 @@ class _ParamsPageState extends State<ParamsPage> {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, size: 16, color: AppTheme.red),
+                  Icon(Icons.info_outline_rounded, size: 16, color: AppTheme.red),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -413,7 +413,7 @@ class _ParamsPageState extends State<ParamsPage> {
       margin: const EdgeInsets.only(right: 16, top: 16, bottom: 16),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outline.withValues(alpha: 0.4)),
         boxShadow: Theme.of(context).brightness == Brightness.dark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
       ),
@@ -452,7 +452,7 @@ class _ParamsPageState extends State<ParamsPage> {
                 // Create Preset button
                 OutlinedButton.icon(
                   onPressed: _createPreset,
-                  icon: const Icon(Icons.add, size: 18),
+                  icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('新建预设'),
                   style: OutlinedButton.styleFrom(foregroundColor: cs.onSurface.withValues(alpha: 0.6), side: BorderSide(color: cs.outline.withValues(alpha: 0.5)), padding: const EdgeInsets.symmetric(vertical: 10)),
                 ),
@@ -461,7 +461,7 @@ class _ParamsPageState extends State<ParamsPage> {
                 GestureDetector(
                   onTap: () => setState(() => _showHistory = !_showHistory),
                   child: Row(children: [
-                    Icon(_showHistory ? Icons.expand_less : Icons.expand_more, size: 18, color: cs.onSurface.withValues(alpha: 0.5)),
+                    Icon(_showHistory ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 18, color: cs.onSurface.withValues(alpha: 0.5)),
                     const SizedBox(width: 6),
                     Text('历史 (${_ps.history.length})', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: cs.onSurface.withValues(alpha: 0.5))),
                   ]),
@@ -472,7 +472,7 @@ class _ParamsPageState extends State<ParamsPage> {
                   contentPadding: EdgeInsets.zero,
                   title: Text(h.presetName, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: cs.onSurface)),
                   subtitle: Text(_formatDateTime(h.savedAt), style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.4))),
-                  leading: Icon(Icons.history, size: 16, color: cs.onSurface.withValues(alpha: 0.3)),
+                  leading: Icon(Icons.history_rounded, size: 16, color: cs.onSurface.withValues(alpha: 0.3)),
                   onTap: () => _loadHistoryEntry(h),
                 )),
               ],
@@ -555,7 +555,7 @@ class _ParamsPageState extends State<ParamsPage> {
                   setState(() { _config = RobotConfig(); _markModified(); });
                   AppToast.showSnapAlign(context, '已对齐默认值');
                 },
-                icon: const Icon(Icons.refresh, size: 16),
+                icon: const Icon(Icons.refresh_rounded, size: 16),
                 label: const Text('重置默认'),
                 style: TextButton.styleFrom(foregroundColor: cs.onSurface.withValues(alpha: 0.8)),
               ),
@@ -611,7 +611,7 @@ class _ParamsPageState extends State<ParamsPage> {
             const Spacer(),
             OutlinedButton.icon(
               onPressed: _addCustomPose,
-              icon: const Icon(Icons.add, size: 16),
+              icon: const Icon(Icons.add_rounded, size: 16),
               label: const Text('新建姿态'),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
             ),
@@ -746,13 +746,13 @@ class _ParamsPageState extends State<ParamsPage> {
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(color: cs.onSurface.withValues(alpha: 0.02), borderRadius: BorderRadius.circular(8), border: Border.all(color: cs.outline.withValues(alpha: 0.3))),
                         child: Row(children: [
-                          Icon(Icons.memory, size: 20, color: AppTheme.brand),
+                          Icon(Icons.memory_rounded, size: 20, color: AppTheme.brand),
                           const SizedBox(width: 10),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                             Text(m.name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: cs.onSurface)),
                             Text('${m.sizeLabel} · ${m.modified.month}/${m.modified.day} ${m.modified.hour}:${m.modified.minute.toString().padLeft(2, '0')}', style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.5))),
                           ])),
-                          IconButton(icon: Icon(Icons.delete_outline, size: 18, color: AppTheme.red), onPressed: () async {
+                          IconButton(icon: Icon(Icons.delete_outline_rounded, size: 18, color: AppTheme.red), onPressed: () async {
                             await ms.delete(m);
                             setState(() {});
                             if (mounted) AppToast.showSuccess(context, '已删除 ${m.name}');
@@ -795,13 +795,13 @@ class _ParamsPageState extends State<ParamsPage> {
                             if (mounted) AppToast.showError(context, '导入失败: $e');
                           }
                         },
-                        icon: const Icon(Icons.file_upload_outlined, size: 16),
+                        icon: const Icon(Icons.file_upload_rounded, size: 16),
                         label: const Text('导入文件'),
                       )),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
                         onPressed: () async { await ms.scan(); if (!mounted) return; setState(() {}); AppToast.showSuccess(context, '已刷新'); },
-                        icon: const Icon(Icons.refresh, size: 16),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
                         label: const Text('刷新'),
                       ),
                     ]),
@@ -909,7 +909,7 @@ class _PresetCardFull extends StatelessWidget {
               Container(
                 width: 36, height: 36,
                 decoration: BoxDecoration(color: active ? AppTheme.brand.withValues(alpha: 0.2) : cs.outline.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
-                child: Icon(Icons.tune, size: 18, color: active ? AppTheme.brand : cs.onSurface.withValues(alpha: 0.4)),
+                child: Icon(Icons.tune_rounded, size: 18, color: active ? AppTheme.brand : cs.onSurface.withValues(alpha: 0.4)),
               ),
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -917,20 +917,20 @@ class _PresetCardFull extends StatelessWidget {
                 Text(subtitle, style: TextStyle(fontSize: 10, color: active ? AppTheme.brand : cs.onSurface.withValues(alpha: 0.5))),
               ])),
               if (active) ...[
-                Icon(Icons.check_circle, size: 18, color: AppTheme.brand),
+                Icon(Icons.check_circle_rounded, size: 18, color: AppTheme.brand),
                 const SizedBox(width: 4),
               ],
               PopupMenuButton<String>(
                 padding: EdgeInsets.zero,
                 iconSize: 18,
-                icon: Icon(Icons.more_vert, size: 16, color: cs.onSurface.withValues(alpha: 0.3)),
+                icon: Icon(Icons.more_vert_rounded, size: 16, color: cs.onSurface.withValues(alpha: 0.3)),
                 onSelected: (v) {
                   if (v == 'rename') onRename();
                   if (v == 'delete') onDelete();
                 },
                 itemBuilder: (_) => [
-                  const PopupMenuItem(value: 'rename', child: Row(children: [Icon(Icons.edit, size: 16), SizedBox(width: 8), Text('重命名')])),
-                  const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: Colors.red), SizedBox(width: 8), Text('删除', style: TextStyle(color: Colors.red))])),
+                  const PopupMenuItem(value: 'rename', child: Row(children: [Icon(Icons.edit_rounded, size: 16), SizedBox(width: 8), Text('重命名')])),
+                  const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline_rounded, size: 16, color: Colors.red), SizedBox(width: 8), Text('删除', style: TextStyle(color: Colors.red))])),
                 ],
               ),
             ],
@@ -971,7 +971,7 @@ class _LegCardGainState extends State<_LegCardGain> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outline.withValues(alpha: 0.4)),
         boxShadow: dark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 4))],
       ),
@@ -981,7 +981,7 @@ class _LegCardGainState extends State<_LegCardGain> {
         children: [
           Row(
             children: [
-              Icon(Icons.arrow_forward_ios, size: 12, color: AppTheme.brand),
+              Icon(Icons.arrow_forward_ios_rounded, size: 12, color: AppTheme.brand),
               const SizedBox(width: 8),
               Expanded(child: Text(widget.title, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cs.onSurface))),
               Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: AppTheme.brand)),
@@ -1096,13 +1096,13 @@ class _ParameterOverview extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     const legs = ['FL', 'FR', 'RL', 'RR'];
     const legIndices = [[3, 4, 5], [0, 1, 2], [9, 10, 11], [6, 7, 8]];
-    const legColors = [Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFF8B5CF6), Color(0xFFF59E0B)];
+    const legColors = AppTheme.legColors;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outline.withValues(alpha: 0.4)),
         boxShadow: dark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 4))],
       ),
@@ -1110,7 +1110,7 @@ class _ParameterOverview extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
-            Icon(Icons.analytics_outlined, size: 18, color: AppTheme.brand),
+            Icon(Icons.analytics_rounded, size: 18, color: AppTheme.brand),
             const SizedBox(width: 8),
             Text('参数概览', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: cs.onSurface)),
           ]),
@@ -1192,7 +1192,7 @@ class _InferenceGainCard extends StatelessWidget {
   static const _legNames = ['前左 FL', '前右 FR', '后左 RL', '后右 RR'];
   static const _legIndices = [[3, 4, 5], [0, 1, 2], [9, 10, 11], [6, 7, 8]];
   static const _jointNames = ['髋', '大腿', '小腿'];
-  static const _legColors = [Color(0xFF3B82F6), Color(0xFF10B981), Color(0xFF8B5CF6), Color(0xFFF59E0B)];
+  static const _legColors = AppTheme.legColors;
 
   double _avg(List<double> vals, List<int> indices) {
     if (vals.isEmpty) return 0.0;
@@ -1215,7 +1215,7 @@ class _InferenceGainCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outline.withValues(alpha: 0.4)),
         boxShadow: dark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 4))],
       ),
@@ -1336,8 +1336,8 @@ class _ParamCardState extends State<_ParamCard> {
           transform: _pressed ? Matrix4.diagonal3Values(0.995, 0.995, 1.0) : Matrix4.identity(),
           transformAlignment: Alignment.center,
           decoration: BoxDecoration(
-            color: dark ? const Color(0xFF111C44) : Colors.white,
-            borderRadius: BorderRadius.circular(14),
+            color: dark ? Theme.of(context).colorScheme.surface : Colors.white,
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _hovered ? cs.primary.withValues(alpha: 0.35) : cs.outline.withValues(alpha: 0.4),
               width: _hovered ? 1 : 0.5,
@@ -1423,7 +1423,7 @@ class _PoseCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: cs.outline.withValues(alpha: 0.4)),
         boxShadow: dark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 4))],
       ),
@@ -1432,17 +1432,17 @@ class _PoseCard extends StatelessWidget {
           Expanded(child: Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: cs.onSurface))),
           OutlinedButton.icon(
             onPressed: onPaste,
-            icon: const Icon(Icons.content_paste, size: 14),
+            icon: const Icon(Icons.content_paste_rounded, size: 14),
             label: const Text('粘贴导入'),
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6), textStyle: const TextStyle(fontSize: 11)),
           ),
           if (onRename != null) ...[
             const SizedBox(width: 6),
-            IconButton(icon: Icon(Icons.edit, size: 16, color: cs.onSurface.withValues(alpha: 0.4)), onPressed: onRename, padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 28, minHeight: 28)),
+            IconButton(icon: Icon(Icons.edit_rounded, size: 16, color: cs.onSurface.withValues(alpha: 0.4)), onPressed: onRename, padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 28, minHeight: 28)),
           ],
           if (onDelete != null) ...[
             const SizedBox(width: 4),
-            IconButton(icon: Icon(Icons.delete_outline, size: 16, color: AppTheme.red), onPressed: onDelete, padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 28, minHeight: 28)),
+            IconButton(icon: Icon(Icons.delete_outline_rounded, size: 16, color: AppTheme.red), onPressed: onDelete, padding: EdgeInsets.zero, constraints: const BoxConstraints(minWidth: 28, minHeight: 28)),
           ],
         ]),
         const SizedBox(height: 12),
@@ -1968,7 +1968,7 @@ class _FirmwareOtaPanelState extends State<_FirmwareOtaPanel> {
       const SizedBox(height: 12),
       SizedBox(width: double.infinity, child: FilledButton.icon(
         onPressed: _uploading ? null : _upload,
-        icon: _uploading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.rocket_launch, size: 18),
+        icon: _uploading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.rocket_launch_rounded, size: 18),
         label: Text(_uploading ? '推送中...' : '推送固件'),
         style: FilledButton.styleFrom(backgroundColor: AppTheme.orange, foregroundColor: Colors.white),
       )),

@@ -180,6 +180,13 @@ class CmsClient extends $grpc.Client {
     return $createUnaryCall(_$getProfile, request, options: options);
   }
 
+  $grpc.ResponseFuture<$0.Empty> calibrate(
+    $0.Empty request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$calibrate, request, options: options);
+  }
+
   // method descriptors
 
   static final _$enable = $grpc.ClientMethod<$0.Empty, $0.Empty>(
@@ -247,6 +254,10 @@ class CmsClient extends $grpc.Client {
       '/han_dog.Cms/GetProfile',
       ($0.Empty value) => value.writeToBuffer(),
       $2.ProfileInfo.fromBuffer);
+  static final _$calibrate = $grpc.ClientMethod<$0.Empty, $0.Empty>(
+      '/han_dog.Cms/Calibrate',
+      ($0.Empty value) => value.writeToBuffer(),
+      $0.Empty.fromBuffer);
 }
 
 @$pb.GrpcServiceName('han_dog.Cms')
@@ -366,6 +377,13 @@ abstract class CmsServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.Empty.fromBuffer(value),
         ($2.ProfileInfo value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.Empty, $0.Empty>(
+        'Calibrate',
+        calibrate_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.Empty.fromBuffer(value),
+        ($0.Empty value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.Empty> enable_Pre(
@@ -485,4 +503,11 @@ abstract class CmsServiceBase extends $grpc.Service {
 
   $async.Future<$2.ProfileInfo> getProfile(
       $grpc.ServiceCall call, $0.Empty request);
+
+  $async.Future<$0.Empty> calibrate_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.Empty> $request) async {
+    return calibrate($call, await $request);
+  }
+
+  $async.Future<$0.Empty> calibrate($grpc.ServiceCall call, $0.Empty request);
 }

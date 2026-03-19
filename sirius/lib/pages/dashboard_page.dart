@@ -7,19 +7,15 @@ import '../services/lan_scanner.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_toast.dart';
 import '../utils/validators.dart';
-import '../widgets/joystick_pad.dart';
+import '../widgets/qp_logo.dart';
 
 class DashboardPage extends StatefulWidget {
   final GrpcService grpc;
   final DeviceRegistry registry;
-  final ValueNotifier<WalkSpeed>? speedNotifier;
-  final ValueNotifier<Set<String>>? keysNotifier;
   const DashboardPage({
     super.key,
     required this.grpc,
     required this.registry,
-    this.speedNotifier,
-    this.keysNotifier,
   });
   @override
   State<DashboardPage> createState() => _DashboardPageState();
@@ -145,13 +141,6 @@ class _DashboardPageState extends State<DashboardPage> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Walk control (joystick)
-                  JoystickPanel(
-                    grpc: g,
-                    speedNotifier: widget.speedNotifier,
-                    keysNotifier: widget.keysNotifier,
-                  ),
-                  gap,
                   // 4 stat cards
                   Row(
                     children: [
@@ -380,7 +369,7 @@ class _DashboardPageState extends State<DashboardPage> {
     const states = ['Grounded', 'StandUp', 'Standing', 'Walking', 'Gesture', 'SitDown'];
     const stateLabels = ['待机', '起立', '站立', '行走', '动作', '坐下'];
     const stateIcons = [
-      Icons.pause_circle_outlined,
+      Icons.pause_circle_rounded,
       Icons.publish_rounded,
       Icons.accessibility_new_rounded,
       Icons.directions_walk_rounded,
@@ -523,8 +512,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Icon(
-                  Icons.smart_toy_rounded,
+                QpLogo(
                   size: 14,
                   color: cs.onSurface.withValues(alpha: 0.3),
                 ),
@@ -1282,8 +1270,7 @@ class _DeviceInfoCardState extends State<_DeviceInfoCard> {
               color: AppTheme.brand.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(
-              Icons.smart_toy_rounded,
+            child: QpLogo(
               size: 18,
               color: AppTheme.brand,
             ),
@@ -1361,7 +1348,7 @@ class _DeviceInfoCardState extends State<_DeviceInfoCard> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.psychology_outlined,
+                    Icons.psychology_rounded,
                     size: 12,
                     color: AppTheme.brand,
                   ),
@@ -1897,7 +1884,7 @@ class _FavListDialogState extends State<_FavListDialog> {
                       vertical: 2,
                     ),
                     leading: Icon(
-                      Icons.smart_toy_outlined,
+                      Icons.smart_toy_rounded,
                       size: 20,
                       color: isCurrent
                           ? AppTheme.brand

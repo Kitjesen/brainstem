@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 /// 将大喵 G6620 电机状态码解码为中文描述
 String decodeMotorStatus(int status) => switch (status) {
@@ -16,7 +17,7 @@ String decodeMotorStatus(int status) => switch (status) {
 
 /// 返回对应状态码的颜色：正常→绿，禁用→灰，其余→红
 Color motorStatusColor(int status) => switch (status) {
-  1 => Colors.green,
-  0 => Colors.grey,
-  _ => Colors.red,
+  1 => AppTheme.green,
+  0 => const Color(0xFF8A8A8A),
+  _ => AppTheme.red,
 };

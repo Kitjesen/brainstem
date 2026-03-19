@@ -45,8 +45,10 @@ class Memory<T> {
   }
 
   Memory({required this.historySize, required T initial})
-    : controller = ReplaySubject<T>(maxSize: historySize),
-      assert(historySize > 0, 'historySize must be at least 1') {
+    : controller = ReplaySubject<T>(maxSize: historySize) {
+    if (historySize < 1) {
+      throw ArgumentError.value(historySize, 'historySize', 'must be at least 1');
+    }
     for (var i = 0; i < historySize; i++) {
       controller.add(initial);
     }

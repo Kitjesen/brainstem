@@ -7,6 +7,7 @@ import '../services/data_recorder.dart';
 import '../services/device_registry.dart';
 import '../services/grpc_service.dart';
 import '../widgets/joystick_pad.dart';
+import '../widgets/qp_logo.dart';
 import '../services/preset_service.dart';
 import '../services/model_service.dart';
 import '../services/run_history_service.dart';
@@ -205,7 +206,7 @@ class _ShellPageState extends State<ShellPage> {
 
   Widget _buildPage() {
     switch (_selectedIndex) {
-      case 0: return DashboardPage(grpc: _grpc, registry: _deviceRegistry, speedNotifier: _speedNotifier, keysNotifier: _keysNotifier);
+      case 0: return DashboardPage(grpc: _grpc, registry: _deviceRegistry);
       case 1: return MonitorPage(grpc: _grpc);
       case 2: return ControlPage(grpc: _grpc);
       case 3: return ParamsPage(grpc: _grpc, presetService: _presetService, modelService: _modelService);
@@ -214,7 +215,7 @@ class _ShellPageState extends State<ShellPage> {
       case 6: return HistoryPage(runHistory: _runHistory);
       case 7: return BrainPage(grpc: _grpc);
       case 8: return const OtaPage();
-      default: return DashboardPage(grpc: _grpc, registry: _deviceRegistry, speedNotifier: _speedNotifier, keysNotifier: _keysNotifier);
+      default: return DashboardPage(grpc: _grpc, registry: _deviceRegistry);
     }
   }
 
@@ -482,8 +483,8 @@ class _CommandPaletteState extends State<_CommandPalette> {
       _CmdItem('智脑', '推理策略管理', Icons.psychology_rounded, () => widget.onNavigate(7)),
       _CmdItem('站立', '执行站立动作', Icons.arrow_upward_rounded, () { if (widget.grpc.connected) widget.grpc.standUp(); widget.onClose(); }),
       _CmdItem('坐下', '执行坐下动作', Icons.arrow_downward_rounded, () { if (widget.grpc.connected) widget.grpc.sitDown(); widget.onClose(); }),
-      _CmdItem('使能电机', '发送 Enable 命令', Icons.power_rounded, () { if (widget.grpc.connected) widget.grpc.enable(); widget.onClose(); }),
-      _CmdItem('禁用电机', '发送 Disable 命令', Icons.power_off_rounded, () { if (widget.grpc.connected) widget.grpc.disable(); widget.onClose(); }),
+      _CmdItem('使能电机', '发送启用命令', Icons.power_rounded, () { if (widget.grpc.connected) widget.grpc.enable(); widget.onClose(); }),
+      _CmdItem('禁用电机', '发送禁用命令', Icons.power_off_rounded, () { if (widget.grpc.connected) widget.grpc.disable(); widget.onClose(); }),
     ];
   }
 
@@ -682,10 +683,10 @@ class _CustomTitleBarState extends State<_CustomTitleBar> with WindowListener {
           children: [
             const SizedBox(width: 16),
             // App icon + title
-            Icon(Icons.smart_toy_rounded, size: 16, color: AppTheme.brand),
+            QpLogo(size: 16, color: AppTheme.brand),
             const SizedBox(width: 8),
             Text(
-              '穹佩控制面板',
+              '穹沛控制台',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -723,7 +724,7 @@ class _CustomTitleBarState extends State<_CustomTitleBar> with WindowListener {
             _WindowButton(
               icon: Icons.close_rounded,
               onTap: () => windowManager.close(),
-              hoverColor: const Color(0xFFE81123),
+              hoverColor: AppTheme.red,
               hoverIconColor: Colors.white,
             ),
           ],

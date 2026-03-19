@@ -160,10 +160,7 @@ Future<void> main() async {
     await _shutdown(m, brain, clock, server);
   }
 
-  ProcessSignal.sigint.watch().listen(onSignal);
-  if (!Platform.isWindows) {
-    ProcessSignal.sigterm.watch().listen(onSignal);
-  }
+  _installSignalHandlers(onSignal);
 }
 
 Future<int> _resolveHistorySize(RobotProfile profile) async {
@@ -257,4 +254,22 @@ void _setupLogging() {
       stdout.writeln('$prefix: ${r.message}');
     }
   });
+}
+
+void _installSignalHandlers(Future<void> Function(ProcessSignal sig) onSignal) {
+  if (Platform.isWindows) {
+    _log.info('Signal handlers disabled on Windows');
+    return;
+  }
+
+  try {
+    ProcessSignal.sigint.watch().listen(onSignal);
+  } catch (e) {
+    _log.warning('SIGINT handler disabled: $e');
+  }
+  try {
+    ProcessSignal.sigterm.watch().listen(onSignal);
+  } catch (e) {
+    _log.warning('SIGTERM handler disabled: $e');
+  }
 }

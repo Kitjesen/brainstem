@@ -217,8 +217,8 @@ class _StatsSummaryCard extends StatelessWidget {
 
     final stats = [
       (Icons.history_rounded, '会话次数', '${entries.length} 次', AppTheme.brand),
-      (Icons.timer_outlined, '总运行时长', _fmtDuration(totalDuration), AppTheme.teal),
-      (Icons.emoji_events_outlined, '最长会话', _fmtDuration(longest), AppTheme.yellow),
+      (Icons.timer_rounded, '总运行时长', _fmtDuration(totalDuration), AppTheme.teal),
+      (Icons.emoji_events_rounded, '最长会话', _fmtDuration(longest), AppTheme.yellow),
       (Icons.bar_chart_rounded, '平均时长', completed.isEmpty ? '--' : _fmtDuration(avgDuration), AppTheme.green),
     ];
 
@@ -356,7 +356,7 @@ class _SessionTile extends StatelessWidget {
         dense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         leading: Icon(
-          isLive ? Icons.circle : Icons.circle_outlined,
+          isLive ? Icons.circle_rounded : Icons.circle_outlined,
           size: 10,
           color: isLive ? AppTheme.green : cs.onSurface.withValues(alpha: 0.25),
         ),
