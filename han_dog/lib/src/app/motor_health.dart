@@ -228,26 +228,44 @@ class MotorHealthManager {
     );
 
     for (final idx in toRecover) {
+      // Skip offline motors — CAN communication lost, clearing is pointless
+      if (!_joint.isOnline(idx)) {
+        _log.warning(
+          'Motor ${jointNames[idx]} is OFFLINE (0 Hz) — skipping recovery, '
+          'check CAN cable / power',
+        );
+        continue;
+      }
+
       var cleared = false;
       for (var attempt = 1; attempt <= 3; attempt++) {
         _joint.clearFaultSingle(idx);
         await Future<void>.delayed(const Duration(milliseconds: 100));
 
         // Check if the next report frame shows no errors
+        // getReport returns null if motor went offline during recovery
         final report = _joint.getReport(idx);
-        if (report != null && report.errors.errors.isEmpty) {
+        if (report == null) {
+          _log.warning(
+            'Motor ${jointNames[idx]} went offline during recovery attempt $attempt',
+          );
+          break;
+        }
+        if (report.errors.errors.isEmpty) {
           _log.info('Motor ${jointNames[idx]} recovered (attempt $attempt)');
           _joints[idx].reset();
           cleared = true;
           break;
         }
         _log.warning(
-          'Motor ${jointNames[idx]} still faulted after attempt $attempt',
+          'Motor ${jointNames[idx]} still faulted after attempt $attempt '
+          '(errors: ${report.errors.errors})',
         );
       }
       if (!cleared) {
         _log.severe(
-          'Motor ${jointNames[idx]} recovery FAILED after 3 attempts',
+          'Motor ${jointNames[idx]} recovery FAILED — '
+          '${_joint.isOnline(idx) ? "persistent fault" : "went offline"}',
         );
       }
     }

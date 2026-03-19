@@ -264,9 +264,17 @@ class RealJoint implements JointService, MotorService {
     return (idx - 12, 4);
   }
 
-  /// Returns the latest report for flat joint [idx], or null if out of range.
+  /// Whether joint [idx] is actively communicating (>0 Hz in last 1s).
+  bool isOnline(int idx) {
+    if (idx < 0 || idx >= 16) return false;
+    return frequencyWatches[idx].value > 0;
+  }
+
+  /// Returns the latest report for flat joint [idx], or null if out of range
+  /// or if the motor is offline (0 Hz — data is stale).
   RSStateReport? getReport(int idx) {
     if (idx < 0 || idx >= 16) return null;
+    if (!isOnline(idx)) return null; // stale data, motor not communicating
     final (legId, canId) = _flatIndexToLegCan(idx);
     return status[legId][canId - 1];
   }
