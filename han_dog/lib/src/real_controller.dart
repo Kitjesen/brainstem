@@ -26,8 +26,10 @@ class RealController {
   // CH12 RT 两档    → 冲刺模式（速度 × 1.5）
   // CH16 R2 两档    → 策略切换
 
-  /// 行走方向流：(x=侧移, y=前进, z=旋转)。
+  /// 行走方向流：(x=前后, y=左右, z=旋转)，与 Walk RPC / RL 训练约定一致。
   ///
+  /// 训练约定：x>0 前进, y>0 向左, z>0 逆时针。
+  /// 摇杆约定：leftStick.y>0 前推, leftStick.x>0 右推, knob>0 顺时针。
   /// 速度缩放规则：LT=精确(0.5×)，RT=冲刺(1.5×)，默认 1.0×。
   /// rightStick.x 以 0.5 权重叠加到旋转轴，实现双手协同偏航控制。
   Stream<Vector3> get direction => watchdogDecay(
@@ -35,9 +37,9 @@ class RealController {
       final scale = data.LT ? 0.5 : (data.RT ? 1.5 : 1.0);
       final yaw = (data.knob + data.rightStick.x * 0.5).clamp(-1.0, 1.0);
       return Vector3(
-        data.leftStick.x * scale,
-        data.leftStick.y * scale,
-        yaw,
+        data.leftStick.y * scale,   // x=前后: 前推(y+) → forward(+)
+        -data.leftStick.x * scale,  // y=左右: 左推(x-) → left(+)
+        -yaw,                        // z=旋转: 顺时针(+) → 逆时针(-)
       );
     }),
     timeout: const Duration(milliseconds: 50),

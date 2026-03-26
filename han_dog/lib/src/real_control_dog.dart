@@ -105,20 +105,11 @@ class RealControlDog {
         }
         _idleTimer?.cancel();
         _idleTimer = null;
-        // 坐标修正：摇杆(x=侧移,y=前进) → 训练(obs[6]=forward,obs[7]=left,obs[8]=ccw)
-        // 前推(y+) → forward(+), 左推(x-) → left(+), yaw 取反
-        // lateral 限制在训练范围 ±0.6（训练 lin_vel_y=[-0.6,0.6]）
-        final corrected = Vector3(
-          direction.y,
-          -direction.x,
-          -direction.z,
-        );
-        _log.info('WALK raw: x=${direction.x.toStringAsFixed(2)} '
-            'y=${direction.y.toStringAsFixed(2)} z=${direction.z.toStringAsFixed(2)} '
-            '→ fwd=${corrected.x.toStringAsFixed(2)} '
-            'lat=${corrected.y.toStringAsFixed(2)} '
-            'yaw=${corrected.z.toStringAsFixed(2)}');
-        sendCommand(A.walk(corrected), 'walk');
+        // 控制器已在 Walk 约定下输出 (x=前后, y=左右, z=旋转)，直接透传
+        _log.info('WALK fwd=${direction.x.toStringAsFixed(2)} '
+            'lat=${direction.y.toStringAsFixed(2)} '
+            'yaw=${direction.z.toStringAsFixed(2)}');
+        sendCommand(A.walk(direction), 'walk');
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'direction'),
       onDone: () => _log.warning('Controller direction stream closed'),
