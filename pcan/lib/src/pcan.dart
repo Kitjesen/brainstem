@@ -1,22 +1,58 @@
 import 'package:ffi/ffi.dart';
 import 'dart:ffi';
+import 'dart:io';
 
 import 'pcan_basic.dart';
 import 'pcan_basic.g.dart';
+import 'socketcan.dart';
 import 'utils.dart';
+
+/// Auto-detect backend: PCAN Basic (chardev) or SocketCAN (Linux netdev).
+///
+/// On Linux, if `/sys/class/pcan` exists the chardev driver is loaded and
+/// PCAN Basic API is used.  Otherwise falls back to raw SocketCAN sockets.
+bool get _usePcanBasic =>
+    !Platform.isLinux || Directory('/sys/class/pcan').existsSync();
 
 class Pcan {
   final PcanChannel channel;
+  SocketCanPcan? _socketCan;
 
   Pcan(this.channel);
-  PcanStatus open([PcanBaudRate baudRate = .baud1M]) =>
-      canInitialize(channel, baudRate, 0, 0, 0);
-  PcanStatus close() => canUninitialize(channel);
-  PcanStatus reset() => canReset(channel);
-  PcanStatus get status => canGetStatus(channel);
 
-  PcanStatus write(PcanMessage message) => canWrite(channel, message);
-  (PcanMessage, PcanTimestamp, PcanStatus) read() => canRead(channel);
+  PcanStatus open([PcanBaudRate baudRate = .baud1M]) {
+    if (_usePcanBasic) {
+      return canInitialize(channel, baudRate, 0, 0, 0);
+    }
+    // SocketCAN fallback
+    _socketCan = SocketCanPcan(channel);
+    return _socketCan!.open(baudRate);
+  }
+
+  PcanStatus close() {
+    if (_socketCan != null) return _socketCan!.close();
+    return canUninitialize(channel);
+  }
+
+  PcanStatus reset() {
+    if (_socketCan != null) return _socketCan!.reset();
+    return canReset(channel);
+  }
+
+  PcanStatus get status {
+    if (_socketCan != null) return _socketCan!.status;
+    return canGetStatus(channel);
+  }
+
+  PcanStatus write(PcanMessage message) {
+    if (_socketCan != null) return _socketCan!.write(message);
+    return canWrite(channel, message);
+  }
+
+  (PcanMessage, PcanTimestamp, PcanStatus) read() {
+    if (_socketCan != null) return _socketCan!.read();
+    return canRead(channel);
+  }
 
   static (String, PcanStatus) get apiVersion {
     final valuePtr = calloc<Char>(MAX_LENGTH_VERSION_STRING);
