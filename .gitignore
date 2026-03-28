@@ -43,6 +43,13 @@ sim/meshes/
 assets/urdf/
 assets/*.zip
 
+# Sim output (generated files)
+sim/output/
+
+# Tool config (per-machine)
+.omc/
+han_dog/.omc/
+
 # Dart compiled snapshots
 *.dill
 
