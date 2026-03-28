@@ -50,6 +50,18 @@ final $typed_data.Uint8List cmsTransitionKindDescriptor = $convert.base64Decode(
     'NfVFJBTlNJVElPTl9LSU5EX1NUQU5EX1VQEAESIAocQ01TX1RSQU5TSVRJT05fS0lORF9TSVRf'
     'RE9XThACEh8KG0NNU19UUkFOU0lUSU9OX0tJTkRfR0VTVFVSRRAD');
 
+@$core.Deprecated('Use voltageDescriptor instead')
+const Voltage$json = {
+  '1': 'Voltage',
+  '2': [
+    {'1': 'values', '3': 1, '4': 3, '5': 2, '10': 'values'},
+  ],
+};
+
+/// Descriptor for `Voltage`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List voltageDescriptor =
+    $convert.base64Decode('CgdWb2x0YWdlEhYKBnZhbHVlcxgBIAMoAlIGdmFsdWVz');
+
 @$core.Deprecated('Use historyDescriptor instead')
 const History$json = {
   '1': 'History',

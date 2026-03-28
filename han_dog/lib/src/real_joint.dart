@@ -295,6 +295,46 @@ class RealJoint implements JointService, MotorService {
     return true;
   }
 
+  // ─── Voltage reading ────────────────────────────────────────────────────
+
+  /// 读取全部 16 个电机的总线电压 (V)。
+  /// 返回 16 个 double，顺序同 JointsMatrix（FR hip/thigh/calf, FL..., feet）。
+  /// 超时未响应的电机返回 0.0。
+  Future<List<double>> readVoltage({
+    Duration timeout = const Duration(milliseconds: 500),
+  }) async {
+    final voltages = List<double>.filled(16, 0.0);
+
+    // 用每条腿的 PcanController 监听 getter 响应
+    final legSubs = <StreamSubscription<RSState>>[];
+    for (int legId = 0; legId < 4; legId++) {
+      legSubs.add(pcans[legId].state.listen((state) {
+        if (state is RSStateGetter && state.getter is RSGetterVbus) {
+          final canId = state.canId;
+          final voltage = (state.getter as RSGetterVbus).value;
+          // canId 1-3 → leg joints, canId 4 → foot
+          final idx = canId <= 3 ? legId * 3 + (canId - 1) : 12 + legId;
+          if (idx >= 0 && idx < 16) voltages[idx] = voltage;
+        }
+      }));
+    }
+
+    // 发送 getter 请求
+    for (int legId = 0; legId < 4; legId++) {
+      for (int canId = 1; canId <= 4; canId++) {
+        pcans[legId].add(RSEvent.get(canId, key: RSKey.vbus));
+      }
+    }
+
+    await Future<void>.delayed(timeout);
+
+    for (final s in legSubs) {
+      await s.cancel();
+    }
+
+    return voltages;
+  }
+
   // ──────────────────────────────────────────────────────────────────────────
 
   bool _disposed = false;

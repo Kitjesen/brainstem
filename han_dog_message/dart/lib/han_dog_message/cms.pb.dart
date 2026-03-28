@@ -24,6 +24,55 @@ export 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 export 'cms.pbenum.dart';
 
+/// 电机总线电压（16 个关节，单位 V）。
+class Voltage extends $pb.GeneratedMessage {
+  factory Voltage({
+    $core.Iterable<$core.double>? values,
+  }) {
+    final result = create();
+    if (values != null) result.values.addAll(values);
+    return result;
+  }
+
+  Voltage._();
+
+  factory Voltage.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory Voltage.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'Voltage',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
+      createEmptyInstance: create)
+    ..p<$core.double>(1, _omitFieldNames ? '' : 'values', $pb.PbFieldType.KF)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Voltage clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  Voltage copyWith(void Function(Voltage) updates) =>
+      super.copyWith((message) => updates(message as Voltage)) as Voltage;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static Voltage create() => Voltage._();
+  @$core.override
+  Voltage createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static Voltage getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<Voltage>(create);
+  static Voltage? _defaultInstance;
+
+  /// 16 个电机总线电压，顺序同 Matrix4 关节索引。
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.double> get values => $_getList(0);
+}
+
 /// 单次推理周期的完整观测数据（RL policy 的输入/输出）。
 class History extends $pb.GeneratedMessage {
   factory History({

@@ -69,6 +69,17 @@ service Cms {
   rpc SwitchProfile(ProfileRequest) returns (ProfileInfo);
   // 获取当前策略信息。
   rpc GetProfile(google.protobuf.Empty) returns (ProfileInfo);
+
+  // ──── 诊断 ────
+
+  // 读取全部 16 个电机的总线电压 (V)。
+  rpc GetVoltage(google.protobuf.Empty) returns (Voltage);
+}
+
+// 电机总线电压（16 个关节，单位 V）。
+message Voltage {
+  // 16 个电机总线电压，顺序同 Matrix4 关节索引。
+  repeated float values = 1;
 }
 
 // 单次推理周期的完整观测数据（RL policy 的输入/输出）。

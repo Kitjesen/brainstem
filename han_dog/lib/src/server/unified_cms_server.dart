@@ -367,7 +367,6 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   //  标零
   // ═══════════════════════════════════════════════════════════
 
-  @override
   Future<proto.Empty> calibrate(
       ServiceCall call, proto.Empty request) async {
     if (_m.state is! Grounded) {
@@ -435,5 +434,22 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
           _brain.joint,
           timestamp: _elapsed(),
         ));
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  诊断接口
+  // ═══════════════════════════════════════════════════════════
+
+  @override
+  Future<proto.Voltage> getVoltage(
+      ServiceCall call, proto.Empty request) async {
+    final j = joint;
+    if (j == null) {
+      throw GrpcError.failedPrecondition(
+        'GetVoltage requires hardware mode with RealJoint',
+      );
+    }
+    final voltages = await j.readVoltage();
+    return proto.Voltage(values: voltages.map((v) => v.toDouble()));
   }
 }
