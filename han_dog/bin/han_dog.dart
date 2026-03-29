@@ -164,15 +164,20 @@ Future<void> _run() async {
   joint.kpExt = defaultProfile.inferKp;
   joint.kdExt = defaultProfile.inferKd;
 
-  // ──── 3. YUNZHUO 遥控器 ────────────────────────────────────
-  final controller = RealController(_cfg.yunzhuoPort);
-  if (!controller.open()) {
-    _log.severe('Failed to open YUNZHUO controller on ${_cfg.yunzhuoPort}');
-    imu.dispose();
-    joint.dispose();
-    return;
+  // ──── 3. YUNZHUO 遥控器（可选，打不开则仅 gRPC 控制）─────────
+  RealController? controller;
+  {
+    final c = RealController(_cfg.yunzhuoPort);
+    if (c.open()) {
+      controller = c;
+      _log.info('YUNZHUO controller opened.');
+    } else {
+      _log.warning(
+        'YUNZHUO controller not available on ${_cfg.yunzhuoPort} — '
+        'running in gRPC-only mode (no joystick control)',
+      );
+    }
   }
-  _log.info('YUNZHUO controller opened.');
 
   // ──── 4. FSM + 仲裁器 ──────────────────────────────────────
   final M m = M(brain)..add(Init());
@@ -190,7 +195,7 @@ Future<void> _run() async {
     joint.disable();
     imu.dispose();
     joint.dispose();
-    controller.dispose();
+    controller?.dispose();
     return;
   }
   _log.info('CMS initialized: ${m.state}');
@@ -255,40 +260,48 @@ Future<void> _run() async {
     },
   ));
 
-  // YUNZHUO 遥控器 → CMS 命令映射（增益来自默认策略）
-  final controlDog = RealControlDog(
-    brain: brain,
-    imu: imu,
-    joint: joint,
-    arbiter: arbiter,
-    inferKd: defaultProfile.inferKd,
-    inferKp: defaultProfile.inferKp,
-    standUpKd: defaultProfile.standUpKd,
-    standUpKp: defaultProfile.standUpKp,
-    sitDownKd: defaultProfile.sitDownKd,
-    sitDownKp: defaultProfile.sitDownKp,
-    controller: controller,
-  );
+  // YUNZHUO 遥控器 → CMS 命令映射（仅在遥控器可用时创建）
+  RealControlDog? controlDog;
+  ProfileManager? profileManager;
+  if (controller != null) {
+    controlDog = RealControlDog(
+      brain: brain,
+      imu: imu,
+      joint: joint,
+      arbiter: arbiter,
+      inferKd: defaultProfile.inferKd,
+      inferKp: defaultProfile.inferKp,
+      standUpKd: defaultProfile.standUpKd,
+      standUpKp: defaultProfile.standUpKp,
+      sitDownKd: defaultProfile.sitDownKd,
+      sitDownKp: defaultProfile.sitDownKp,
+      controller: controller,
+    );
 
-  // ──── 4b. 策略管理（始终创建，ProfileManager 为必需组件）────────
-  final profileManager = ProfileManager(
-    profiles: profiles,
-    brain: brain,
-    controlDog: controlDog,
-    initial: defaultProfile.name,
-  );
-  controlDog.onProfileSwitch = () => profileManager.toggle();
-  controlDog.onMotorEnableChanged = (enabled) {
-    motorOutputEnabled = enabled;
-  };
-  _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
+    // ──── 4b. 策略管理 ───────────────────────────────────────────
+    profileManager = ProfileManager(
+      profiles: profiles,
+      brain: brain,
+      controlDog: controlDog,
+      initial: defaultProfile.name,
+    );
+    controlDog.onProfileSwitch = () => profileManager!.toggle();
+    controlDog.onMotorEnableChanged = (enabled) {
+      motorOutputEnabled = enabled;
+    };
+    _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
+  } else {
+    _log.info('No controller — motor enable via gRPC only');
+  }
 
   // ──── 4c. 策略热加载（每 30s 扫描 profileDir）────────────────
-  _profileReloadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-    profileManager.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
-      _log.warning('Profile hot-reload failed', e, st);
+  if (profileManager != null) {
+    _profileReloadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      profileManager!.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
+        _log.warning('Profile hot-reload failed', e, st);
+      });
     });
-  });
+  }
 
   // ──── 5. 监控 ──────────────────────────────────────────────
   _subs.add(startSensorMonitoring(
@@ -297,10 +310,12 @@ Future<void> _run() async {
     arbiter: arbiter,
     threshold: _cfg.sensorLowThreshold,
   ));
-  _subs.add(startControllerMonitoring(
-    controller: controller,
-    arbiter: arbiter,
-  ));
+  if (controller != null) {
+    _subs.add(startControllerMonitoring(
+      controller: controller,
+      arbiter: arbiter,
+    ));
+  }
   _subs.add(startJointLimitMonitoring(
     joint: joint,
     arbiter: arbiter,
@@ -490,8 +505,8 @@ void _registerShutdown({
   required RealJoint joint,
   required ControlArbiter arbiter,
   required grpc.Server grpcServer,
-  required RealControlDog controlDog,
-  required RealController controller,
+  required RealControlDog? controlDog,
+  required RealController? controller,
   required RealImu imu,
   required Brain brain,
   required MotorHealthManager motorHealth,
