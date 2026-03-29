@@ -188,6 +188,22 @@ class CmsClient extends $grpc.Client {
     return $createUnaryCall(_$getVoltage, request, options: options);
   }
 
+  /// 查询全部 16 个电机的健康状态。
+  $grpc.ResponseFuture<$2.MotorStatusResponse> getMotorStatus(
+    $0.Empty request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$getMotorStatus, request, options: options);
+  }
+
+  /// 清除电机故障。joint_ids 为空则清除全部，否则只清指定关节。
+  $grpc.ResponseFuture<$0.Empty> clearMotorFault(
+    $2.ClearFaultRequest request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$clearMotorFault, request, options: options);
+  }
+
   // method descriptors
 
   static final _$enable = $grpc.ClientMethod<$0.Empty, $0.Empty>(
@@ -259,6 +275,16 @@ class CmsClient extends $grpc.Client {
       '/han_dog.Cms/GetVoltage',
       ($0.Empty value) => value.writeToBuffer(),
       $2.Voltage.fromBuffer);
+  static final _$getMotorStatus =
+      $grpc.ClientMethod<$0.Empty, $2.MotorStatusResponse>(
+          '/han_dog.Cms/GetMotorStatus',
+          ($0.Empty value) => value.writeToBuffer(),
+          $2.MotorStatusResponse.fromBuffer);
+  static final _$clearMotorFault =
+      $grpc.ClientMethod<$2.ClearFaultRequest, $0.Empty>(
+          '/han_dog.Cms/ClearMotorFault',
+          ($2.ClearFaultRequest value) => value.writeToBuffer(),
+          $0.Empty.fromBuffer);
 }
 
 @$pb.GrpcServiceName('han_dog.Cms')
@@ -385,6 +411,20 @@ abstract class CmsServiceBase extends $grpc.Service {
         false,
         ($core.List<$core.int> value) => $0.Empty.fromBuffer(value),
         ($2.Voltage value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.Empty, $2.MotorStatusResponse>(
+        'GetMotorStatus',
+        getMotorStatus_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.Empty.fromBuffer(value),
+        ($2.MotorStatusResponse value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$2.ClearFaultRequest, $0.Empty>(
+        'ClearMotorFault',
+        clearMotorFault_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $2.ClearFaultRequest.fromBuffer(value),
+        ($0.Empty value) => value.writeToBuffer()));
   }
 
   $async.Future<$0.Empty> enable_Pre(
@@ -512,4 +552,20 @@ abstract class CmsServiceBase extends $grpc.Service {
 
   $async.Future<$2.Voltage> getVoltage(
       $grpc.ServiceCall call, $0.Empty request);
+
+  $async.Future<$2.MotorStatusResponse> getMotorStatus_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.Empty> $request) async {
+    return getMotorStatus($call, await $request);
+  }
+
+  $async.Future<$2.MotorStatusResponse> getMotorStatus(
+      $grpc.ServiceCall call, $0.Empty request);
+
+  $async.Future<$0.Empty> clearMotorFault_Pre($grpc.ServiceCall $call,
+      $async.Future<$2.ClearFaultRequest> $request) async {
+    return clearMotorFault($call, await $request);
+  }
+
+  $async.Future<$0.Empty> clearMotorFault(
+      $grpc.ServiceCall call, $2.ClearFaultRequest request);
 }

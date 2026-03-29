@@ -73,6 +73,260 @@ class Voltage extends $pb.GeneratedMessage {
   $pb.PbList<$core.double> get values => $_getList(0);
 }
 
+/// 单个电机状态。
+class MotorState extends $pb.GeneratedMessage {
+  factory MotorState({
+    $core.int? id,
+    $core.bool? online,
+    $core.int? statusCode,
+    $core.double? temperature,
+    $core.double? voltage,
+    $core.double? position,
+    $core.double? velocity,
+    $core.double? torque,
+    $core.Iterable<$core.int>? errors,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (online != null) result.online = online;
+    if (statusCode != null) result.statusCode = statusCode;
+    if (temperature != null) result.temperature = temperature;
+    if (voltage != null) result.voltage = voltage;
+    if (position != null) result.position = position;
+    if (velocity != null) result.velocity = velocity;
+    if (torque != null) result.torque = torque;
+    if (errors != null) result.errors.addAll(errors);
+    return result;
+  }
+
+  MotorState._();
+
+  factory MotorState.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MotorState.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MotorState',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
+      createEmptyInstance: create)
+    ..aI(1, _omitFieldNames ? '' : 'id', fieldType: $pb.PbFieldType.OU3)
+    ..aOB(2, _omitFieldNames ? '' : 'online')
+    ..aI(3, _omitFieldNames ? '' : 'statusCode', fieldType: $pb.PbFieldType.OU3)
+    ..aD(4, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
+    ..aD(5, _omitFieldNames ? '' : 'voltage', fieldType: $pb.PbFieldType.OF)
+    ..aD(6, _omitFieldNames ? '' : 'position', fieldType: $pb.PbFieldType.OF)
+    ..aD(7, _omitFieldNames ? '' : 'velocity', fieldType: $pb.PbFieldType.OF)
+    ..aD(8, _omitFieldNames ? '' : 'torque', fieldType: $pb.PbFieldType.OF)
+    ..p<$core.int>(9, _omitFieldNames ? '' : 'errors', $pb.PbFieldType.KU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MotorState clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MotorState copyWith(void Function(MotorState) updates) =>
+      super.copyWith((message) => updates(message as MotorState)) as MotorState;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MotorState create() => MotorState._();
+  @$core.override
+  MotorState createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MotorState getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MotorState>(create);
+  static MotorState? _defaultInstance;
+
+  /// 关节索引（0-15，顺序同 Matrix4）。
+  @$pb.TagNumber(1)
+  $core.int get id => $_getIZ(0);
+  @$pb.TagNumber(1)
+  set id($core.int value) => $_setUnsignedInt32(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  /// 是否在线（CAN 通信频率 > 0）。
+  @$pb.TagNumber(2)
+  $core.bool get online => $_getBF(1);
+  @$pb.TagNumber(2)
+  set online($core.bool value) => $_setBool(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasOnline() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOnline() => $_clearField(2);
+
+  /// 电机状态码（具体含义取决于电机驱动协议）。
+  @$pb.TagNumber(3)
+  $core.int get statusCode => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set statusCode($core.int value) => $_setUnsignedInt32(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasStatusCode() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearStatusCode() => $_clearField(3);
+
+  /// 电机温度 (°C)。
+  @$pb.TagNumber(4)
+  $core.double get temperature => $_getN(3);
+  @$pb.TagNumber(4)
+  set temperature($core.double value) => $_setFloat(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasTemperature() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTemperature() => $_clearField(4);
+
+  /// 总线电压 (V)。
+  @$pb.TagNumber(5)
+  $core.double get voltage => $_getN(4);
+  @$pb.TagNumber(5)
+  set voltage($core.double value) => $_setFloat(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasVoltage() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearVoltage() => $_clearField(5);
+
+  /// 当前关节角度 (rad)。
+  @$pb.TagNumber(6)
+  $core.double get position => $_getN(5);
+  @$pb.TagNumber(6)
+  set position($core.double value) => $_setFloat(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasPosition() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPosition() => $_clearField(6);
+
+  /// 当前关节角速度 (rad/s)。
+  @$pb.TagNumber(7)
+  $core.double get velocity => $_getN(6);
+  @$pb.TagNumber(7)
+  set velocity($core.double value) => $_setFloat(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasVelocity() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearVelocity() => $_clearField(7);
+
+  /// 当前关节力矩 (N·m)。
+  @$pb.TagNumber(8)
+  $core.double get torque => $_getN(7);
+  @$pb.TagNumber(8)
+  set torque($core.double value) => $_setFloat(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasTorque() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearTorque() => $_clearField(8);
+
+  /// 故障码列表（空 = 无故障）。
+  @$pb.TagNumber(9)
+  $pb.PbList<$core.int> get errors => $_getList(8);
+}
+
+/// 全部电机状态响应。
+class MotorStatusResponse extends $pb.GeneratedMessage {
+  factory MotorStatusResponse({
+    $core.Iterable<MotorState>? motors,
+  }) {
+    final result = create();
+    if (motors != null) result.motors.addAll(motors);
+    return result;
+  }
+
+  MotorStatusResponse._();
+
+  factory MotorStatusResponse.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory MotorStatusResponse.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'MotorStatusResponse',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
+      createEmptyInstance: create)
+    ..pPM<MotorState>(1, _omitFieldNames ? '' : 'motors',
+        subBuilder: MotorState.create)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MotorStatusResponse clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  MotorStatusResponse copyWith(void Function(MotorStatusResponse) updates) =>
+      super.copyWith((message) => updates(message as MotorStatusResponse))
+          as MotorStatusResponse;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static MotorStatusResponse create() => MotorStatusResponse._();
+  @$core.override
+  MotorStatusResponse createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static MotorStatusResponse getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<MotorStatusResponse>(create);
+  static MotorStatusResponse? _defaultInstance;
+
+  /// 16 个电机状态。
+  @$pb.TagNumber(1)
+  $pb.PbList<MotorState> get motors => $_getList(0);
+}
+
+/// 清除电机故障请求。
+class ClearFaultRequest extends $pb.GeneratedMessage {
+  factory ClearFaultRequest({
+    $core.Iterable<$core.int>? jointIds,
+  }) {
+    final result = create();
+    if (jointIds != null) result.jointIds.addAll(jointIds);
+    return result;
+  }
+
+  ClearFaultRequest._();
+
+  factory ClearFaultRequest.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory ClearFaultRequest.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'ClearFaultRequest',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
+      createEmptyInstance: create)
+    ..p<$core.int>(1, _omitFieldNames ? '' : 'jointIds', $pb.PbFieldType.KU3)
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ClearFaultRequest clone() => deepCopy();
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  ClearFaultRequest copyWith(void Function(ClearFaultRequest) updates) =>
+      super.copyWith((message) => updates(message as ClearFaultRequest))
+          as ClearFaultRequest;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ClearFaultRequest create() => ClearFaultRequest._();
+  @$core.override
+  ClearFaultRequest createEmptyInstance() => create();
+  @$core.pragma('dart2js:noInline')
+  static ClearFaultRequest getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<ClearFaultRequest>(create);
+  static ClearFaultRequest? _defaultInstance;
+
+  /// 要清除的关节索引（0-15）。为空则清除全部。
+  @$pb.TagNumber(1)
+  $pb.PbList<$core.int> get jointIds => $_getList(0);
+}
+
 /// 单次推理周期的完整观测数据（RL policy 的输入/输出）。
 class History extends $pb.GeneratedMessage {
   factory History({

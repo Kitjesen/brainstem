@@ -452,4 +452,57 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
     final voltages = await j.readVoltage();
     return proto.Voltage(values: voltages.map((v) => v.toDouble()));
   }
+
+  @override
+  Future<proto.MotorStatusResponse> getMotorStatus(
+      ServiceCall call, proto.Empty request) async {
+    final j = joint;
+    if (j == null) {
+      throw GrpcError.failedPrecondition(
+        'GetMotorStatus requires hardware mode with RealJoint',
+      );
+    }
+    final motors = <proto.MotorState>[];
+    for (int i = 0; i < 16; i++) {
+      final online = j.isOnline(i);
+      final report = j.getReport(i);
+      motors.add(proto.MotorState(
+        id: i,
+        online: online,
+        statusCode: report?.status.value ?? 0,
+        temperature: report?.temperature ?? 0.0,
+        voltage: 0.0, // voltage requires async getter, use GetVoltage RPC
+        position: report?.position ?? 0.0,
+        velocity: report?.velocity ?? 0.0,
+        torque: report?.torque ?? 0.0,
+        errors: report?.errors.errors.map((e) => e.index).toList() ?? [],
+      ));
+    }
+    return proto.MotorStatusResponse(motors: motors);
+  }
+
+  @override
+  Future<proto.Empty> clearMotorFault(
+      ServiceCall call, proto.ClearFaultRequest request) async {
+    final j = joint;
+    if (j == null) {
+      throw GrpcError.failedPrecondition(
+        'ClearMotorFault requires hardware mode with RealJoint',
+      );
+    }
+    if (request.jointIds.isEmpty) {
+      // 清除全部
+      await j.disable(clearErrors: true);
+      _log.info('ClearMotorFault: all 16 joints cleared');
+    } else {
+      // 清除指定关节
+      for (final id in request.jointIds) {
+        if (id >= 0 && id < 16) {
+          j.clearFaultSingle(id);
+        }
+      }
+      _log.info('ClearMotorFault: joints ${request.jointIds} cleared');
+    }
+    return proto.Empty();
+  }
 }

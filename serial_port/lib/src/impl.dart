@@ -1,9 +1,25 @@
 import 'dart:async';
 import 'dart:ffi' as ffi;
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 import 'cserialport.g.dart';
+
+/// Eagerly load libcserialport into the process so that @ffi.Native process
+/// lookup can resolve symbols when native-assets hooks are unavailable
+/// (e.g. `dart run` without `dart build`).
+// ignore: unused_element
+final ffi.DynamicLibrary _cserialportLib = ffi.DynamicLibrary.open(
+  switch (Platform.operatingSystem) {
+    'linux' => 'libcserialport.so',
+    'windows' => 'cserialport.dll',
+    'macos' => 'libcserialport.dylib',
+    _ => throw UnsupportedError(
+      'CSerialPort: unsupported platform ${Platform.operatingSystem}',
+    ),
+  },
+);
 
 class SerialPort {
   final int _handle;

@@ -348,17 +348,17 @@ enum Parity {
 }
 
 enum StopBits {
-  StopOne(0),
-  StopOneAndHalf(1),
-  StopTwo(2);
+  StopOne(1),
+  StopTwo(2),
+  StopOneAndHalf(3);
 
   final int value;
   const StopBits(this.value);
 
   static StopBits fromValue(int value) => switch (value) {
-    0 => StopOne,
-    1 => StopOneAndHalf,
+    1 => StopOne,
     2 => StopTwo,
+    3 => StopOneAndHalf,
     _ => throw ArgumentError('Unknown value for StopBits: $value'),
   };
 }

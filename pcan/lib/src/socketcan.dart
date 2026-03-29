@@ -87,23 +87,17 @@ final int Function(int, ffi.Pointer<_CanFrame>, int) _write =
         ffi.IntPtr Function(ffi.Int32, ffi.Pointer<_CanFrame>, ffi.Size),
         int Function(int, ffi.Pointer<_CanFrame>, int)>('write');
 
-final int Function(int, ffi.Pointer<_CanFrame>, int) _read =
+final int Function(int, ffi.Pointer<_CanFrame>, int, int) _recv =
     _libc.lookupFunction<
-        ffi.IntPtr Function(ffi.Int32, ffi.Pointer<_CanFrame>, ffi.Size),
-        int Function(int, ffi.Pointer<_CanFrame>, int)>('read');
+        ffi.IntPtr Function(ffi.Int32, ffi.Pointer<_CanFrame>, ffi.Size, ffi.Int32),
+        int Function(int, ffi.Pointer<_CanFrame>, int, int)>('recv');
+
+const int _MSG_DONTWAIT = 0x40;
 
 final int Function(int) _close =
     _libc.lookupFunction<ffi.Int32 Function(ffi.Int32), int Function(int)>(
         'close');
 
-// fcntl for non-blocking
-final int Function(int, int, int) _fcntl =
-    _libc.lookupFunction<ffi.Int32 Function(ffi.Int32, ffi.Int32, ffi.Int32),
-        int Function(int, int, int)>('fcntl');
-
-const int _F_GETFL = 3;
-const int _F_SETFL = 4;
-const int _O_NONBLOCK = 2048;
 
 // ─── Channel mapping ─────────────────────────────────────────────────────────
 
@@ -178,9 +172,13 @@ class SocketCanPcan {
       calloc.free(ifreq);
     }
 
-    // 4. Set non-blocking mode for read
-    final flags = _fcntl(fd, _F_GETFL, 0);
-    _fcntl(fd, _F_SETFL, flags | _O_NONBLOCK);
+    // 4. Keep write BLOCKING (CAN tx queue is small; non-blocking bursts
+    //    return EAGAIN).  Read uses poll/select externally so blocking
+    //    write + non-blocking read is the practical combination.
+    //    We only set O_NONBLOCK for read via a separate fcntl after open
+    //    — but SocketCAN doesn't support mixed mode on one fd, so we
+    //    leave the fd blocking and handle read-empty via MSG_DONTWAIT
+    //    in the read path instead.
 
     _fd = fd;
     _frameBuf = calloc<_CanFrame>();
@@ -214,10 +212,10 @@ class SocketCanPcan {
       frame.ref.data[i] = message.data[i];
     }
 
-    final written = _write(_fd, frame, ffi.sizeOf<_CanFrame>());
-    return written == ffi.sizeOf<_CanFrame>()
-        ? PcanStatus.ok
-        : PcanStatus.xmtfull;
+    final size = ffi.sizeOf<_CanFrame>();
+    // Blocking write — kernel will wait until tx queue has space.
+    final written = _write(_fd, frame, size);
+    return written == size ? PcanStatus.ok : PcanStatus.xmtfull;
   }
 
   (PcanMessage, PcanTimestamp, PcanStatus) read() {
@@ -229,7 +227,7 @@ class SocketCanPcan {
       );
     }
     final frame = _frameBuf!;
-    final n = _read(_fd, frame, ffi.sizeOf<_CanFrame>());
+    final n = _recv(_fd, frame, ffi.sizeOf<_CanFrame>(), _MSG_DONTWAIT);
     if (n < ffi.sizeOf<_CanFrame>()) {
       return (
         PcanMessage(id: 0, type: PcanMessageType.standard, data: Uint8List(0)),

@@ -62,6 +62,62 @@ const Voltage$json = {
 final $typed_data.Uint8List voltageDescriptor =
     $convert.base64Decode('CgdWb2x0YWdlEhYKBnZhbHVlcxgBIAMoAlIGdmFsdWVz');
 
+@$core.Deprecated('Use motorStateDescriptor instead')
+const MotorState$json = {
+  '1': 'MotorState',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 13, '10': 'id'},
+    {'1': 'online', '3': 2, '4': 1, '5': 8, '10': 'online'},
+    {'1': 'status_code', '3': 3, '4': 1, '5': 13, '10': 'statusCode'},
+    {'1': 'temperature', '3': 4, '4': 1, '5': 2, '10': 'temperature'},
+    {'1': 'voltage', '3': 5, '4': 1, '5': 2, '10': 'voltage'},
+    {'1': 'position', '3': 6, '4': 1, '5': 2, '10': 'position'},
+    {'1': 'velocity', '3': 7, '4': 1, '5': 2, '10': 'velocity'},
+    {'1': 'torque', '3': 8, '4': 1, '5': 2, '10': 'torque'},
+    {'1': 'errors', '3': 9, '4': 3, '5': 13, '10': 'errors'},
+  ],
+};
+
+/// Descriptor for `MotorState`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List motorStateDescriptor = $convert.base64Decode(
+    'CgpNb3RvclN0YXRlEg4KAmlkGAEgASgNUgJpZBIWCgZvbmxpbmUYAiABKAhSBm9ubGluZRIfCg'
+    'tzdGF0dXNfY29kZRgDIAEoDVIKc3RhdHVzQ29kZRIgCgt0ZW1wZXJhdHVyZRgEIAEoAlILdGVt'
+    'cGVyYXR1cmUSGAoHdm9sdGFnZRgFIAEoAlIHdm9sdGFnZRIaCghwb3NpdGlvbhgGIAEoAlIIcG'
+    '9zaXRpb24SGgoIdmVsb2NpdHkYByABKAJSCHZlbG9jaXR5EhYKBnRvcnF1ZRgIIAEoAlIGdG9y'
+    'cXVlEhYKBmVycm9ycxgJIAMoDVIGZXJyb3Jz');
+
+@$core.Deprecated('Use motorStatusResponseDescriptor instead')
+const MotorStatusResponse$json = {
+  '1': 'MotorStatusResponse',
+  '2': [
+    {
+      '1': 'motors',
+      '3': 1,
+      '4': 3,
+      '5': 11,
+      '6': '.han_dog.MotorState',
+      '10': 'motors'
+    },
+  ],
+};
+
+/// Descriptor for `MotorStatusResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List motorStatusResponseDescriptor = $convert.base64Decode(
+    'ChNNb3RvclN0YXR1c1Jlc3BvbnNlEisKBm1vdG9ycxgBIAMoCzITLmhhbl9kb2cuTW90b3JTdG'
+    'F0ZVIGbW90b3Jz');
+
+@$core.Deprecated('Use clearFaultRequestDescriptor instead')
+const ClearFaultRequest$json = {
+  '1': 'ClearFaultRequest',
+  '2': [
+    {'1': 'joint_ids', '3': 1, '4': 3, '5': 13, '10': 'jointIds'},
+  ],
+};
+
+/// Descriptor for `ClearFaultRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List clearFaultRequestDescriptor = $convert.base64Decode(
+    'ChFDbGVhckZhdWx0UmVxdWVzdBIbCglqb2ludF9pZHMYASADKA1SCGpvaW50SWRz');
+
 @$core.Deprecated('Use historyDescriptor instead')
 const History$json = {
   '1': 'History',

@@ -74,12 +74,50 @@ service Cms {
 
   // 读取全部 16 个电机的总线电压 (V)。
   rpc GetVoltage(google.protobuf.Empty) returns (Voltage);
+  // 查询全部 16 个电机的健康状态。
+  rpc GetMotorStatus(google.protobuf.Empty) returns (MotorStatusResponse);
+  // 清除电机故障。joint_ids 为空则清除全部，否则只清指定关节。
+  rpc ClearMotorFault(ClearFaultRequest) returns (google.protobuf.Empty);
 }
 
 // 电机总线电压（16 个关节，单位 V）。
 message Voltage {
   // 16 个电机总线电压，顺序同 Matrix4 关节索引。
   repeated float values = 1;
+}
+
+// 单个电机状态。
+message MotorState {
+  // 关节索引（0-15，顺序同 Matrix4）。
+  uint32 id = 1;
+  // 是否在线（CAN 通信频率 > 0）。
+  bool online = 2;
+  // 电机状态码（具体含义取决于电机驱动协议）。
+  uint32 status_code = 3;
+  // 电机温度 (°C)。
+  float temperature = 4;
+  // 总线电压 (V)。
+  float voltage = 5;
+  // 当前关节角度 (rad)。
+  float position = 6;
+  // 当前关节角速度 (rad/s)。
+  float velocity = 7;
+  // 当前关节力矩 (N·m)。
+  float torque = 8;
+  // 故障码列表（空 = 无故障）。
+  repeated uint32 errors = 9;
+}
+
+// 全部电机状态响应。
+message MotorStatusResponse {
+  // 16 个电机状态。
+  repeated MotorState motors = 1;
+}
+
+// 清除电机故障请求。
+message ClearFaultRequest {
+  // 要清除的关节索引（0-15）。为空则清除全部。
+  repeated uint32 joint_ids = 1;
 }
 
 // 单次推理周期的完整观测数据（RL policy 的输入/输出）。
