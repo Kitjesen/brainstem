@@ -32,6 +32,7 @@ class RealController {
   /// 摇杆约定：leftStick.y>0 前推, leftStick.x>0 右推, knob>0 顺时针。
   /// 速度缩放规则：LT=精确(0.5×)，RT=冲刺(1.5×)，默认 1.0×。
   /// rightStick.x 以 0.5 权重叠加到旋转轴，实现双手协同偏航控制。
+  /// 行走方向流，强关联遥控器：有数据就输出，150ms 无数据直接归零。
   Stream<Vector3> get direction => watchdogDecay(
     stateStream.map((data) {
       final scale = data.LT ? 0.5 : (data.RT ? 1.5 : 1.0);
@@ -42,10 +43,10 @@ class RealController {
         -yaw,                        // z=旋转: 顺时针(+) → 逆时针(-)
       );
     }),
-    timeout: const Duration(milliseconds: 50),
-    steps: 100,
-    stepPeriod: const Duration(milliseconds: 20),
-    decayCurve: (s0, t) => s0 * t,
+    timeout: const Duration(milliseconds: 150),
+    steps: 1,                         // 1 步直接归零，不衰减
+    stepPeriod: const Duration(milliseconds: 1),
+    decayCurve: (s0, t) => s0 * 0.0,  // 直接到 0
   );
 
   Stream<bool> get standup => stateStream
