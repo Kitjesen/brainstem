@@ -10,8 +10,6 @@ import 'package:vector_math/vector_math.dart';
 
 final _log = Logger('han_dog.control');
 
-/// 摇杆归零后触发 Idle 命令的等待时长。
-const _idleTimeout = Duration(seconds: 5);
 
 class RealControlDog {
   final Brain brain;
@@ -33,7 +31,6 @@ class RealControlDog {
   void Function(bool enabled)? onMotorEnableChanged;
 
   final List<StreamSubscription<Object?>> _subscriptions = [];
-  Timer? _idleTimer;
 
   RealControlDog({
     required this.brain,
@@ -92,19 +89,13 @@ class RealControlDog {
     _subscriptions.add(controller.direction.listen(
       (direction) {
         if (direction.x == 0 && direction.y == 0 && direction.z == 0) {
-          // 摇杆归零：如果正在 Walking，立刻发 walk(0,0,0) 让策略减速；
-          // 如果在 Standing，不发 walk 避免误触发 Walking 状态。
+          // 摇杆归零：发 walk(0,0,0) 让策略减速，保持 Walking 状态。
+          // 不自动切回 Standing（由用户手动按 R1/L2 切换）。
           if (arbiter.state is Walking) {
             sendCommand(A.walk(Vector3.zero()), 'walk(zero)');
           }
-          _idleTimer ??= Timer(_idleTimeout, () {
-            _idleTimer = null;
-            sendCommand(const A.idle(), 'idle(timeout)');
-          });
           return;
         }
-        _idleTimer?.cancel();
-        _idleTimer = null;
         // 控制器已在 Walk 约定下输出 (x=前后, y=左右, z=旋转)，直接透传
         _log.info('WALK fwd=${direction.x.toStringAsFixed(2)} '
             'lat=${direction.y.toStringAsFixed(2)} '
@@ -116,8 +107,6 @@ class RealControlDog {
     ));
     _subscriptions.add(controller.standup.listen(
       (_) {
-        _idleTimer?.cancel();
-        _idleTimer = null;
         _log.info('L1 → standUp');
         sendCommand(const A.standUp(), 'standUp');
       },
@@ -126,8 +115,6 @@ class RealControlDog {
     ));
     _subscriptions.add(controller.sitdown.listen(
       (_) {
-        _idleTimer?.cancel();
-        _idleTimer = null;
         _log.info('L2 → sitDown');
         sendCommand(const A.sitDown(), 'sitDown');
       },
@@ -149,8 +136,6 @@ class RealControlDog {
     ));
     _subscriptions.add(controller.red.listen(
       (_) {
-        _idleTimer?.cancel();
-        _idleTimer = null;
         _log.info('红键 → disable motors + clear errors');
         joint.disable(clearErrors: true);
       },
@@ -159,8 +144,6 @@ class RealControlDog {
     ));
     _subscriptions.add(controller.idle.listen(
       (_) {
-        _idleTimer?.cancel();
-        _idleTimer = null;
         _log.info('R1 → standUp');
         sendCommand(const A.standUp(), 'standUp(R1)');
       },
@@ -224,8 +207,6 @@ class RealControlDog {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    _idleTimer?.cancel();
-    _idleTimer = null;
     for (final sub in _subscriptions) {
       sub.cancel();
     }
