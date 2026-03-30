@@ -200,9 +200,6 @@ def main():
             walk_start_step = step
             print(f"  [{now_s:.1f}s] Walk({args.vx}, {args.vy}, {args.vyaw}) sent")
 
-        if walk_sent and cms.kind in (CMS_STATE_STANDING, CMS_STATE_WALKING):
-            stub.Walk(msg.Vector3(x=args.vx, y=args.vy, z=args.vyaw))
-
         # 检查行走时长
         if walk_start_step is not None and (step - walk_start_step) / CONTROL_HZ >= args.duration:
             break

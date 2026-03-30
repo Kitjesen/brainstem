@@ -69,9 +69,11 @@ Future<void> main() async {
     defaultProfile = profiles.values.first;
   }
   final historySize = await _resolveHistorySize(defaultProfile);
+  final modelInputName = await _resolveInputName(defaultProfile);
   _log.info(
     'medulla starting — port=$_port profile=$defaultName '
-    'historySize=$historySize (model=${defaultProfile.modelPath})',
+    'historySize=$historySize inputName=$modelInputName '
+    '(model=${defaultProfile.modelPath})',
   );
 
   // ── 传感器 ────────────────────────────────────────────────
@@ -110,7 +112,7 @@ Future<void> main() async {
   );
 
   try {
-    await brain.loadModel(defaultProfile.modelPath);
+    await brain.loadModel(defaultProfile.modelPath, inputName: modelInputName);
     _log.info('ONNX model loaded from ${defaultProfile.modelPath}');
   } catch (e) {
     _log.severe('Failed to load model: $e');
@@ -193,6 +195,23 @@ Future<int> _resolveHistorySize(RobotProfile profile) async {
     'falling back to 1',
   );
   return 1;
+}
+
+Future<String> _resolveInputName(RobotProfile profile) async {
+  final inferred = await inferInputNameFromModel(
+    modelPath: profile.modelPath,
+  );
+  if (inferred != null && inferred.isNotEmpty) {
+    _log.info(
+      'Inferred inputName=$inferred from model ${profile.modelPath}',
+    );
+    return inferred;
+  }
+  _log.warning(
+    'Unable to infer input name from model ${profile.modelPath}; '
+    'falling back to "obs"',
+  );
+  return 'obs';
 }
 
 Future<void> _shutdown(
