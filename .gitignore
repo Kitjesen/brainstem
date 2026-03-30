@@ -16,7 +16,7 @@ Thumbs.db
 logs/
 
 # Generated (do not edit manually)
-*.freezed.dart
+# *.freezed.dart — 已入库，确保新机器部署不需要 build_runner
 *.g.dart
 
 # 例外：FFI bindings 由 ffigen + C 头文件生成，CI 无法轻易重新生成
