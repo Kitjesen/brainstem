@@ -130,6 +130,7 @@ def apply_history(history: msg.History, model: mujoco.MjModel, data: mujoco.MjDa
 
 def main():
     parser = argparse.ArgumentParser(description="brainstem MuJoCo walk test")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Dart server host")
     parser.add_argument("--port", type=int, default=13145)
     parser.add_argument("--vx", type=float, default=0.5, help="forward speed command")
     parser.add_argument("--vy", type=float, default=0.0, help="lateral speed command")
@@ -139,8 +140,8 @@ def main():
     args = parser.parse_args()
 
     # ── 1. 连接 Dart server ────────────────────────────────────
-    print(f"Connecting to Dart server at 127.0.0.1:{args.port}...")
-    channel = grpc.insecure_channel(f"127.0.0.1:{args.port}")
+    print(f"Connecting to Dart server at {args.host}:{args.port}...")
+    channel = grpc.insecure_channel(f"{args.host}:{args.port}")
     grpc.channel_ready_future(channel).result(timeout=10)
     stub = msg.CmsStub(channel)
 
