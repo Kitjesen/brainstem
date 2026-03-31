@@ -203,6 +203,22 @@ class RealJoint implements JointService, MotorService {
     }
   }
 
+  /// 清除所有电机 fault（启动时调用，清除上次异常退出遗留的故障）。
+  void clearFaults() {
+    for (final pcan in pcans) {
+      for (int i = 1; i <= 4; i++) {
+        pcan.add(.disable(i, clearErrors: true));
+      }
+    }
+  }
+
+  /// 设置足轮 CAN 通信超时（微秒）。程序崩溃后轮子在超时后自动停转。
+  void setFootWheelCantimeout(int microseconds) {
+    for (final pcan in pcans) {
+      pcan.add(RSEvent.set(4, setter: RSSetter.cantimeout(microseconds)));
+    }
+  }
+
   void setReporting([bool enable = true]) {
     for (final pcan in pcans) {
       for (int i = 1; i <= 4; i++) {

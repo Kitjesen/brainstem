@@ -88,19 +88,25 @@ class RealControlDog {
 
     _subscriptions.add(controller.direction.listen(
       (direction) {
-        if (direction.x == 0 && direction.y == 0 && direction.z == 0) {
+        // 摇杆死区：中位附近的微小值归零（SBUS ±1/720 ≈ 0.0014）
+        const deadzone = 0.02;
+        final vx = direction.x.abs() < deadzone ? 0.0 : direction.x;
+        final vy = direction.y.abs() < deadzone ? 0.0 : direction.y;
+        final yaw = direction.z.abs() < deadzone ? 0.0 : direction.z;
+
+        if (vx == 0 && vy == 0 && yaw == 0) {
           // 摇杆归零：发 walk(0,0,0) 让策略减速，保持 Walking 状态。
-          // 不自动切回 Standing（由用户手动按 R1/L2 切换）。
           if (arbiter.state is Walking) {
             sendCommand(A.walk(Vector3.zero()), 'walk(zero)');
           }
           return;
         }
         // 控制器已在 Walk 约定下输出 (x=前后, y=左右, z=旋转)，直接透传
-        _log.info('WALK fwd=${direction.x.toStringAsFixed(2)} '
-            'lat=${direction.y.toStringAsFixed(2)} '
-            'yaw=${direction.z.toStringAsFixed(2)}');
-        sendCommand(A.walk(direction), 'walk');
+        final cmd = Vector3(vx, vy, yaw);
+        _log.info('WALK fwd=${vx.toStringAsFixed(2)} '
+            'lat=${vy.toStringAsFixed(2)} '
+            'yaw=${yaw.toStringAsFixed(2)}');
+        sendCommand(A.walk(cmd), 'walk');
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'direction'),
       onDone: () => _log.warning('Controller direction stream closed'),

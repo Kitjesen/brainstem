@@ -115,6 +115,16 @@ Future<void> _run() async {
   }
   _log.info('Joint PCAN opened.');
 
+  // 清除上次异常退出遗留的 fault
+  _log.info('Clearing motor faults...');
+  joint.clearFaults();
+  await Future<void>.delayed(const Duration(milliseconds: 200));
+
+  // 设置足轮 cantimeout = 500ms，程序崩溃后轮子自动停转
+  _log.info('Setting foot wheel canTimeout...');
+  joint.setFootWheelCantimeout(500000);
+  await Future<void>.delayed(const Duration(milliseconds: 100));
+
   // 发送 setReporting x3（带间隔），防止刚 open 后首帧丢失
   for (var retry = 0; retry < 3; retry++) {
     joint.setReporting(true);
@@ -387,6 +397,31 @@ Future<void> _run() async {
 
   clockTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
     clock.add(null);
+  });
+
+  // ──── 8. 低压保护（每 10 秒检测一次）──────────────────────────
+  const lowVoltageThreshold = 42.0;
+  var lowVoltageTriggered = false;
+  Timer.periodic(const Duration(seconds: 10), (_) async {
+    if (lowVoltageTriggered) return;
+    try {
+      final voltages = await joint.readVoltage();
+      final valid = voltages.where((v) => v > 0).toList();
+      if (valid.isEmpty) return;
+      final minV = valid.reduce((a, b) => a < b ? a : b);
+      if (minV < lowVoltageThreshold) {
+        lowVoltageTriggered = true;
+        _log.severe(
+          'LOW VOLTAGE: ${minV.toStringAsFixed(1)}V < ${lowVoltageThreshold}V — emergency sitDown',
+        );
+        m.add(const A.sitDown());
+        Future<void>.delayed(const Duration(seconds: 4), () {
+          joint.disable();
+          motorOutputEnabled = false;
+          _log.severe('Motors disabled due to low voltage');
+        });
+      }
+    } catch (_) {}
   });
 
   if (_cfg.debugTui) {

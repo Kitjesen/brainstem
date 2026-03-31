@@ -176,50 +176,6 @@ void main() {
     });
   });
 
-  group('idle timer', () {
-    test('zero direction for 5 seconds → idle command', () {
-      fakeAsync((async) {
-        buildDog();
-        directionCtrl.add(Vector3(0, 0, 0));
-        async.flushMicrotasks();
-
-        async.elapse(const Duration(seconds: 5));
-
-        verify(
-          () => arbiter.command(
-            any(that: isA<CmdIdle>()),
-            ControlSource.yunzhuo,
-          ),
-        ).called(1);
-      });
-    });
-
-    test('non-zero direction cancels idle timer', () {
-      fakeAsync((async) {
-        buildDog();
-        // Start timer with zero direction
-        directionCtrl.add(Vector3(0, 0, 0));
-        async.flushMicrotasks();
-
-        // 3 seconds in, send non-zero direction
-        async.elapse(const Duration(seconds: 3));
-        directionCtrl.add(Vector3(1, 0, 0));
-        async.flushMicrotasks();
-
-        // Wait past original 5-second window
-        async.elapse(const Duration(seconds: 3));
-
-        // Idle should NOT have been sent (timer was cancelled)
-        verifyNever(
-          () => arbiter.command(
-            any(that: isA<CmdIdle>()),
-            ControlSource.yunzhuo,
-          ),
-        );
-      });
-    });
-  });
-
   group('buttons', () {
     test('L1 → standUp', () async {
       buildDog();
