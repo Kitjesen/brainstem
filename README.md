@@ -5,29 +5,54 @@
 ## 快速开始
 
 ```bash
-# 安装依赖
-dart pub get
+# 安装依赖（需要 Flutter SDK，因为 workspace 含 sirius）
+flutter pub get
 
-# 代码检查
-dart analyze
+# 代码检查（strict 模式）
+dart analyze han_dog_brain/ han_dog/
 
-# 运行测试（131 个）
-dart test han_dog_brain/ han_dog/ frequency_watch/ skinny_dog_algebra/
+# 运行测试（232 个）
+dart test han_dog/ han_dog_brain/ frequency_watch/ skinny_dog_algebra/
 ```
+
+### 新机器一键部署
+
+```bash
+sudo bash scripts/setup_brainstem.sh
+```
+
+自动完成：USB 串口驱动、CAN 接口自启、libcserialport 编译、libpcanbasic/libonnxruntime 链接、Dart SDK 检查。
 
 ### 真机运行
 
 ```bash
-dart run han_dog/bin/han_dog.dart
+# 遥控器 + IMU + 电机全接好
+HAN_DOG_IMU_PORT=/dev/imu dart run han_dog/bin/han_dog.dart
+
+# 无遥控器（gRPC-only 模式，遥控器可选）
+HAN_DOG_IMU_PORT=/dev/imu dart run han_dog/bin/han_dog.dart
 ```
 
-### 仿真运行（MuJoCo）
+### MuJoCo 仿真
 
 ```bash
+# 终端 1: Dart server
 dart run han_dog/bin/server.dart
+
+# 终端 2: MuJoCo 闭环测试
+python sim/walk_test.py --vx 0.5 --duration 5
+python sim/walk_test.py --vx 0.5 --render   # 带可视化
+python sim/walk_test.py --host 192.168.66.190  # 连接远程 Dart server
 ```
 
-MuJoCo Python 端通过 gRPC 调用 `step()` 注入传感器数据、调用 `tick()` 触发推理。
+### 诊断工具
+
+```bash
+dart run han_dog/bin/ping.dart            # 16 电机连接检测
+dart run han_dog/bin/calibrate_can.dart   # CAN 通道↔腿映射校准（手动转关节）
+dart run han_dog/bin/ping_raw.dart        # 原始 4 路 CAN 全扫描
+dart run han_dog/bin/test_grpc.dart       # gRPC 接口测试
+```
 
 ---
 
@@ -35,45 +60,74 @@ MuJoCo Python 端通过 gRPC 调用 `step()` 注入传感器数据、调用 `tic
 
 ```
 brainstem/
-│
-├── han_dog/                          ← 主程序包（所有可运行入口都在这里）
+├── han_dog/                          ← 主程序包
 │   ├── bin/
-│   │   ├── han_dog.dart              ← ★ 真机主程序（接硬件跑这个）
-│   │   └── server.dart               ← ★ 仿真主程序（MuJoCo 连这个）
+│   │   ├── han_dog.dart              ← 真机主程序（50Hz Timer 驱动）
+│   │   ├── server.dart               ← 仿真主程序（MuJoCo gRPC 驱动）
+│   │   ├── ping.dart                 ← 电机连接诊断
+│   │   ├── ping_raw.dart             ← 原始 CAN 全扫描
+│   │   ├── calibrate_can.dart        ← CAN↔腿映射校准
+│   │   └── test_grpc.dart            ← gRPC 接口测试
 │   ├── lib/src/
-│   │   ├── app/                      ← 应用层
+│   │   ├── app/                      ← 应用层（配置、监控、策略管理）
 │   │   │   ├── config.dart           ←   环境变量配置
-│   │   │   ├── robot_params.dart     ←   机器人参数（kp/kd、站立姿态）
-│   │   │   └── monitoring.dart       ←   传感器监控、遥控器断连检测、调试 TUI
+│   │   │   ├── profile_manager.dart  ←   策略热加载（每 30s 扫描）
+│   │   │   ├── motor_health.dart     ←   电机健康管理（故障检测+恢复）
+│   │   │   └── monitoring.dart       ←   传感器监控、调试 TUI
 │   │   ├── server/                   ← gRPC 服务层
-│   │   │   ├── unified_cms_server.dart ← gRPC 服务（仿真/硬件通用）
-│   │   │   ├── gain_manager.dart     ←   PD 增益管理（按指令自动切换）
+│   │   │   ├── unified_cms_server.dart ← 统一 gRPC 服务（仿真/硬件通用）
+│   │   │   ├── gain_manager.dart     ←   PD 增益管理（按状态自动切换）
 │   │   │   ├── proto_convert.dart    ←   Dart ↔ Protobuf 转换
-│   │   │   └── sim_sensor.dart       ←   仿真传感器实现
-│   │   ├── control_arbiter.dart      ← 控制权仲裁（遥控器 vs App）
-│   │   ├── real_control_dog.dart     ← YUNZHUO 遥控器桥接
-│   │   ├── real_controller.dart      ← YUNZHUO 串口驱动
-│   │   ├── real_imu.dart             ← HI91 IMU 驱动
-│   │   └── real_joint.dart           ← PCAN 关节电机驱动
-│   └── test/                         ← 71 个测试
+│   │   │   └── sim_sensor.dart       ←   仿真传感器（SimSensorService）
+│   │   ├── control_arbiter.dart      ← 控制权仲裁（遥控器优先级 > gRPC）
+│   │   ├── real_control_dog.dart     ← YUNZHUO 遥控器桥接（速度强关联，无衰减）
+│   │   ├── real_controller.dart      ← YUNZHUO 串口驱动（SBUS 协议）
+│   │   ├── real_imu.dart             ← HI91 IMU 驱动（CP210x）
+│   │   └── real_joint.dart           ← Robstride 电机驱动（PCAN/SocketCAN）
+│   ├── profiles/                     ← 策略配置
+│   │   ├── default.json              ←   默认策略（standingPose/kp/kd/modelPath）
+│   │   └── mini.json                 ←   Mini Dog 策略
+│   └── test/                         ← 测试
 │
-├── han_dog_brain/                    ← 推理核心（纯逻辑，不碰硬件）
+├── han_dog_brain/                    ← 推理核心（纯逻辑，无网络/硬件依赖）
 │   ├── lib/src/
-│   │   ├── brain.dart                ← Brain 总入口
-│   │   ├── cms/                      ← FSM 状态机
-│   │   │   ├── cms.dart              ←   状态转换逻辑
-│   │   │   ├── s.dart                ←   状态定义
-│   │   │   └── a.dart                ←   动作定义
+│   │   ├── brain.dart                ← Brain facade（外层只与它交互）
+│   │   ├── cms/                      ← FSM 状态机（Zero→Grounded→Standing→Walking）
 │   │   ├── behaviour.dart            ← 行为层（Walk/StandUp/SitDown/Idle/Gesture）
-│   │   ├── gesture.dart              ← ★ 动作 SDK（关键帧、动作库、预定义动作）
-│   │   ├── memory.dart               ← 历史环形缓冲区
-│   │   └── sensor.dart               ← 接口定义（ImuService/JointService 等）
-│   └── test/                         ← 42 个测试
+│   │   ├── observation_builder.dart  ← 57 维观测张量构建（与 Isaac Lab 训练对齐）
+│   │   ├── gesture.dart              ← 动作 SDK（关键帧插值、动作库）
+│   │   ├── memory.dart               ← 历史帧滑动窗口（historySize=5）
+│   │   ├── model_info.dart           ← ONNX 模型元数据推断
+│   │   └── sensor.dart               ← 接口定义（ImuService/JointService）
+│   └── test/
+│
+├── pcan/                             ← CAN 通信包
+│   └── lib/src/
+│       ├── pcan.dart                 ← 自动选择后端（PCAN Basic / SocketCAN）
+│       ├── socketcan.dart            ← Linux SocketCAN 后端（AF_CAN socket）
+│       ├── pcan_library.dart         ← PCAN Basic FFI 绑定
+│       └── pcan_basic.dart           ← PCAN Basic API 封装
 │
 ├── skinny_dog_algebra/               ← 数学库（JointsMatrix 16 关节矩阵）
 ├── onnx_runtime/                     ← ONNX 推理 FFI 绑定
+├── serial_port/                      ← 串口通信（CSerialPort FFI）
+├── robo_device/                      ← 设备抽象（PcanController/SerialPortController）
+├── robo_device_proto/                ← 设备协议（Robstride/HiPNUC/YUNZHUO 编解码）
 ├── frequency_watch/                  ← 频率统计工具
-└── han_dog_message/                  ← Protobuf/gRPC 协议（protoc 生成，勿手改）
+├── han_dog_message/                  ← Protobuf/gRPC 协议（protoc 生成，勿手改）
+├── protoframe/                       ← 帧协议解析
+│
+├── sim/                              ← MuJoCo 仿真
+│   ├── quadruped.xml                 ← MuJoCo 机器人模型
+│   ├── walk_test.py                  ← 行走闭环测试脚本
+│   ├── verify_gestures.py            ← 动作验证（离线，不走 gRPC）
+│   └── meshes/                       ← STL 模型文件
+│
+├── sirius/                           ← Flutter 桌面控制 App
+├── scripts/                          ← 部署脚本
+│   └── setup_brainstem.sh            ← 一键部署（新机器跑一次即可）
+├── model/                            ← ONNX 模型（不入 git，手动部署）
+└── CLAUDE.md                         ← AI 工作指南
 ```
 
 ---
@@ -84,182 +138,185 @@ brainstem/
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│  应用层 (han_dog/bin/)                               │
-│  han_dog.dart（真机）  server.dart（仿真）            │
+│  入口层                                              │
+│  han_dog.dart（真机 50Hz）  server.dart（仿真 gRPC）  │
 ├─────────────────────────────────────────────────────┤
-│  服务层 (han_dog/lib/src/server/)                    │
-│  UnifiedCmsServer · GainManager · proto_convert      │
+│  gRPC 服务层                                         │
+│  UnifiedCmsServer · ControlArbiter · ProfileManager  │
 ├─────────────────────────────────────────────────────┤
-│  硬件适配层 (han_dog/lib/src/)                       │
-│  RealImu · RealJoint · RealController · SimSensor    │
+│  硬件适配层                                          │
+│  RealImu(Hi91) · RealJoint(Robstride) · RealController│
+│  SimSensorService（仿真模式替代）                      │
 ├─────────────────────────────────────────────────────┤
-│  推理核心 (han_dog_brain/)                           │
-│  Brain · FSM(M) · Behaviour · Gesture · Memory       │
+│  推理核心（han_dog_brain，纯逻辑无硬件依赖）          │
+│  Brain · FSM(M) · Behaviour · ObservationBuilder     │
+│  Gesture SDK · Memory · ONNX Runtime                 │
+├─────────────────────────────────────────────────────┤
+│  通信层                                              │
+│  pcan（PCAN Basic / SocketCAN 自动切换）              │
+│  serial_port（CSerialPort FFI）                      │
 ├─────────────────────────────────────────────────────┤
 │  基础层                                              │
 │  skinny_dog_algebra · onnx_runtime · frequency_watch │
 └─────────────────────────────────────────────────────┘
 ```
 
-关键原则：**han_dog_brain 是纯逻辑包**，不依赖 gRPC、Protobuf、硬件驱动。所有网络和硬件相关代码在 han_dog 包中。
+**核心原则**：Brain 不知道自己跑在真机还是仿真——所有硬件差异在传感器接口层隔离。
 
 ### 数据流
 
 ```
-YUNZHUO 遥控器 → RealControlDog → ControlArbiter → FSM(M) → Brain → 电机
-App 远程控制   → UnifiedCmsServer → ControlArbiter ↗       ↑
-                                                   ONNX 推理 (Walk)
-                                                   或 Lerp 插值 (StandUp/SitDown)
+传感器 → ImuService/JointService
+              ↓
+ObservationBuilder.build(History) → 57 维 float[]
+              ↓
+      ONNX policy 推理 → 16 维 action
+              ↓
+   toRealAction(action) → 关节目标角度
+              ↓
+MotorService.sendAction() → CAN 总线 / MuJoCo
 ```
 
-遥控器（YUNZHUO）永远有最高优先权。App 通过 gRPC 发送的命令在遥控器操作时会被拒绝。
+### 观测张量布局（57 维，与 Isaac Lab 训练对齐）
+
+```
+obs[0:3]   = gyroscope × 0.25          (body frame 角速度)
+obs[3:6]   = projectedGravity          (body frame 重力投影)
+obs[6:9]   = command [vx, vy, vyaw]    (速度命令)
+obs[9:25]  = jointPosition - standing  (关节位置偏差，foot 归零)
+obs[25:41] = jointVelocity × 0.05      (关节速度)
+obs[41:57] = (lastAction - standing) / actionScale  (上一步动作)
+```
 
 ### FSM 状态转换
 
 ```
-Zero ──Init──► Grounded ──StandUp──► Transitioning(StandUp) ──Done──► Standing
-                                                                        │  ▲  ▲
-                                                         SitDown        │  │  │ Gesture Done
-                                                           ▼            │  │  │
-                                                    Transitioning(SitDown) │ Transitioning(Gesture)
-                                                           │            │     ▲
-                                                         Done    Walking │     │ Gesture
-                                                           ▼       ▲    │     │
-                                                       Grounded    Walk ──────┘
+Zero ──Init──> Grounded ──StandUp──> Transitioning ──Done──> Standing
+                   ^                                          │  ^
+                   │ SitDown Done                       Walk  │  │ Gesture Done
+                   │                                          v  │
+              Transitioning(SitDown)                     Walking ─┘
 ```
-
-安全保护：
-- `Fault` 在任何运动状态下触发 → 自动坐下回到 Grounded
-- Gesture 途中 Fault → 回到 Standing
-- Ctrl-C 关机 → 安全坐下 → 禁用电机 → 释放资源
 
 ---
 
-## gRPC 服务
+## gRPC 接口
 
-`UnifiedCmsServer` 是唯一的 gRPC 服务实现，通过运行模式和依赖注入区分行为：
+端口 `13145`，proto 定义在 `han_dog_message/han_dog_message/cms.proto`。
 
-| 模式 | 用途 | tick/step | ControlArbiter |
-|------|------|-----------|:-:|
-| `CmsMode.simulation` | MuJoCo 仿真 | 可用 | 无 |
-| `CmsMode.hardware` | 真实硬件 | 不可用 | 有 |
+### 运动控制
 
-### RPC 接口
+| RPC | 参数 | 说明 |
+|-----|------|------|
+| `Walk(Vector3)` | x=前后, y=左右, z=旋转 | 行走命令，范围 [-1, 1] |
+| `StandUp()` | - | 从坐姿站起 |
+| `SitDown()` | - | 从站立坐下 |
+| `Enable()` / `Disable()` | - | 电机使能/禁用 |
+
+### 状态查询
+
+| RPC | 返回 | 说明 |
+|-----|------|------|
+| `GetCmsState()` | CmsState | FSM 当前状态 |
+| `ListenCmsState()` | stream CmsState | FSM 状态变化推送 |
+| `GetProfile()` | ProfileInfo | 当前策略信息 |
+| `SwitchProfile(name)` | ProfileInfo | 切换策略（Grounded 状态） |
+| `GetStartTime()` | Timestamp | 服务启动时间 |
+| `GetParams()` | Params | 机器人模型参数 |
+
+### 传感器数据流
+
+| RPC | 返回 | 频率 |
+|-----|------|------|
+| `ListenHistory()` | stream History | 50Hz（推理帧） |
+| `ListenImu()` | stream Imu | ~100Hz |
+| `ListenJoint()` | stream Joint | ~115Hz |
+
+### 诊断接口
+
+| RPC | 返回 | 说明 |
+|-----|------|------|
+| `GetVoltage()` | Voltage | 16 电机总线电压 (V) |
+| `GetMotorStatus()` | MotorStatusResponse | 16 电机状态（在线/温度/力矩/故障码） |
+| `ClearMotorFault(joint_ids)` | - | 清除电机故障（空=全部） |
+
+### 仿真专用
 
 | RPC | 说明 |
 |-----|------|
-| `enable` / `disable` | 使能/禁用电机 |
-| `walk(Vector3)` | 行走（方向向量） |
-| `standUp` / `sitDown` | 站起/坐下 |
-| `tick` | 触发一帧推理（仿真模式） |
-| `step(SimState)` | 注入传感器数据（仿真模式） |
-| `listenHistory` | 流式推理历史 |
-| `listenImu` | 流式 IMU 数据 |
-| `listenJoint` | 流式关节数据 |
-| `getParams` | 获取机器人参数 |
-| `getStartTime` | 获取启动时间 |
+| `Step(SimState)` | 注入传感器数据（MuJoCo → Dart） |
+| `Tick()` → History | 触发一帧推理（Dart → MuJoCo） |
 
-### SDK 集成示例
+---
 
-**仿真模式（MuJoCo / Python 调用）：**
+## 关节索引
 
-```dart
-final sim = SimSensorService(standingPose: standingPose);
-final brain = Brain(imu: sim, joint: sim, clock: clock, ...);
-final m = M(brain)..add(Init());
+所有 `Matrix4` 消息和 `JointsMatrix` 使用统一的 16 关节顺序：
 
-final server = UnifiedCmsServer(
-  brain: brain,
-  m: m,
-  mode: CmsMode.simulation,
-  simInjector: sim,
-  gains: GainManager(
-    inferKp: kp, inferKd: kd,
-    standUpKp: standUpKp, standUpKd: standUpKd,
-    sitDownKp: sitDownKp, sitDownKd: sitDownKd,
-  ),
-);
+```
+ 0 FR_hip     3 FL_hip     6 RR_hip     9 RL_hip
+ 1 FR_thigh   4 FL_thigh   7 RR_thigh  10 RL_thigh
+ 2 FR_calf    5 FL_calf    8 RR_calf   11 RL_calf
+12 FR_foot   13 FL_foot   14 RR_foot   15 RL_foot
 ```
 
-**硬件模式（真实机器人）：**
+## 坐标约定
 
-```dart
-final server = UnifiedCmsServer(
-  brain: brain,
-  m: m,
-  mode: CmsMode.hardware,
-  arbiter: arbiter,
-  imuStreamFactory: () => imuHardwareStream,
-  jointStreamFactory: () => jointHardwareStream,
-);
+全链路统一，与 Isaac Lab 训练一致：
+
+```
+Body frame: X=前, Y=左, Z=上
+Walk 命令: x>0 前进, y>0 向左, z>0 逆时针
+四元数: Hi91 IMU 输出 → quaternion.rotate([0,0,-1]) = projected gravity
+关节: Dart 值直接用（真机）; MuJoCo 需取反（dart_to_mujoco）
+PD gains: 不取反（dart_gains_to_mujoco 只重排顺序）
 ```
 
 ---
 
-## 动作 SDK（Gesture）
+## 遥控器
 
-机器人可以执行预定义的花式动作（鞠躬、点头、扭动、伸展等）。动作系统基于关键帧插值，支持自定义。
+YUNZHUO 遥控器通过 SBUS 协议（CH340 USB 串口），udev 规则映射到 `/dev/yunzhuo`。
 
-### 内置动作
+| 控件 | 功能 |
+|------|------|
+| 左摇杆 Y | 前后速度（前推=前进） |
+| 左摇杆 X | 左右速度（左推=向左） |
+| 旋钮 + 右摇杆 X | 偏航旋转 |
+| CH5 (H) | 电机使能开关 |
+| L1 | StandUp |
+| L2 | SitDown |
+| R1 | StandUp |
+| R2 | 策略切换 |
+| 红键 | 紧急停止（disable + clear errors） |
+| LT | 精确模式（速度×0.5） |
+| RT | 冲刺模式（速度×1.5） |
 
-| 名称 | 说明 | 关键帧数 |
-|------|------|---------|
-| `bow` | 鞠躬 / 拜年 | 3（弯下→保持→站回） |
-| `nod` | 点头 | 4（低→高→低→高） |
-| `wiggle` | 左右扭动 | 5（左→右→左→右→复位） |
-| `stretch` | 伸展 | 4（前伸→复位→后伸→复位） |
+遥控器可选——未接时以 gRPC-only 模式启动。摇杆速度强关联：松手即归零，无衰减。
 
-### 使用方式
+---
 
-```dart
-// 1. 创建动作库并注册内置动作
-final gestureLib = GestureLibrary(standingPose: standingPose)
-  ..registerDefaults();
+## 策略配置 (Profile)
 
-// 2. 挂载到 Brain
-brain.gestureLibrary = gestureLib;
-
-// 3. 通过 FSM 触发（机器人必须在 Standing 状态）
-m.add(A.gesture('bow'));
-
-// 或通过 UnifiedCmsServer
-server.gesture('bow');
-```
-
-### 自定义动作
-
-```dart
-// 通过代码定义
-gestureLib.register(GestureDefinition(
-  name: 'dance',
-  description: '跳舞',
-  keyframes: [
-    Keyframe(targetPose: pose1, counts: 30),  // 30 帧插值到 pose1
-    Keyframe(targetPose: pose2, counts: 20),  // 20 帧插值到 pose2
-    Keyframe(targetPose: standingPose, counts: 40), // 回到站立
-  ],
-));
-
-// 通过 JSON 加载
-gestureLib.loadFromJson(jsonString);
-```
-
-### JSON 格式
+`han_dog/profiles/*.json`：
 
 ```json
-[
-  {
-    "name": "wave",
-    "description": "挥手",
-    "keyframes": [
-      { "targetPose": [0, -0.8, 1.8, ...], "counts": 30 },
-      { "targetPose": [0, -0.4, 1.2, ...], "counts": 30 }
-    ]
-  }
-]
+{
+  "name": "default",
+  "modelPath": "model/policy_260106.onnx",
+  "standingPose": [-0.1, -0.8, 1.8, 0.1, 0.8, -1.8, ...],
+  "sittingPose": [0, 0, 0, ...],
+  "standUpCounts": 150,
+  "sitDownCounts": 150,
+  "inferKp": [65, 95, 120, 65, 95, 120, ...],
+  "inferKd": [20, 20, 20, ...],
+  "imuGyroscopeScale": 0.25,
+  "jointVelocityScale": [0.05, 0.05, 0.05, 0.05],
+  "actionScale": [0.125, 0.25, 0.25, 5.0]
+}
 ```
 
-`targetPose` 是 16 个关节值的数组（顺序：FR hip/thigh/calf, FL, RR, RL, 4x foot）。
+支持运行时热切换（Grounded 状态下通过 gRPC `SwitchProfile` 或遥控器 R2）。
 
 ---
 
@@ -270,13 +327,13 @@ gestureLib.loadFromJson(jsonString);
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `HAN_DOG_PORT` | `13145` | gRPC 端口 |
-| `HAN_DOG_IMU_PORT` | `/dev/ttyUSB1` | IMU 串口 |
+| `HAN_DOG_IMU_PORT` | `/dev/ttyUSB1` | IMU 串口（建议用 `/dev/imu`） |
 | `HAN_DOG_YUNZHUO_PORT` | `/dev/yunzhuo` | 遥控器串口 |
-| `HAN_DOG_MODEL` | `model/policy_260106.onnx` | ONNX 模型路径 |
+| `HAN_DOG_PROFILE_DIR` | `han_dog/profiles` | 策略目录 |
+| `HAN_DOG_DEFAULT_PROFILE` | (第一个) | 默认策略名 |
 | `HAN_DOG_ARBITER_TIMEOUT` | `3` | 仲裁器超时（秒） |
-| `HAN_DOG_SENSOR_LOW_THRESHOLD` | `3` | 传感器低频告警阈值 |
+| `HAN_DOG_STARTUP_TIMEOUT` | `10` | FSM 启动超时（秒） |
 | `HAN_DOG_SHUTDOWN_TIMEOUT` | `8` | 关机超时（秒） |
-| `HAN_DOG_DEBUG_TUI` | `false` | 启用调试 TUI |
 | `HAN_DOG_LOG` | `INFO` | 日志级别 |
 
 ### 仿真 (`server.dart`)
@@ -284,53 +341,95 @@ gestureLib.loadFromJson(jsonString);
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `MEDULLA_PORT` | `13145` | gRPC 端口 |
-| `MEDULLA_MODEL` | `model/policy.onnx` | ONNX 模型路径 |
-| `MEDULLA_HISTORY_SIZE` | `1` | 历史缓冲区大小 |
-| `MEDULLA_STANDUP_COUNTS` | `150` | 站起插值帧数 |
-| `MEDULLA_SITDOWN_COUNTS` | `150` | 坐下插值帧数 |
+| `MEDULLA_PROFILE_DIR` | `han_dog/profiles` | 策略目录 |
+| `MEDULLA_DEFAULT_PROFILE` | (第一个) | 默认策略名 |
+| `MEDULLA_HISTORY_SIZE` | (自动推断) | 历史帧数 |
 | `MEDULLA_LOG` | `INFO` | 日志级别 |
+| `ONNXRUNTIME_DLL_PATH` | (系统搜索) | ONNX Runtime 动态库路径 |
+
+---
+
+## CAN 通信
+
+pcan 包自动选择后端：
+- **有 `/sys/class/pcan`**（chardev 驱动）→ PCAN Basic API
+- **无 chardev**（SocketCAN 驱动）→ Linux AF_CAN socket
+
+默认通道映射（`han_dog.dart`）：
+
+```dart
+RealJoint(fr: .usbbus3, fl: .usbbus1, rr: .usbbus4, rl: .usbbus2)
+// usbbus1 → can0, usbbus2 → can1, usbbus3 → can2, usbbus4 → can3
+```
+
+使用 `calibrate_can.dart` 校准实际接线映射。
+
+---
+
+## 部署
+
+### systemd 服务
+
+`scripts/setup_brainstem.sh` 自动配置：
+
+| 服务 | 说明 |
+|------|------|
+| `can-setup.service` | CAN 接口自启（1Mbps, txqueuelen 100） |
+| `han_dog.service` | brainstem 主程序（需手动创建） |
+
+### udev 规则
+
+```
+/dev/imu      → CP210x (Hi91 IMU)
+/dev/yunzhuo  → CH340 (YUNZHUO 遥控器)
+```
+
+### 依赖
+
+| 库 | 来源 | 说明 |
+|----|------|------|
+| `libcserialport.so` | 编译自 CSerialPort | IMU/遥控器串口 |
+| `libpcanbasic.so` | PEAK 提供 | PCAN Basic（可选，SocketCAN 可替代） |
+| `libonnxruntime.so` | pip onnxruntime 或手动安装 | ONNX 推理 |
+
+---
+
+## 动作 SDK（Gesture）
+
+```dart
+// 创建动作库
+final gestureLib = GestureLibrary(standingPose: standingPose)
+  ..registerDefaults();  // bow, nod, wiggle, stretch
+brain.gestureLibrary = gestureLib;
+
+// 触发动作（Standing 状态）
+m.add(A.gesture('bow'));
+```
+
+支持 JSON 自定义动作、关键帧插值、余弦缓入缓出。
 
 ---
 
 ## 测试
 
 ```bash
-dart test han_dog_brain/        # 42 个：FSM 全路径 + Memory + Behaviour + Gesture
-dart test han_dog/              # 71 个：ControlArbiter + RealControlDog + ProtoConvert + SimSensor
-dart test frequency_watch/      # 8 个：频率统计
-dart test skinny_dog_algebra/   # 10 个：JointsMatrix + clamp + NaN 检测
+dart test han_dog/              # ControlArbiter, RealControlDog, UnifiedCmsServer, ProtoConvert...
+dart test han_dog_brain/        # FSM 全路径, Memory, Behaviour, ObservationBuilder, Gesture...
+dart test frequency_watch/      # 频率统计
+dart test skinny_dog_algebra/   # JointsMatrix, clamp, NaN 检测
 ```
+
+全部 232 个测试必须通过。每次改动后运行 `dart analyze han_dog_brain/ han_dog/` 确保零 issue。
 
 ---
 
 ## 关键接口
 
-推理核心通过接口与硬件解耦，方便替换实现：
-
-```dart
-abstract interface class ImuService {
-  Vector3 get gyroscope;
-  Vector3 get projectedGravity;
-}
-
-abstract interface class JointService {
-  JointsMatrix get position;
-  JointsMatrix get velocity;
-}
-
-abstract interface class MotorService {
-  Future<void> enable();
-  Future<void> disable();
-}
-
-abstract interface class SimStateInjector {
-  Quaternion get quaternion;
-  void injectSim({...});
-}
-```
+推理核心通过接口与硬件解耦：
 
 | 接口 | 真机实现 | 仿真实现 |
 |------|---------|---------|
-| `ImuService` | `RealImu` | `SimSensorService` |
-| `JointService` | `RealJoint` | `SimSensorService` |
+| `ImuService` | `RealImu` (Hi91) | `SimSensorService` |
+| `JointService` | `RealJoint` (Robstride) | `SimSensorService` |
+| `MotorService` | `RealJoint` | 不需要 |
 | `SimStateInjector` | 不需要 | `SimSensorService` |
