@@ -28,6 +28,7 @@ class SimSensorService implements ImuService, JointService, SimStateInjector {
 
   @override
   Vector3 get projectedGravity {
+    // Dart q.rotate(v) = q * v * q⁻¹ = 等价于训练的 R.apply(v, inverse=True)
     final g = Vector3(0.0, 0.0, -1.0);
     quaternion.rotate(g);
     return g;
