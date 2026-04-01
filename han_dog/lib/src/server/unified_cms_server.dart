@@ -55,8 +55,8 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   DateTime? _lastWalkAt;
   static const _minWalkInterval = Duration(milliseconds: 18);
 
-  /// Calibration lock.
-  bool _calibrating = false;
+  /// SetZero lock.
+  bool _zeroing = false;
 
   /// 硬件模式：由外部提供 IMU 数据流。
   final Stream<proto.Imu> Function()? imuStreamFactory;
@@ -365,27 +365,31 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   //  标零
   // ═══════════════════════════════════════════════════════════
 
-  Future<proto.Empty> calibrate(
+  /// 电机清零：把当前位置标记为零点并保存。
+  /// 机器人必须处于 Grounded 状态（趴地/放平后再清零）。
+  @override
+  Future<proto.Empty> setZero(
       ServiceCall call, proto.Empty request) async {
     if (_m.state is! Grounded) {
       throw GrpcError.failedPrecondition('Must be in Grounded state');
     }
     final j = joint;
     if (j == null) {
-      throw GrpcError.unimplemented('Calibration not available');
+      throw GrpcError.unimplemented('SetZero not available (no joint controller)');
     }
-    if (_calibrating) {
-      throw GrpcError.resourceExhausted('Calibration already in progress');
+    if (_zeroing) {
+      throw GrpcError.resourceExhausted('SetZero already in progress');
     }
-    _calibrating = true;
+    _zeroing = true;
     try {
-      final ok = await j.calibrateAndSave();
+      final ok = await j.setZero();
       if (!ok) {
-        _log.warning('Calibration completed with suspicious results');
+        _log.warning('SetZero completed with suspicious results');
       }
+      _log.info('SetZero completed');
       return proto.Empty();
     } finally {
-      _calibrating = false;
+      _zeroing = false;
     }
   }
 

@@ -302,9 +302,8 @@ class RealJoint implements JointService, MotorService {
     pcans[legId].add(.disable(canId, clearErrors: true));
   }
 
-  /// Sets zero, signs zero, and saves parameters for all joints.
-  /// Returns true on completion.
-  Future<bool> calibrateAndSave() async {
+  /// 电机清零：把当前位置标记为零点，设置符号，保存参数。
+  Future<bool> setZero() async {
     setZeroPosition();
     setZeroSigned();
     saveParameters();

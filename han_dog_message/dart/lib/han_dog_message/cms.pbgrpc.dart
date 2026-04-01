@@ -204,6 +204,14 @@ class CmsClient extends $grpc.Client {
     return $createUnaryCall(_$clearMotorFault, request, options: options);
   }
 
+  /// 电机清零：把当前位置标记为零点并保存。必须在 Grounded 状态。
+  $grpc.ResponseFuture<$0.Empty> setZero(
+    $0.Empty request, {
+    $grpc.CallOptions? options,
+  }) {
+    return $createUnaryCall(_$setZero, request, options: options);
+  }
+
   // method descriptors
 
   static final _$enable = $grpc.ClientMethod<$0.Empty, $0.Empty>(
@@ -285,6 +293,10 @@ class CmsClient extends $grpc.Client {
           '/han_dog.Cms/ClearMotorFault',
           ($2.ClearFaultRequest value) => value.writeToBuffer(),
           $0.Empty.fromBuffer);
+  static final _$setZero = $grpc.ClientMethod<$0.Empty, $0.Empty>(
+      '/han_dog.Cms/SetZero',
+      ($0.Empty value) => value.writeToBuffer(),
+      $0.Empty.fromBuffer);
 }
 
 @$pb.GrpcServiceName('han_dog.Cms')
@@ -424,6 +436,13 @@ abstract class CmsServiceBase extends $grpc.Service {
         false,
         false,
         ($core.List<$core.int> value) => $2.ClearFaultRequest.fromBuffer(value),
+        ($0.Empty value) => value.writeToBuffer()));
+    $addMethod($grpc.ServiceMethod<$0.Empty, $0.Empty>(
+        'SetZero',
+        setZero_Pre,
+        false,
+        false,
+        ($core.List<$core.int> value) => $0.Empty.fromBuffer(value),
         ($0.Empty value) => value.writeToBuffer()));
   }
 
@@ -568,4 +587,11 @@ abstract class CmsServiceBase extends $grpc.Service {
 
   $async.Future<$0.Empty> clearMotorFault(
       $grpc.ServiceCall call, $2.ClearFaultRequest request);
+
+  $async.Future<$0.Empty> setZero_Pre(
+      $grpc.ServiceCall $call, $async.Future<$0.Empty> $request) async {
+    return setZero($call, await $request);
+  }
+
+  $async.Future<$0.Empty> setZero($grpc.ServiceCall call, $0.Empty request);
 }

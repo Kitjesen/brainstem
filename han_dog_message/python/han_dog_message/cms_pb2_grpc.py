@@ -143,6 +143,11 @@ class CmsStub(object):
                 request_serializer=han__dog__message_dot_cms__pb2.ClearFaultRequest.SerializeToString,
                 response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                 _registered_method=True)
+        self.SetZero = channel.unary_unary(
+                '/han_dog.Cms/SetZero',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
 
 
 class CmsServicer(object):
@@ -300,6 +305,13 @@ class CmsServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetZero(self, request, context):
+        """电机清零：把当前位置标记为零点并保存。必须在 Grounded 状态。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_CmsServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -396,6 +408,11 @@ def add_CmsServicer_to_server(servicer, server):
             'ClearMotorFault': grpc.unary_unary_rpc_method_handler(
                     servicer.ClearMotorFault,
                     request_deserializer=han__dog__message_dot_cms__pb2.ClearFaultRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            ),
+            'SetZero': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetZero,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
@@ -922,6 +939,33 @@ class Cms(object):
             target,
             '/han_dog.Cms/ClearMotorFault',
             han__dog__message_dot_cms__pb2.ClearFaultRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetZero(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/han_dog.Cms/SetZero',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,

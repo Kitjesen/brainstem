@@ -78,6 +78,8 @@ service Cms {
   rpc GetMotorStatus(google.protobuf.Empty) returns (MotorStatusResponse);
   // 清除电机故障。joint_ids 为空则清除全部，否则只清指定关节。
   rpc ClearMotorFault(ClearFaultRequest) returns (google.protobuf.Empty);
+  // 电机清零：把当前位置标记为零点并保存。必须在 Grounded 状态。
+  rpc SetZero(google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
 // 电机总线电压（16 个关节，单位 V）。
