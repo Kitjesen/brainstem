@@ -121,10 +121,12 @@ def main():
     last_cms = -1
     last_btn = {}
     walking = False
+    enabled = False
     last_walk_time = 0.0
 
     print()
     print("Controls:")
+    print("  Y          : Enable/Disable (电机使能切换)")
     print("  A          : StandUp")
     print("  X          : SitDown")
     print("  Left stick : Walk (auto sends Walk command)")
@@ -174,6 +176,18 @@ def main():
                     return fn(*a, **kw)
                 except grpc.RpcError:
                     return None
+
+            # Y = Enable/Disable 切换 (按钮 3)
+            if btn_pressed(3):
+                if not enabled:
+                    safe_call(stub.Enable, msg.Empty())
+                    enabled = True
+                    print(f"  [{now_s:.1f}s] >> Enable (电机使能)")
+                else:
+                    safe_call(stub.Disable, msg.Empty())
+                    enabled = False
+                    walking = False
+                    print(f"  [{now_s:.1f}s] >> Disable (电机关闭)")
 
             # A = StandUp
             if btn_pressed(0):
