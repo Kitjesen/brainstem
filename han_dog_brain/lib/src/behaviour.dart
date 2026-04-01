@@ -31,8 +31,7 @@ abstract class Behaviour {
 
   Stream<void> get ts => clock.stream;
 
-  /// action 字段用 policyTracker（真实策略输出），不是 memory.latestAction（物理目标）。
-  /// 这样 obs 里的 last_action 始终反映 ONNX 输出，和训练一致。
+  /// action 字段用 memory.latestAction（= 上一帧 nextAction），和 legacy 一致。
   History next({required Command command, required JointsMatrix nextAction}) =>
       History(
         gyroscope: imu.gyroscope,
@@ -40,7 +39,7 @@ abstract class Behaviour {
         command: command,
         jointPosition: joint.position,
         jointVelocity: joint.velocity,
-        action: policyTracker.action,
+        action: memory.latestAction,
         nextAction: nextAction,
       );
 }

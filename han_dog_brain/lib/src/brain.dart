@@ -117,12 +117,7 @@ class Brain {
             ),
       ),
     );
-    // Idle 每帧跑 ONNX → 更新 policyTracker（给 obs 的 action 字段用）
-    // 物理目标不变（nextAction = memory.latestAction = standingPose）
-    brain.idle.inferAction = () {
-      if (!brain.walk.isModelLoaded) return brain.walk.standingPose;
-      return brain.walk.inferOnce();
-    };
+    // Idle 不跑 ONNX（和 legacy 一致）
     return brain;
   }
 
