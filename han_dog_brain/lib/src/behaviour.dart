@@ -273,12 +273,12 @@ class Walk extends Behaviour {
         command: .walk(this.direction),
         nextAction: .zero(),
       );
-      // history 拼接: [t-4, t-3, t-2, t-1] + [t-now] = 5帧
-      // histories[0..3] 是缓存的 4 帧，holdNext 是当前实时帧
+      // history 拼接: [t-3, t-2, t-1, t-0] + [t-now] = 连续5帧
+      // 跳过 histories[0]（最老帧），和 legacy skip(1) 一致
       final histories = memory.histories;
-      for (int i = 0; i < historySize - 1; i++) {
+      for (int i = 1; i < historySize; i++) {
         final row = observationBuilder.build(histories[i]);
-        final offset = i * tensorSize;
+        final offset = (i - 1) * tensorSize;
         for (int j = 0; j < tensorSize; j++) {
           observationBuffer[offset + j] = row[j];
         }
