@@ -56,3 +56,6 @@ han_dog/.omc/
 # Large sample data
 han_dog/sample/case1.json
 han_dog/sample/case1_real.json
+sim/robot/meshes/
+sim/legacy/
+sim/output/

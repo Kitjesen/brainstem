@@ -24,7 +24,7 @@ from pathlib import Path
 
 # ── 路径 ──────────────────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).resolve().parent
-MODEL_PATH = SCRIPT_DIR / "quadruped.xml"
+MODEL_PATH = SCRIPT_DIR.parent / "robot" / "quadruped.xml"
 OUTPUT_DIR = SCRIPT_DIR
 FPS = 50
 DT = 0.002  # MuJoCo timestep

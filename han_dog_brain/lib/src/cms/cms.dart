@@ -54,16 +54,25 @@ class M extends Cms<S, A> {
       Future.microtask(() => add(A.fault('Transition setup error: $e')));
       return const Stream<History>.empty().listen((_) {});
     }
-    return stream.listen(
+    // 用 late 捕获订阅引用，onError 时取消订阅防止 onDone 竞态。
+    // 竞态场景：流 emit error → 排队 Fault → 流 emit done → 排队 Done
+    // → Fault 触发新 transition → 旧 Done 误完成新 transition。
+    late final StreamSubscription<History> sub;
+    var faulted = false;
+    sub = stream.listen(
       _brain.memory.add,
       onError: (Object error, StackTrace st) {
+        faulted = true;
         _log.severe('Transition(${target.runtimeType}) stream error', error, st);
+        sub.cancel(); // 阻止后续 onDone
         Future.microtask(() => add(A.fault('Transition error: $error')));
       },
       onDone: () {
+        if (faulted) return; // 已经 fault 了，忽略 stale Done
         Future.microtask(() => add(const A.done()));
       },
     );
+    return sub;
   }
 
   /// 监听行走行为（由时钟驱动的无限流）。

@@ -142,12 +142,23 @@ Future<void> main() async {
   );
   _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
 
+  // ── 增益管理（仿真也需要，用于 tick 返回 kp/kd 给 MuJoCo）───
+  final gainManager = GainManager(
+    inferKp: defaultProfile.inferKp,
+    inferKd: defaultProfile.inferKd,
+    standUpKp: defaultProfile.standUpKp,
+    standUpKd: defaultProfile.standUpKd,
+    sitDownKp: defaultProfile.sitDownKp,
+    sitDownKd: defaultProfile.sitDownKd,
+  );
+
   // ── gRPC 服务器 ────────────────────────────────────────────
   final cmsService = UnifiedCmsServer(
     brain: brain,
     m: m,
     mode: CmsMode.simulation,
     simInjector: sim,
+    gains: gainManager,
   )..profileManager = profileManager;
   final server = Server.create(services: [cmsService]);
 

@@ -37,7 +37,7 @@ class SimSensorService implements ImuService, JointService, SimStateInjector {
   final Vector3 initialGyroscope = Vector3.zero();
 
   @override
-  final Vector3 initialProjectedGravity = Vector3(0.0, 0.0, -1.0);
+  final Vector3 initialProjectedGravity = Vector3.zero();
 
   // ─── JointService ────────────────────────────────────────────
 
@@ -62,10 +62,10 @@ class SimSensorService implements ImuService, JointService, SimStateInjector {
   int get droppedFrames => _droppedFrames;
 
   SimSensorService({required JointsMatrix standingPose})
-      : position = standingPose,
+      : position = JointsMatrix.zero(),
         velocity = JointsMatrix.zero(),
         torque = JointsMatrix.zero(),
-        initialPosition = standingPose,
+        initialPosition = JointsMatrix.zero(),
         initialVelocity = JointsMatrix.zero();
 
   // ─── SimStateInjector ────────────────────────────────────────

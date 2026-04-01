@@ -13,6 +13,7 @@ class Brain {
   final Memory<History> memory;
   final ImuService imu;
   final JointService joint;
+  final PolicyActionTracker policyTracker;
   JointsMatrix get standingPose => walk.observationBuilder.standingPose;
   Idle idle;
   SitDown sitDown;
@@ -34,12 +35,16 @@ class Brain {
     required ObservationBuilder observationBuilder,
     required JointsMatrix sittingPose,
     required this.memory,
-  }) : idle = .new(clock: clock, imu: imu, joint: joint, memory: memory),
+    PolicyActionTracker? policyTracker,
+  }) : policyTracker = policyTracker ??= PolicyActionTracker(),
+       idle = .new(clock: clock, imu: imu, joint: joint, memory: memory,
+              policyTracker: policyTracker),
        sitDown = .new(
          clock: clock,
          imu: imu,
          joint: joint,
          memory: memory,
+         policyTracker: policyTracker,
          sittingPose: sittingPose,
          counts: sitDownCounts,
        ),
@@ -48,6 +53,7 @@ class Brain {
          imu: imu,
          joint: joint,
          memory: memory,
+         policyTracker: policyTracker,
          standingPose: observationBuilder.standingPose,
          counts: standUpCounts,
        ),
@@ -57,6 +63,7 @@ class Brain {
          joint: joint,
          clock: clock,
          memory: memory,
+         policyTracker: policyTracker,
        );
 
   factory Brain({
@@ -86,7 +93,7 @@ class Brain {
           jointVelocityScale: jointVelocityScale,
           actionScale: actionScale,
         );
-    return .shareMemory(
+    final brain = Brain.shareMemory(
       historySize: historySize,
       imu: imu,
       joint: joint,
@@ -95,21 +102,28 @@ class Brain {
       sitDownCounts: sitDownCounts,
       observationBuilder: builder,
       sittingPose: sittingPose,
-      memory: .new(
+      memory: Memory<History>(
         historySize: historySize,
         initial:
             initialHistory ??
-            .new(
+            History(
               gyroscope: imu.initialGyroscope,
               projectedGravity: imu.initialProjectedGravity,
-              command: .idle(),
+              command: const Command.idle(),
               jointPosition: joint.initialPosition,
               jointVelocity: joint.initialVelocity,
-              action: standingPose,
-              nextAction: standingPose,
+              action: JointsMatrix.zero(),
+              nextAction: JointsMatrix.zero(),
             ),
       ),
     );
+    // Idle 每帧跑 ONNX → 更新 policyTracker（给 obs 的 action 字段用）
+    // 物理目标不变（nextAction = memory.latestAction = standingPose）
+    brain.idle.inferAction = () {
+      if (!brain.walk.isModelLoaded) return brain.walk.standingPose;
+      return brain.walk.inferOnce();
+    };
+    return brain;
   }
 
   /// 根据名称从动作库创建一个 [Gesture] 行为。
@@ -122,6 +136,7 @@ class Brain {
       imu: imu,
       joint: joint,
       memory: memory,
+      policyTracker: policyTracker,
       definition: definition,
     );
   }
@@ -187,6 +202,7 @@ class Brain {
       imu: imu,
       joint: joint,
       memory: memory,
+      policyTracker: policyTracker,
       standingPose: standingPose,
       counts: standUpCounts,
     );
@@ -195,6 +211,7 @@ class Brain {
       imu: imu,
       joint: joint,
       memory: memory,
+      policyTracker: policyTracker,
       sittingPose: sittingPose,
       counts: sitDownCounts,
     );
@@ -204,6 +221,7 @@ class Brain {
       joint: joint,
       clock: clock,
       memory: memory,
+      policyTracker: policyTracker,
     );
 
     try {
@@ -228,8 +246,8 @@ class Brain {
       command: Command.idle(),
       jointPosition: joint.position,
       jointVelocity: joint.velocity,
-      action: standingPose,
-      nextAction: standingPose,
+      action: JointsMatrix.zero(),
+      nextAction: JointsMatrix.zero(),
     ));
   }
 

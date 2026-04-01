@@ -127,9 +127,7 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
       if (!a.command(action, ControlSource.grpc)) {
         _log.warning('${action.runtimeType} rejected: ${a.owner} has priority'
             '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
-        throw GrpcError.failedPrecondition(
-          'Control rejected: ${a.owner} has priority',
-        );
+        return; // 静默忽略，不抛异常
       }
     } else {
       _m.add(action);
@@ -147,28 +145,27 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   Future<proto.Empty> walk(ServiceCall call, proto.Vector3 request) async {
     final now = DateTime.now();
     if (_lastWalkAt != null && now.difference(_lastWalkAt!) < _minWalkInterval) {
-      throw GrpcError.resourceExhausted('Walk command rate exceeded');
+      // 频率过高：静默忽略而非报错，避免客户端崩溃
+      return proto.Empty();
     }
     _lastWalkAt = now;
     if (!request.x.isFinite || !request.y.isFinite || !request.z.isFinite) {
-      throw GrpcError.invalidArgument('Walk direction contains NaN or Inf');
+      _log.warning('Walk ignored: NaN or Inf in direction');
+      return proto.Empty();
     }
     final dir = request.toVM();
     final mag = dir.length;
     if (mag > _walkDirMaxMagnitude) {
       _log.warning(
         'Walk direction magnitude=${mag.toStringAsFixed(2)} '
-        'exceeds max=$_walkDirMaxMagnitude — rejected',
+        'exceeds max=$_walkDirMaxMagnitude — clamped',
       );
-      throw GrpcError.invalidArgument(
-        'Walk direction magnitude=${mag.toStringAsFixed(2)} '
-        'exceeds max $_walkDirMaxMagnitude',
-      );
+      dir.normalize();
+      dir.scale(_walkDirMaxMagnitude);
     }
-    if (_m.state is Grounded) {
-      throw GrpcError.failedPrecondition(
-        'Cannot walk in Grounded state — stand up first',
-      );
+    if (_m.state is Grounded || _m.state is Zero || _m.state is Transitioning) {
+      _log.fine('Walk ignored: ${_m.state.runtimeType}');
+      return proto.Empty();
     }
     _dispatch(A.walk(dir));
     return proto.Empty();
@@ -177,9 +174,9 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   @override
   Future<proto.Empty> standUp(ServiceCall call, proto.Empty request) async {
     if (_m.state is Transitioning) {
-      throw GrpcError.failedPrecondition(
-        'Cannot standUp while already transitioning',
-      );
+      // 过渡中静默忽略，不抛异常（防止客户端崩溃）
+      _log.fine('StandUp ignored: transitioning');
+      return proto.Empty();
     }
     _dispatch(const A.standUp());
     _log.info('StandUp command received');

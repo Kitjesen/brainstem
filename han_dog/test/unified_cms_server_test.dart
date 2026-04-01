@@ -68,46 +68,25 @@ void main() {
   // ─── walk 入力バリデーション ──────────────────────────────────────────
 
   group('walk — 输入验证', () {
-    test('NaN 方向向量 → GrpcError.invalidArgument', () async {
+    test('NaN 方向向量 → 静默忽略', () async {
       final server = _simServer(brain, m);
-      await expectLater(
-        server.walk(call, proto.Vector3(x: double.nan, y: 0, z: 0)),
-        throwsA(
-          isA<GrpcError>().having(
-            (e) => e.code,
-            'code',
-            StatusCode.invalidArgument,
-          ),
-        ),
-      );
+      final result = await server.walk(
+        call, proto.Vector3(x: double.nan, y: 0, z: 0));
+      expect(result, isA<proto.Empty>());
     });
 
-    test('Inf 方向向量 → GrpcError.invalidArgument', () async {
+    test('Inf 方向向量 → 静默忽略', () async {
       final server = _simServer(brain, m);
-      await expectLater(
-        server.walk(call, proto.Vector3(x: double.infinity, y: 0, z: 0)),
-        throwsA(
-          isA<GrpcError>().having(
-            (e) => e.code,
-            'code',
-            StatusCode.invalidArgument,
-          ),
-        ),
-      );
+      final result = await server.walk(
+        call, proto.Vector3(x: double.infinity, y: 0, z: 0));
+      expect(result, isA<proto.Empty>());
     });
 
-    test('幅值超过 3.0 → GrpcError.invalidArgument', () async {
+    test('幅值超过 3.0 → clamp 后执行', () async {
       final server = _simServer(brain, m);
-      await expectLater(
-        server.walk(call, proto.Vector3(x: 3.1, y: 0, z: 0)),
-        throwsA(
-          isA<GrpcError>().having(
-            (e) => e.code,
-            'code',
-            StatusCode.invalidArgument,
-          ),
-        ),
-      );
+      final result = await server.walk(
+        call, proto.Vector3(x: 3.1, y: 0, z: 0));
+      expect(result, isA<proto.Empty>());
     });
 
     test('合法方向 → 调用 m.add()', () async {
@@ -282,28 +261,21 @@ void main() {
   });
 
   group('motion preconditions', () {
-    test('Grounded walk returns failedPrecondition', () async {
+    test('Grounded walk → 静默忽略', () async {
       final historyCtrl = StreamController<History>();
       final sub = historyCtrl.stream.listen((_) {});
       when(() => m.state).thenReturn(Grounded(sub));
 
       final server = _simServer(brain, m);
-      await expectLater(
-        server.walk(call, proto.Vector3(x: 0.5, y: 0, z: 0)),
-        throwsA(
-          isA<GrpcError>().having(
-            (e) => e.code,
-            'code',
-            StatusCode.failedPrecondition,
-          ),
-        ),
-      );
+      final result = await server.walk(
+        call, proto.Vector3(x: 0.5, y: 0, z: 0));
+      expect(result, isA<proto.Empty>());
 
       await sub.cancel();
       await historyCtrl.close();
     });
 
-    test('Transitioning standUp returns failedPrecondition', () async {
+    test('Transitioning standUp → 静默忽略', () async {
       final historyCtrl = StreamController<History>();
       final sub = historyCtrl.stream.listen((_) {});
       when(
@@ -311,16 +283,8 @@ void main() {
       ).thenReturn(Transitioning(const StandUpCommand(), sub, null));
 
       final server = _simServer(brain, m);
-      await expectLater(
-        server.standUp(call, proto.Empty()),
-        throwsA(
-          isA<GrpcError>().having(
-            (e) => e.code,
-            'code',
-            StatusCode.failedPrecondition,
-          ),
-        ),
-      );
+      final result = await server.standUp(call, proto.Empty());
+      expect(result, isA<proto.Empty>());
 
       await sub.cancel();
       await historyCtrl.close();

@@ -32,8 +32,8 @@ void main() {
       sim = SimSensorService(standingPose: standingPose);
     });
 
-    test('position equals standingPose', () {
-      expect(sim.position.values, standingPose.values);
+    test('position is zero (legacy convention)', () {
+      expect(sim.position, matrixEquals(.zero()));
     });
 
     test('velocity is zero', () {
@@ -62,8 +62,8 @@ void main() {
       expect(g.z, closeTo(-1.0, 1e-9));
     });
 
-    test('initialPosition equals standingPose', () {
-      expect(sim.initialPosition.values, standingPose.values);
+    test('initialPosition is zero (legacy convention)', () {
+      expect(sim.initialPosition, matrixEquals(.zero()));
     });
 
     test('initialVelocity is zero', () {
@@ -74,10 +74,10 @@ void main() {
       expect(sim.initialGyroscope, Vector3.zero());
     });
 
-    test('initialProjectedGravity is (0,0,-1)', () {
+    test('initialProjectedGravity is zero (legacy convention)', () {
       expect(sim.initialProjectedGravity.x, closeTo(0.0, 1e-9));
       expect(sim.initialProjectedGravity.y, closeTo(0.0, 1e-9));
-      expect(sim.initialProjectedGravity.z, closeTo(-1.0, 1e-9));
+      expect(sim.initialProjectedGravity.z, closeTo(0.0, 1e-9));
     });
   });
 
@@ -130,7 +130,7 @@ void main() {
         position: JointsMatrix.fromList(List.filled(16, 99.0)),
         velocity: JointsMatrix.fromList(List.filled(16, 88.0)),
       );
-      expect(sim.initialPosition.values, standingPose.values);
+      expect(sim.initialPosition, matrixEquals(.zero()));
       expect(sim.initialVelocity, matrixEquals(.zero()));
       expect(sim.initialGyroscope, Vector3.zero());
     });
@@ -160,7 +160,7 @@ void main() {
         velocity: .zero(),
       );
       // Position should remain at standingPose (initial value)
-      expect(sim.position.values, standingPose.values);
+      expect(sim.position, matrixEquals(.zero()));
       expect(sim.gyroscope, Vector3.zero());
     });
 
@@ -171,7 +171,7 @@ void main() {
         position: JointsMatrix.fromList(List.filled(16, 99.0)),
         velocity: .zero(),
       );
-      expect(sim.position.values, standingPose.values);
+      expect(sim.position, matrixEquals(.zero()));
     });
 
     test('discards frame when position contains NaN', () {
@@ -183,7 +183,7 @@ void main() {
         position: JointsMatrix.fromList(nanPos),
         velocity: .zero(),
       );
-      expect(sim.position.values, standingPose.values);
+      expect(sim.position, matrixEquals(.zero()));
     });
 
     test('discards frame when velocity contains Infinity', () {
@@ -211,7 +211,7 @@ void main() {
       );
       // Everything should remain at initial values
       expect(sim.gyroscope, Vector3.zero());
-      expect(sim.position.values, standingPose.values);
+      expect(sim.position, matrixEquals(.zero()));
       expect(sim.torque, matrixEquals(.zero()));
     });
 
@@ -223,7 +223,7 @@ void main() {
         position: JointsMatrix.fromList(List.filled(16, 99.0)),
         velocity: .zero(),
       );
-      expect(sim.position.values, standingPose.values);
+      expect(sim.position, matrixEquals(.zero()));
 
       // Second: valid frame
       final validPos = JointsMatrix.fromList(List.filled(16, 2.0));
