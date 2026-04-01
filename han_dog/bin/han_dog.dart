@@ -101,12 +101,12 @@ Future<void> _run() async {
   }
   _log.info('IMU opened.');
 
-  // PCAN USB 通道映射（由硬件接线决定，不可随意修改）
+  // PCAN USB 通道映射（由硬件接线决定）
   final joint = RealJoint(
-    fr: .usbbus3,
-    fl: .usbbus1,
-    rr: .usbbus4,
-    rl: .usbbus2,
+    fr: .usbbus1,
+    fl: .usbbus2,
+    rr: .usbbus3,
+    rl: .usbbus4,
   );
   if (!joint.open()) {
     _log.severe('Joint PCAN open failed');
