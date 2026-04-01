@@ -309,11 +309,6 @@ Future<void> _run() async {
     _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
   } else {
     _log.info('No controller — motor enable via gRPC only');
-    // 无遥控器时，gRPC Enable/Disable 直接控制 motorOutputEnabled
-    cmsService.onMotorEnableChanged = (enabled) {
-      motorOutputEnabled = enabled;
-      _log.info('motorOutputEnabled=$enabled (via gRPC)');
-    };
   }
 
   // ──── 4c. 策略热加载（每 30s 扫描 profileDir）────────────────
@@ -386,6 +381,13 @@ Future<void> _run() async {
   );
   cmsService.profileManager = profileManager;
   cmsService.joint = joint;
+  // 无遥控器时，gRPC Enable/Disable 直接控制 motorOutputEnabled
+  if (controlDog == null) {
+    cmsService.onMotorEnableChanged = (enabled) {
+      motorOutputEnabled = enabled;
+      _log.info('motorOutputEnabled=$enabled (via gRPC)');
+    };
+  }
   final grpcServer = await _startGrpc(cmsService);
   _grpcServerForCleanup = grpcServer;
   _jointForCleanup = joint;
