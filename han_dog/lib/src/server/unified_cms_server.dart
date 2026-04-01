@@ -97,9 +97,13 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   //  生命周期
   // ═══════════════════════════════════════════════════════════
 
+  /// gRPC Enable/Disable 时的回调（无遥控器时用于设置 motorOutputEnabled）。
+  void Function(bool enabled)? onMotorEnableChanged;
+
   @override
   Future<proto.Empty> enable(ServiceCall call, proto.Empty request) async {
     await motor?.enable();
+    onMotorEnableChanged?.call(true);
     _log.info('Motors enabled');
     return proto.Empty();
   }
@@ -107,6 +111,7 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
   @override
   Future<proto.Empty> disable(ServiceCall call, proto.Empty request) async {
     await motor?.disable();
+    onMotorEnableChanged?.call(false);
     _log.info('Motors disabled');
     return proto.Empty();
   }
