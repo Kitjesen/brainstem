@@ -73,7 +73,8 @@ StreamSubscription<void> startJointLimitMonitoring({
     (_) {
       final pos = joint.position;
       final values = pos.values;
-      for (var i = 0; i < values.length && i < _jointNames.length; i++) {
+      // 只检查腿关节 (0-11)，足轮 (12-15) 可无限旋转不限位
+      for (var i = 0; i < 12 && i < values.length; i++) {
         final v = values[i];
         if (v.abs() > limitRad) {
           _log.severe('关节超限: ${_jointNames[i]}=${v.toStringAsFixed(3)} rad '
