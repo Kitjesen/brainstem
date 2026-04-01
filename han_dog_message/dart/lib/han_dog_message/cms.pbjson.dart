@@ -188,6 +188,7 @@ const History$json = {
     },
     {'1': 'kp', '3': 9, '4': 1, '5': 11, '6': '.han_dog.Matrix4', '10': 'kp'},
     {'1': 'kd', '3': 10, '4': 1, '5': 11, '6': '.han_dog.Matrix4', '10': 'kd'},
+    {'1': 'observation', '3': 11, '4': 3, '5': 1, '10': 'observation'},
   ],
 };
 
@@ -201,7 +202,8 @@ final $typed_data.Uint8List historyDescriptor = $convert.base64Decode(
     'kSKAoGYWN0aW9uGAYgASgLMhAuaGFuX2RvZy5NYXRyaXg0UgZhY3Rpb24SMQoLbmV4dF9hY3Rp'
     'b24YByABKAsyEC5oYW5fZG9nLk1hdHJpeDRSCm5leHRBY3Rpb24SNwoJdGltZXN0YW1wGAggAS'
     'gLMhkuZ29vZ2xlLnByb3RvYnVmLkR1cmF0aW9uUgl0aW1lc3RhbXASIAoCa3AYCSABKAsyEC5o'
-    'YW5fZG9nLk1hdHJpeDRSAmtwEiAKAmtkGAogASgLMhAuaGFuX2RvZy5NYXRyaXg0UgJrZA==');
+    'YW5fZG9nLk1hdHJpeDRSAmtwEiAKAmtkGAogASgLMhAuaGFuX2RvZy5NYXRyaXg0UgJrZBIgCg'
+    'tvYnNlcnZhdGlvbhgLIAMoAVILb2JzZXJ2YXRpb24=');
 
 @$core.Deprecated('Use imuDescriptor instead')
 const Imu$json = {

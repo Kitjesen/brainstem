@@ -1,6 +1,8 @@
 """
-逐帧对比 local ONNX vs gRPC brainstem 的输入输出。
-同一个 MuJoCo 物理状态，两边各自算 obs / 推理 / 得到 action，打印差异。
+精确对比：用 Dart 返回的 285 维 obs buffer 跑本地 ONNX，对比 nextAction。
+
+Dart 通过 History.observation 返回内部的 ONNX 输入 buffer（仅 Walking 时有值），
+Python 用同一个 buffer 跑本地 ONNX，如果输出一致则证明链路完全正确。
 
 用法:
     # 终端 1: dart run han_dog/bin/server.dart
@@ -12,8 +14,6 @@ import onnxruntime as ort
 import grpc
 import sys
 from pathlib import Path
-from scipy.spatial.transform import Rotation as R
-from collections import deque
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROTO_PY_ROOT = SCRIPT_DIR.parent.parent / "han_dog_message" / "python"
@@ -26,13 +26,7 @@ dof_vel = [6,7,8, 10,11,12, 14,15,16, 18,19,20, 9,13,17,21]
 default_angle = np.array([
     -0.1,-0.8,1.8, 0.1,0.8,-1.8, 0.1,0.8,-1.8, -0.1,-0.8,1.8, 0,0,0,0
 ], dtype=np.double)
-
-NAMES_57 = (
-    ['gyro_x','gyro_y','gyro_z','grav_x','grav_y','grav_z','cmd_vx','cmd_vy','cmd_vyaw'] +
-    [f'jpos_{i}' for i in range(16)] +
-    [f'jvel_{i}' for i in range(16)] +
-    [f'act_{i}' for i in range(16)]
-)
+AS = np.array([0.125,0.25,0.25]*4+[5,5,5,5])
 NAMES_16 = [
     'fr_hip','fr_thigh','fr_calf','fl_hip','fl_thigh','fl_calf',
     'rr_hip','rr_thigh','rr_calf','rl_hip','rl_thigh','rl_calf',
@@ -40,23 +34,7 @@ NAMES_16 = [
 ]
 
 
-def local_obs(data, vx, vy, vyaw, last_action):
-    """和 walk_ref.py 100% 一致。"""
-    q = data.qpos[dof_ids].astype(np.double) - default_angle
-    dq = data.qvel[dof_vel].astype(np.double) * 0.05
-    q[-4:] = 0.0
-    imu_quat = data.sensor('orientation').data[[1,2,3,0]].astype(np.double)
-    r_imu = R.from_quat(imu_quat)
-    proj = r_imu.apply([0.,0.,-1.], inverse=True).astype(np.double)
-    gyro_local = data.sensor('angular-velocity').data.astype(np.double)
-    base_quat = data.qpos[3:7][[1,2,3,0]].astype(np.double)
-    r_base = R.from_quat(base_quat)
-    gyro = r_base.apply(r_imu.apply(gyro_local), inverse=True) * 0.25
-    return np.concatenate([gyro, proj, [vx,vy,vyaw], q, dq, last_action]).astype(np.float32)
-
-
 def build_sim_state(data, elapsed_s):
-    """发给 Dart server 的 SimState（不取共轭）。"""
     raw_q = data.sensor('orientation').data
     gyro = data.sensor('angular-velocity').data
     jp = [float(data.qpos[i]) for i in dof_ids]
@@ -72,39 +50,19 @@ def build_sim_state(data, elapsed_s):
     )
 
 
-def dart_obs_from_history(h):
-    """从 History 反推当前帧 obs（57维）。"""
-    gyro = np.array([h.gyroscope.x, h.gyroscope.y, h.gyroscope.z]) * 0.25
-    grav = np.array([h.projected_gravity.x, h.projected_gravity.y, h.projected_gravity.z])
-    cmd = np.zeros(3)
-    if h.command.HasField('walk'):
-        cmd = np.array([h.command.walk.x, h.command.walk.y, h.command.walk.z])
-    jpos = np.array(h.joint_position.values) - default_angle
-    jpos[-4:] = 0.0
-    jvel = np.array(h.joint_velocity.values) * 0.05
-    act_scale = np.array([0.125,0.25,0.25]*4 + [5,5,5,5])
-    act = (np.array(h.action.values) - default_angle) / act_scale
-    return np.concatenate([gyro, grav, cmd, jpos, jvel, act]).astype(np.float32)
-
-
 def main():
-    # ── gRPC ──────────────────────────────────────────────────
     print("Connecting to brainstem...")
     channel = grpc.insecure_channel("127.0.0.1:13145")
     grpc.channel_ready_future(channel).result(timeout=10)
     stub = msg.CmsStub(channel)
-    print(f"Connected. CMS: {stub.GetCmsState(msg.Empty()).kind}")
 
-    # ── Local ONNX ────────────────────────────────────────────
-    sess = ort.InferenceSession("sim/model/policy_v9_800.onnx")
+    sess = ort.InferenceSession("model/policy_260106.onnx")
     input_name = sess.get_inputs()[0].name
     print(f"ONNX: {input_name}")
 
-    # ── MuJoCo ────────────────────────────────────────────────
     model = mujoco.MjModel.from_xml_path("sim/robot/quadruped_v3.xml")
     model.opt.timestep = 0.005
     data = mujoco.MjData(model)
-
     data.qpos[:3] = [0,0,0.5]; data.qpos[3:7] = [1,0,0,0]
     data.qpos[dof_ids] = default_angle.copy(); data.qvel[:] = 0
     mujoco.mj_step(model, data)
@@ -112,104 +70,66 @@ def main():
     kp = np.array([70,100,120]*4, dtype=np.float64)
     kd = np.array([15,15,20]*4, dtype=np.float64)
     target_q = default_angle.copy()
+    count = 0; decimation = 4
+    walk_sent = False; walk_tick = 0
 
-    # Local state
-    local_last_action = np.zeros(16, dtype=np.float32)
-    local_history = deque(maxlen=5)
+    stub.StandUp(msg.Empty())
 
-    # StandUp via gRPC
-    try:
-        stub.StandUp(msg.Empty())
-    except:
-        pass
+    print("\n=== StandUp 3.5s + Walk 2.5s ===\n")
 
-    count = 0
-    decimation = 4
-
-    # Walk at step 150
-    walk_sent = False
-
-    print("\n=== Running 300 steps (6s): warmup 150 + walk 150 ===\n")
-
-    for step in range(300):
+    for i in range(1200):
         now_s = count * 0.005
 
-        if step == 150:
-            try:
-                stub.Walk(msg.Vector3(x=0.3, y=0.0, z=0.0))
-                walk_sent = True
-                print(f"  [{now_s:.1f}s] >>> Walk(0.3,0,0) sent\n")
-            except:
-                pass
-
         if count % decimation == 0:
-            cmd_vx = 0.3 if walk_sent else 0.0
-
-            # === LOCAL obs ===
-            py_obs = local_obs(data, cmd_vx, 0, 0, local_last_action)
-            local_history.append(py_obs.copy())
-            while len(local_history) < 5:
-                local_history.appendleft(py_obs.copy())
-            py_flat = np.concatenate(list(local_history)).astype(np.float32).reshape(1,-1)
-            py_raw = sess.run(None, {input_name: py_flat})[0].squeeze()
-
-            # Local target
-            if step > 100:
-                py_scaled = np.zeros(16)
-                for j in range(4):
-                    b=j*3
-                    py_scaled[b]=py_raw[b]*0.125; py_scaled[b+1]=py_raw[b+1]*0.25; py_scaled[b+2]=py_raw[b+2]*0.25
-                py_scaled[12:]=py_raw[12:]*5.0
-                py_target = py_scaled + default_angle
-                local_last_action = py_raw.astype(np.float32).copy()
-            else:
-                py_target = default_angle.copy()
-                local_last_action = py_raw.astype(np.float32).copy()
-
-            # === GRPC obs + action ===
             sim_state = build_sim_state(data, now_s)
             stub.Step(sim_state)
+
+            if not walk_sent and now_s >= 3.5:
+                stub.Walk(msg.Vector3(x=0.3, y=0.0, z=0.0))
+                walk_sent = True
+                print(f"  [{now_s:.1f}s] Walk sent\n")
+
             history = stub.Tick(msg.Empty())
             dart_target = np.array(history.next_action.values, dtype=np.float64)
-            dart_obs = dart_obs_from_history(history)
+            if len(history.kp.values) == 16:
+                kp = np.array(history.kp.values[:12])
+            if len(history.kd.values) == 16:
+                kd = np.array(history.kd.values[:12])
+            target_q = dart_target
 
-            # === 对比 obs (当前帧) ===
-            obs_diff = np.abs(py_obs - dart_obs)
-            max_obs_diff = np.max(obs_diff)
-            max_obs_idx = np.argmax(obs_diff)
+            # 用 Dart 返回的 285 维 obs buffer 跑本地 ONNX
+            dart_obs = list(history.observation)
+            if walk_sent and len(dart_obs) == 285:
+                walk_tick += 1
+                if walk_tick <= 20:
+                    # 同一个 buffer → 本地 ONNX
+                    local_input = np.array(dart_obs, dtype=np.float32).reshape(1, -1)
+                    local_raw = sess.run(None, {input_name: local_input})[0].squeeze()
+                    lsc = np.zeros(16)
+                    for j in range(4):
+                        b = j*3
+                        lsc[b] = local_raw[b]*0.125
+                        lsc[b+1] = local_raw[b+1]*0.25
+                        lsc[b+2] = local_raw[b+2]*0.25
+                    lsc[12:] = local_raw[12:]*5.0
+                    local_target = lsc + default_angle
 
-            # === 对比 action (target_q) ===
-            act_diff = np.abs(py_target - dart_target)
-            max_act_diff = np.max(act_diff)
-            max_act_idx = np.argmax(act_diff)
+                    diff = np.abs(dart_target - local_target)
+                    max_diff = diff.max()
+                    max_idx = np.argmax(diff)
+                    print(f"  [{now_s:.2f}s] tick#{walk_tick:2d} "
+                          f"legs={diff[:12].max():.10f} wheels={diff[12:].max():.10f} "
+                          f"max={max_diff:.10f} @ {NAMES_16[max_idx]}")
 
-            # 打印
-            if step % 25 == 0 or max_obs_diff > 0.1 or max_act_diff > 0.1:
-                z = float(data.qpos[2])
-                print(f"--- step {step} [{now_s:.2f}s] z={z:.3f} ---")
-                print(f"  OBS max_diff={max_obs_diff:.4f} @ {NAMES_57[max_obs_idx]}")
-                if max_obs_diff > 0.01:
-                    bad = np.where(obs_diff > 0.01)[0]
-                    for idx in bad[:8]:
-                        print(f"    [{idx:2d}] {NAMES_57[idx]:8s}  local={py_obs[idx]:+.4f}  dart={dart_obs[idx]:+.4f}  diff={obs_diff[idx]:.4f}")
-                print(f"  ACT max_diff={max_act_diff:.4f} @ {NAMES_16[max_act_idx]}")
-                if max_act_diff > 0.01:
-                    bad_a = np.where(act_diff > 0.01)[0]
-                    for idx in bad_a[:8]:
-                        print(f"    [{idx:2d}] {NAMES_16[idx]:12s}  local={py_target[idx]:+.4f}  dart={dart_target[idx]:+.4f}  diff={act_diff[idx]:.4f}")
-                print()
+        q = data.qpos[dof_ids]; dq = data.qvel[dof_vel]
+        tau = np.zeros(16)
+        tau[:12] = kp*(target_q[:12]-q[:12]) - kd*dq[:12]
+        tau[12:] = 1.0*(target_q[12:]-dq[12:])
+        data.ctrl[:] = np.clip(tau, -100, 100)
+        mujoco.mj_step(model, data)
+        count += 1
 
-        # PD（用 local target 驱动物理）
-        for _ in range(decimation):
-            q = data.qpos[dof_ids]; dq = data.qvel[dof_vel]
-            tau = np.zeros(16)
-            tau[:12] = kp*(py_target[:12]-q[:12]) - kd*dq[:12]
-            tau[12:] = 1.0*(py_target[12:]-dq[12:])
-            data.ctrl[:] = np.clip(tau, -100, 100)
-            mujoco.mj_step(model, data)
-            count += 1
-
-    print("Done.")
+    print(f"\nFinal: x={data.qpos[0]:.3f}")
     channel.close()
 
 

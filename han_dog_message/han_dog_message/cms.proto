@@ -142,6 +142,9 @@ message History {
   Matrix4 kp = 9;
   // 当前 PD 控制器的微分增益（16 个关节）。
   Matrix4 kd = 10;
+  // [debug] ONNX 输入 buffer（285 维 = 5帧×57维）。
+  // 仅在 Walking 时填充，用于对比验证。
+  repeated double observation = 11;
 }
 
 // IMU 传感器数据。

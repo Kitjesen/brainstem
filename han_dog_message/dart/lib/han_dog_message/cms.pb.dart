@@ -340,6 +340,7 @@ class History extends $pb.GeneratedMessage {
     $4.Duration? timestamp,
     $1.Matrix4? kp,
     $1.Matrix4? kd,
+    $core.Iterable<$core.double>? observation,
   }) {
     final result = create();
     if (gyroscope != null) result.gyroscope = gyroscope;
@@ -352,6 +353,7 @@ class History extends $pb.GeneratedMessage {
     if (timestamp != null) result.timestamp = timestamp;
     if (kp != null) result.kp = kp;
     if (kd != null) result.kd = kd;
+    if (observation != null) result.observation.addAll(observation);
     return result;
   }
 
@@ -388,6 +390,8 @@ class History extends $pb.GeneratedMessage {
         subBuilder: $1.Matrix4.create)
     ..aOM<$1.Matrix4>(10, _omitFieldNames ? '' : 'kd',
         subBuilder: $1.Matrix4.create)
+    ..p<$core.double>(
+        11, _omitFieldNames ? '' : 'observation', $pb.PbFieldType.KD)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -527,6 +531,11 @@ class History extends $pb.GeneratedMessage {
   void clearKd() => $_clearField(10);
   @$pb.TagNumber(10)
   $1.Matrix4 ensureKd() => $_ensure(9);
+
+  /// [debug] ONNX 输入 buffer（285 维 = 5帧×57维）。
+  /// 仅在 Walking 时填充，用于对比验证。
+  @$pb.TagNumber(11)
+  $pb.PbList<$core.double> get observation => $_getList(10);
 }
 
 /// IMU 传感器数据。

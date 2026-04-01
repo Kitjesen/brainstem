@@ -26,6 +26,7 @@ extension HistoryX on History {
     proto.Duration? timestamp,
     JointsMatrix? kp,
     JointsMatrix? kd,
+    List<double>? observation,
   }) =>
       proto.History(
         gyroscope: gyroscope.toProto(),
@@ -38,6 +39,7 @@ extension HistoryX on History {
         timestamp: timestamp,
         kp: kp?.toProto(),
         kd: kd?.toProto(),
+        observation: observation ?? [],
       );
 }
 

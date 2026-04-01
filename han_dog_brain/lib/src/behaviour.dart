@@ -177,6 +177,9 @@ class Walk extends Behaviour {
   /// Dart 单 Isolate 模型保证同一 Isolate 内的读写是顺序执行的。
   Vector3 direction = .zero();
 
+  /// [debug] 最近一帧 ONNX 输入（285 维），供外部对比验证。
+  Float64List? lastObservation;
+
   Walk({
     required this.observationBuilder,
     required super.imu,
@@ -287,6 +290,8 @@ class Walk extends Behaviour {
       }
       final nextAction = clampAction(toRealAction(_run(observationBuffer)));
       policyTracker.action = nextAction; // 更新策略输出（给下一帧 obs 用）
+      // debug: 保存 285 维 obs buffer 供外部对比
+      lastObservation = Float64List.fromList(observationBuffer);
       return holdNext.copyWith(nextAction: nextAction);
     });
   }

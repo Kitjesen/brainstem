@@ -281,6 +281,7 @@ class UnifiedCmsServer extends proto.CmsServiceBase {
         timestamp: _elapsed(),
         kp: gains?.kp,
         kd: gains?.kd,
+        observation: _brain.walk.lastObservation?.toList(),
       );
     } on TimeoutException {
       throw GrpcError.deadlineExceeded('Inference timed out');
