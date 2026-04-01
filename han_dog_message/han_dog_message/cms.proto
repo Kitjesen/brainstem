@@ -83,7 +83,7 @@ service Cms {
 // 电机总线电压（16 个关节，单位 V）。
 message Voltage {
   // 16 个电机总线电压，顺序同 Matrix4 关节索引。
-  repeated float values = 1;
+  repeated double values = 1;
 }
 
 // 单个电机状态。
@@ -95,15 +95,15 @@ message MotorState {
   // 电机状态码（具体含义取决于电机驱动协议）。
   uint32 status_code = 3;
   // 电机温度 (°C)。
-  float temperature = 4;
+  double temperature = 4;
   // 总线电压 (V)。
-  float voltage = 5;
+  double voltage = 5;
   // 当前关节角度 (rad)。
-  float position = 6;
+  double position = 6;
   // 当前关节角速度 (rad/s)。
-  float velocity = 7;
+  double velocity = 7;
   // 当前关节力矩 (N·m)。
-  float torque = 8;
+  double torque = 8;
   // 故障码列表（空 = 无故障）。
   repeated uint32 errors = 9;
 }
@@ -171,11 +171,11 @@ message SingleJoint {
   // 关节 ID（参见 Matrix4 的关节索引 0-15）。
   uint32 id = 1;
   // 关节角度 (rad)。
-  float position = 2;
+  double position = 2;
   // 关节角速度 (rad/s)。
-  float velocity = 3;
+  double velocity = 3;
   // 关节力矩 (N·m)。
-  float torque = 4;
+  double torque = 4;
   // 电机状态码（具体含义取决于电机驱动协议）。
   uint32 status = 5;
 }

@@ -47,7 +47,7 @@ class Voltage extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'Voltage',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
       createEmptyInstance: create)
-    ..p<$core.double>(1, _omitFieldNames ? '' : 'values', $pb.PbFieldType.KF)
+    ..p<$core.double>(1, _omitFieldNames ? '' : 'values', $pb.PbFieldType.KD)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -115,11 +115,11 @@ class MotorState extends $pb.GeneratedMessage {
     ..aI(1, _omitFieldNames ? '' : 'id', fieldType: $pb.PbFieldType.OU3)
     ..aOB(2, _omitFieldNames ? '' : 'online')
     ..aI(3, _omitFieldNames ? '' : 'statusCode', fieldType: $pb.PbFieldType.OU3)
-    ..aD(4, _omitFieldNames ? '' : 'temperature', fieldType: $pb.PbFieldType.OF)
-    ..aD(5, _omitFieldNames ? '' : 'voltage', fieldType: $pb.PbFieldType.OF)
-    ..aD(6, _omitFieldNames ? '' : 'position', fieldType: $pb.PbFieldType.OF)
-    ..aD(7, _omitFieldNames ? '' : 'velocity', fieldType: $pb.PbFieldType.OF)
-    ..aD(8, _omitFieldNames ? '' : 'torque', fieldType: $pb.PbFieldType.OF)
+    ..aD(4, _omitFieldNames ? '' : 'temperature')
+    ..aD(5, _omitFieldNames ? '' : 'voltage')
+    ..aD(6, _omitFieldNames ? '' : 'position')
+    ..aD(7, _omitFieldNames ? '' : 'velocity')
+    ..aD(8, _omitFieldNames ? '' : 'torque')
     ..p<$core.int>(9, _omitFieldNames ? '' : 'errors', $pb.PbFieldType.KU3)
     ..hasRequiredFields = false;
 
@@ -175,7 +175,7 @@ class MotorState extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   $core.double get temperature => $_getN(3);
   @$pb.TagNumber(4)
-  set temperature($core.double value) => $_setFloat(3, value);
+  set temperature($core.double value) => $_setDouble(3, value);
   @$pb.TagNumber(4)
   $core.bool hasTemperature() => $_has(3);
   @$pb.TagNumber(4)
@@ -185,7 +185,7 @@ class MotorState extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   $core.double get voltage => $_getN(4);
   @$pb.TagNumber(5)
-  set voltage($core.double value) => $_setFloat(4, value);
+  set voltage($core.double value) => $_setDouble(4, value);
   @$pb.TagNumber(5)
   $core.bool hasVoltage() => $_has(4);
   @$pb.TagNumber(5)
@@ -195,7 +195,7 @@ class MotorState extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   $core.double get position => $_getN(5);
   @$pb.TagNumber(6)
-  set position($core.double value) => $_setFloat(5, value);
+  set position($core.double value) => $_setDouble(5, value);
   @$pb.TagNumber(6)
   $core.bool hasPosition() => $_has(5);
   @$pb.TagNumber(6)
@@ -205,7 +205,7 @@ class MotorState extends $pb.GeneratedMessage {
   @$pb.TagNumber(7)
   $core.double get velocity => $_getN(6);
   @$pb.TagNumber(7)
-  set velocity($core.double value) => $_setFloat(6, value);
+  set velocity($core.double value) => $_setDouble(6, value);
   @$pb.TagNumber(7)
   $core.bool hasVelocity() => $_has(6);
   @$pb.TagNumber(7)
@@ -215,7 +215,7 @@ class MotorState extends $pb.GeneratedMessage {
   @$pb.TagNumber(8)
   $core.double get torque => $_getN(7);
   @$pb.TagNumber(8)
-  set torque($core.double value) => $_setFloat(7, value);
+  set torque($core.double value) => $_setDouble(7, value);
   @$pb.TagNumber(8)
   $core.bool hasTorque() => $_has(7);
   @$pb.TagNumber(8)
@@ -756,9 +756,9 @@ class SingleJoint extends $pb.GeneratedMessage {
       package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
       createEmptyInstance: create)
     ..aI(1, _omitFieldNames ? '' : 'id', fieldType: $pb.PbFieldType.OU3)
-    ..aD(2, _omitFieldNames ? '' : 'position', fieldType: $pb.PbFieldType.OF)
-    ..aD(3, _omitFieldNames ? '' : 'velocity', fieldType: $pb.PbFieldType.OF)
-    ..aD(4, _omitFieldNames ? '' : 'torque', fieldType: $pb.PbFieldType.OF)
+    ..aD(2, _omitFieldNames ? '' : 'position')
+    ..aD(3, _omitFieldNames ? '' : 'velocity')
+    ..aD(4, _omitFieldNames ? '' : 'torque')
     ..aI(5, _omitFieldNames ? '' : 'status', fieldType: $pb.PbFieldType.OU3)
     ..hasRequiredFields = false;
 
@@ -795,7 +795,7 @@ class SingleJoint extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   $core.double get position => $_getN(1);
   @$pb.TagNumber(2)
-  set position($core.double value) => $_setFloat(1, value);
+  set position($core.double value) => $_setDouble(1, value);
   @$pb.TagNumber(2)
   $core.bool hasPosition() => $_has(1);
   @$pb.TagNumber(2)
@@ -805,7 +805,7 @@ class SingleJoint extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   $core.double get velocity => $_getN(2);
   @$pb.TagNumber(3)
-  set velocity($core.double value) => $_setFloat(2, value);
+  set velocity($core.double value) => $_setDouble(2, value);
   @$pb.TagNumber(3)
   $core.bool hasVelocity() => $_has(2);
   @$pb.TagNumber(3)
@@ -815,7 +815,7 @@ class SingleJoint extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   $core.double get torque => $_getN(3);
   @$pb.TagNumber(4)
-  set torque($core.double value) => $_setFloat(3, value);
+  set torque($core.double value) => $_setDouble(3, value);
   @$pb.TagNumber(4)
   $core.bool hasTorque() => $_has(3);
   @$pb.TagNumber(4)

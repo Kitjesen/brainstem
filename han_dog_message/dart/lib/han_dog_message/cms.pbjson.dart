@@ -54,13 +54,13 @@ final $typed_data.Uint8List cmsTransitionKindDescriptor = $convert.base64Decode(
 const Voltage$json = {
   '1': 'Voltage',
   '2': [
-    {'1': 'values', '3': 1, '4': 3, '5': 2, '10': 'values'},
+    {'1': 'values', '3': 1, '4': 3, '5': 1, '10': 'values'},
   ],
 };
 
 /// Descriptor for `Voltage`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List voltageDescriptor =
-    $convert.base64Decode('CgdWb2x0YWdlEhYKBnZhbHVlcxgBIAMoAlIGdmFsdWVz');
+    $convert.base64Decode('CgdWb2x0YWdlEhYKBnZhbHVlcxgBIAMoAVIGdmFsdWVz');
 
 @$core.Deprecated('Use motorStateDescriptor instead')
 const MotorState$json = {
@@ -69,11 +69,11 @@ const MotorState$json = {
     {'1': 'id', '3': 1, '4': 1, '5': 13, '10': 'id'},
     {'1': 'online', '3': 2, '4': 1, '5': 8, '10': 'online'},
     {'1': 'status_code', '3': 3, '4': 1, '5': 13, '10': 'statusCode'},
-    {'1': 'temperature', '3': 4, '4': 1, '5': 2, '10': 'temperature'},
-    {'1': 'voltage', '3': 5, '4': 1, '5': 2, '10': 'voltage'},
-    {'1': 'position', '3': 6, '4': 1, '5': 2, '10': 'position'},
-    {'1': 'velocity', '3': 7, '4': 1, '5': 2, '10': 'velocity'},
-    {'1': 'torque', '3': 8, '4': 1, '5': 2, '10': 'torque'},
+    {'1': 'temperature', '3': 4, '4': 1, '5': 1, '10': 'temperature'},
+    {'1': 'voltage', '3': 5, '4': 1, '5': 1, '10': 'voltage'},
+    {'1': 'position', '3': 6, '4': 1, '5': 1, '10': 'position'},
+    {'1': 'velocity', '3': 7, '4': 1, '5': 1, '10': 'velocity'},
+    {'1': 'torque', '3': 8, '4': 1, '5': 1, '10': 'torque'},
     {'1': 'errors', '3': 9, '4': 3, '5': 13, '10': 'errors'},
   ],
 };
@@ -81,9 +81,9 @@ const MotorState$json = {
 /// Descriptor for `MotorState`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List motorStateDescriptor = $convert.base64Decode(
     'CgpNb3RvclN0YXRlEg4KAmlkGAEgASgNUgJpZBIWCgZvbmxpbmUYAiABKAhSBm9ubGluZRIfCg'
-    'tzdGF0dXNfY29kZRgDIAEoDVIKc3RhdHVzQ29kZRIgCgt0ZW1wZXJhdHVyZRgEIAEoAlILdGVt'
-    'cGVyYXR1cmUSGAoHdm9sdGFnZRgFIAEoAlIHdm9sdGFnZRIaCghwb3NpdGlvbhgGIAEoAlIIcG'
-    '9zaXRpb24SGgoIdmVsb2NpdHkYByABKAJSCHZlbG9jaXR5EhYKBnRvcnF1ZRgIIAEoAlIGdG9y'
+    'tzdGF0dXNfY29kZRgDIAEoDVIKc3RhdHVzQ29kZRIgCgt0ZW1wZXJhdHVyZRgEIAEoAVILdGVt'
+    'cGVyYXR1cmUSGAoHdm9sdGFnZRgFIAEoAVIHdm9sdGFnZRIaCghwb3NpdGlvbhgGIAEoAVIIcG'
+    '9zaXRpb24SGgoIdmVsb2NpdHkYByABKAFSCHZlbG9jaXR5EhYKBnRvcnF1ZRgIIAEoAVIGdG9y'
     'cXVlEhYKBmVycm9ycxgJIAMoDVIGZXJyb3Jz');
 
 @$core.Deprecated('Use motorStatusResponseDescriptor instead')
@@ -288,17 +288,17 @@ const SingleJoint$json = {
   '1': 'SingleJoint',
   '2': [
     {'1': 'id', '3': 1, '4': 1, '5': 13, '10': 'id'},
-    {'1': 'position', '3': 2, '4': 1, '5': 2, '10': 'position'},
-    {'1': 'velocity', '3': 3, '4': 1, '5': 2, '10': 'velocity'},
-    {'1': 'torque', '3': 4, '4': 1, '5': 2, '10': 'torque'},
+    {'1': 'position', '3': 2, '4': 1, '5': 1, '10': 'position'},
+    {'1': 'velocity', '3': 3, '4': 1, '5': 1, '10': 'velocity'},
+    {'1': 'torque', '3': 4, '4': 1, '5': 1, '10': 'torque'},
     {'1': 'status', '3': 5, '4': 1, '5': 13, '10': 'status'},
   ],
 };
 
 /// Descriptor for `SingleJoint`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List singleJointDescriptor = $convert.base64Decode(
-    'CgtTaW5nbGVKb2ludBIOCgJpZBgBIAEoDVICaWQSGgoIcG9zaXRpb24YAiABKAJSCHBvc2l0aW'
-    '9uEhoKCHZlbG9jaXR5GAMgASgCUgh2ZWxvY2l0eRIWCgZ0b3JxdWUYBCABKAJSBnRvcnF1ZRIW'
+    'CgtTaW5nbGVKb2ludBIOCgJpZBgBIAEoDVICaWQSGgoIcG9zaXRpb24YAiABKAFSCHBvc2l0aW'
+    '9uEhoKCHZlbG9jaXR5GAMgASgBUgh2ZWxvY2l0eRIWCgZ0b3JxdWUYBCABKAFSBnRvcnF1ZRIW'
     'CgZzdGF0dXMYBSABKA1SBnN0YXR1cw==');
 
 @$core.Deprecated('Use allJointsDescriptor instead')

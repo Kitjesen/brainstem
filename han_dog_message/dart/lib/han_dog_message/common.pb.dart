@@ -49,9 +49,9 @@ class Vector3 extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'Vector3',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
       createEmptyInstance: create)
-    ..aD(1, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
-    ..aD(2, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
-    ..aD(3, _omitFieldNames ? '' : 'z', fieldType: $pb.PbFieldType.OF)
+    ..aD(1, _omitFieldNames ? '' : 'x')
+    ..aD(2, _omitFieldNames ? '' : 'y')
+    ..aD(3, _omitFieldNames ? '' : 'z')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -75,7 +75,7 @@ class Vector3 extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $core.double get x => $_getN(0);
   @$pb.TagNumber(1)
-  set x($core.double value) => $_setFloat(0, value);
+  set x($core.double value) => $_setDouble(0, value);
   @$pb.TagNumber(1)
   $core.bool hasX() => $_has(0);
   @$pb.TagNumber(1)
@@ -84,7 +84,7 @@ class Vector3 extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   $core.double get y => $_getN(1);
   @$pb.TagNumber(2)
-  set y($core.double value) => $_setFloat(1, value);
+  set y($core.double value) => $_setDouble(1, value);
   @$pb.TagNumber(2)
   $core.bool hasY() => $_has(1);
   @$pb.TagNumber(2)
@@ -93,7 +93,7 @@ class Vector3 extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   $core.double get z => $_getN(2);
   @$pb.TagNumber(3)
-  set z($core.double value) => $_setFloat(2, value);
+  set z($core.double value) => $_setDouble(2, value);
   @$pb.TagNumber(3)
   $core.bool hasZ() => $_has(2);
   @$pb.TagNumber(3)
@@ -123,7 +123,7 @@ class ArrayFloat extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'ArrayFloat',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
       createEmptyInstance: create)
-    ..p<$core.double>(1, _omitFieldNames ? '' : 'values', $pb.PbFieldType.KF)
+    ..p<$core.double>(1, _omitFieldNames ? '' : 'values', $pb.PbFieldType.KD)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -181,7 +181,7 @@ class Matrix4 extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'Matrix4',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
       createEmptyInstance: create)
-    ..p<$core.double>(1, _omitFieldNames ? '' : 'values', $pb.PbFieldType.KF)
+    ..p<$core.double>(1, _omitFieldNames ? '' : 'values', $pb.PbFieldType.KD)
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -285,10 +285,10 @@ class Quaternion extends $pb.GeneratedMessage {
       _omitMessageNames ? '' : 'Quaternion',
       package: const $pb.PackageName(_omitMessageNames ? '' : 'han_dog'),
       createEmptyInstance: create)
-    ..aD(1, _omitFieldNames ? '' : 'w', fieldType: $pb.PbFieldType.OF)
-    ..aD(2, _omitFieldNames ? '' : 'x', fieldType: $pb.PbFieldType.OF)
-    ..aD(3, _omitFieldNames ? '' : 'y', fieldType: $pb.PbFieldType.OF)
-    ..aD(4, _omitFieldNames ? '' : 'z', fieldType: $pb.PbFieldType.OF)
+    ..aD(1, _omitFieldNames ? '' : 'w')
+    ..aD(2, _omitFieldNames ? '' : 'x')
+    ..aD(3, _omitFieldNames ? '' : 'y')
+    ..aD(4, _omitFieldNames ? '' : 'z')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -312,7 +312,7 @@ class Quaternion extends $pb.GeneratedMessage {
   @$pb.TagNumber(1)
   $core.double get w => $_getN(0);
   @$pb.TagNumber(1)
-  set w($core.double value) => $_setFloat(0, value);
+  set w($core.double value) => $_setDouble(0, value);
   @$pb.TagNumber(1)
   $core.bool hasW() => $_has(0);
   @$pb.TagNumber(1)
@@ -321,7 +321,7 @@ class Quaternion extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   $core.double get x => $_getN(1);
   @$pb.TagNumber(2)
-  set x($core.double value) => $_setFloat(1, value);
+  set x($core.double value) => $_setDouble(1, value);
   @$pb.TagNumber(2)
   $core.bool hasX() => $_has(1);
   @$pb.TagNumber(2)
@@ -330,7 +330,7 @@ class Quaternion extends $pb.GeneratedMessage {
   @$pb.TagNumber(3)
   $core.double get y => $_getN(2);
   @$pb.TagNumber(3)
-  set y($core.double value) => $_setFloat(2, value);
+  set y($core.double value) => $_setDouble(2, value);
   @$pb.TagNumber(3)
   $core.bool hasY() => $_has(2);
   @$pb.TagNumber(3)
@@ -339,7 +339,7 @@ class Quaternion extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   $core.double get z => $_getN(3);
   @$pb.TagNumber(4)
-  set z($core.double value) => $_setFloat(3, value);
+  set z($core.double value) => $_setDouble(3, value);
   @$pb.TagNumber(4)
   $core.bool hasZ() => $_has(3);
   @$pb.TagNumber(4)

@@ -128,6 +128,21 @@ class CmsStub(object):
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=han__dog__message_dot_cms__pb2.ProfileInfo.FromString,
                 _registered_method=True)
+        self.GetVoltage = channel.unary_unary(
+                '/han_dog.Cms/GetVoltage',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=han__dog__message_dot_cms__pb2.Voltage.FromString,
+                _registered_method=True)
+        self.GetMotorStatus = channel.unary_unary(
+                '/han_dog.Cms/GetMotorStatus',
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+                response_deserializer=han__dog__message_dot_cms__pb2.MotorStatusResponse.FromString,
+                _registered_method=True)
+        self.ClearMotorFault = channel.unary_unary(
+                '/han_dog.Cms/ClearMotorFault',
+                request_serializer=han__dog__message_dot_cms__pb2.ClearFaultRequest.SerializeToString,
+                response_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                _registered_method=True)
 
 
 class CmsServicer(object):
@@ -262,6 +277,29 @@ class CmsServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetVoltage(self, request, context):
+        """──── 诊断 ────
+
+        读取全部 16 个电机的总线电压 (V)。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetMotorStatus(self, request, context):
+        """查询全部 16 个电机的健康状态。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ClearMotorFault(self, request, context):
+        """清除电机故障。joint_ids 为空则清除全部，否则只清指定关节。
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_CmsServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -344,6 +382,21 @@ def add_CmsServicer_to_server(servicer, server):
                     servicer.GetProfile,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=han__dog__message_dot_cms__pb2.ProfileInfo.SerializeToString,
+            ),
+            'GetVoltage': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetVoltage,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=han__dog__message_dot_cms__pb2.Voltage.SerializeToString,
+            ),
+            'GetMotorStatus': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMotorStatus,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
+                    response_serializer=han__dog__message_dot_cms__pb2.MotorStatusResponse.SerializeToString,
+            ),
+            'ClearMotorFault': grpc.unary_unary_rpc_method_handler(
+                    servicer.ClearMotorFault,
+                    request_deserializer=han__dog__message_dot_cms__pb2.ClearFaultRequest.FromString,
+                    response_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -789,6 +842,87 @@ class Cms(object):
             '/han_dog.Cms/GetProfile',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             han__dog__message_dot_cms__pb2.ProfileInfo.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetVoltage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/han_dog.Cms/GetVoltage',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            han__dog__message_dot_cms__pb2.Voltage.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetMotorStatus(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/han_dog.Cms/GetMotorStatus',
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
+            han__dog__message_dot_cms__pb2.MotorStatusResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ClearMotorFault(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/han_dog.Cms/ClearMotorFault',
+            han__dog__message_dot_cms__pb2.ClearFaultRequest.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.FromString,
             options,
             channel_credentials,
             insecure,

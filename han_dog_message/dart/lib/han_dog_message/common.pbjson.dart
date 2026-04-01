@@ -34,39 +34,39 @@ final $typed_data.Uint8List robotTypeDescriptor = $convert.base64Decode(
 const Vector3$json = {
   '1': 'Vector3',
   '2': [
-    {'1': 'x', '3': 1, '4': 1, '5': 2, '10': 'x'},
-    {'1': 'y', '3': 2, '4': 1, '5': 2, '10': 'y'},
-    {'1': 'z', '3': 3, '4': 1, '5': 2, '10': 'z'},
+    {'1': 'x', '3': 1, '4': 1, '5': 1, '10': 'x'},
+    {'1': 'y', '3': 2, '4': 1, '5': 1, '10': 'y'},
+    {'1': 'z', '3': 3, '4': 1, '5': 1, '10': 'z'},
   ],
 };
 
 /// Descriptor for `Vector3`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List vector3Descriptor = $convert.base64Decode(
-    'CgdWZWN0b3IzEgwKAXgYASABKAJSAXgSDAoBeRgCIAEoAlIBeRIMCgF6GAMgASgCUgF6');
+    'CgdWZWN0b3IzEgwKAXgYASABKAFSAXgSDAoBeRgCIAEoAVIBeRIMCgF6GAMgASgBUgF6');
 
 @$core.Deprecated('Use arrayFloatDescriptor instead')
 const ArrayFloat$json = {
   '1': 'ArrayFloat',
   '2': [
-    {'1': 'values', '3': 1, '4': 3, '5': 2, '10': 'values'},
+    {'1': 'values', '3': 1, '4': 3, '5': 1, '10': 'values'},
   ],
 };
 
 /// Descriptor for `ArrayFloat`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List arrayFloatDescriptor =
-    $convert.base64Decode('CgpBcnJheUZsb2F0EhYKBnZhbHVlcxgBIAMoAlIGdmFsdWVz');
+    $convert.base64Decode('CgpBcnJheUZsb2F0EhYKBnZhbHVlcxgBIAMoAVIGdmFsdWVz');
 
 @$core.Deprecated('Use matrix4Descriptor instead')
 const Matrix4$json = {
   '1': 'Matrix4',
   '2': [
-    {'1': 'values', '3': 1, '4': 3, '5': 2, '10': 'values'},
+    {'1': 'values', '3': 1, '4': 3, '5': 1, '10': 'values'},
   ],
 };
 
 /// Descriptor for `Matrix4`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List matrix4Descriptor =
-    $convert.base64Decode('CgdNYXRyaXg0EhYKBnZhbHVlcxgBIAMoAlIGdmFsdWVz');
+    $convert.base64Decode('CgdNYXRyaXg0EhYKBnZhbHVlcxgBIAMoAVIGdmFsdWVz');
 
 @$core.Deprecated('Use matrix4Int32Descriptor instead')
 const Matrix4Int32$json = {
@@ -84,17 +84,17 @@ final $typed_data.Uint8List matrix4Int32Descriptor = $convert
 const Quaternion$json = {
   '1': 'Quaternion',
   '2': [
-    {'1': 'w', '3': 1, '4': 1, '5': 2, '10': 'w'},
-    {'1': 'x', '3': 2, '4': 1, '5': 2, '10': 'x'},
-    {'1': 'y', '3': 3, '4': 1, '5': 2, '10': 'y'},
-    {'1': 'z', '3': 4, '4': 1, '5': 2, '10': 'z'},
+    {'1': 'w', '3': 1, '4': 1, '5': 1, '10': 'w'},
+    {'1': 'x', '3': 2, '4': 1, '5': 1, '10': 'x'},
+    {'1': 'y', '3': 3, '4': 1, '5': 1, '10': 'y'},
+    {'1': 'z', '3': 4, '4': 1, '5': 1, '10': 'z'},
   ],
 };
 
 /// Descriptor for `Quaternion`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List quaternionDescriptor = $convert.base64Decode(
-    'CgpRdWF0ZXJuaW9uEgwKAXcYASABKAJSAXcSDAoBeBgCIAEoAlIBeBIMCgF5GAMgASgCUgF5Eg'
-    'wKAXoYBCABKAJSAXo=');
+    'CgpRdWF0ZXJuaW9uEgwKAXcYASABKAFSAXcSDAoBeBgCIAEoAVIBeBIMCgF5GAMgASgBUgF5Eg'
+    'wKAXoYBCABKAFSAXo=');
 
 @$core.Deprecated('Use actionDescriptor instead')
 const Action$json = {
