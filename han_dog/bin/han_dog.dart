@@ -252,10 +252,10 @@ Future<void> _run() async {
   _subs.add(brain.nextActionStream.listen(
     (action) {
       _actionCount++;
-      if (_actionCount <= 5 || _actionCount % 50 == 0) {
-        _log.fine('action[$_actionCount] enabled=$motorOutputEnabled '
+      if (_actionCount <= 3 || _actionCount % 50 == 0) {
+        _log.info('ACTION[$_actionCount] enabled=$motorOutputEnabled '
             'state=${arbiter.state.runtimeType} '
-            'action[0]=${action.values[0].toStringAsFixed(3)}');
+            'a0=${action.values[0].toStringAsFixed(3)}');
       }
       if (!motorOutputEnabled) return;
 
