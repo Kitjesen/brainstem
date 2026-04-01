@@ -125,12 +125,13 @@ def main():
 
     print()
     print("Controls:")
-    print("  A        : StandUp")
-    print("  X        : SitDown")
+    print("  A          : StandUp")
+    print("  X          : SitDown")
     print("  Left stick : Walk (auto sends Walk command)")
     print("  Right stick X : Yaw")
-    print("  LT/RT    : Slow/Fast")
-    print("  B        : Quit")
+    print("  LT/RT      : Slow/Fast")
+    print("  Back/Select: SetZero (标零，需在 Grounded 状态)")
+    print("  B          : Quit")
     print()
 
     try:
@@ -185,6 +186,14 @@ def main():
                 safe_call(stub.SitDown, msg.Empty())
                 walking = False
                 print(f"  [{now_s:.1f}s] >> SitDown")
+
+            # Back/Select = SetZero (按钮 6)
+            if btn_pressed(6):
+                result = safe_call(stub.SetZero, msg.Empty())
+                if result is not None:
+                    print(f"  [{now_s:.1f}s] >> SetZero (标零完成)")
+                else:
+                    print(f"  [{now_s:.1f}s] >> SetZero 失败 (需在 Grounded 状态)")
 
             # B = Quit
             if btn_pressed(1):
