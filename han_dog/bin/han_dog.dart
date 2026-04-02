@@ -442,14 +442,23 @@ Future<void> _run() async {
       if (minV < lowVoltageThreshold) {
         lowVoltageTriggered = true;
         _log.severe(
-          'LOW VOLTAGE: ${minV.toStringAsFixed(1)}V < ${lowVoltageThreshold}V — emergency sitDown',
+          'LOW VOLTAGE: ${minV.toStringAsFixed(1)}V < ${lowVoltageThreshold}V — graceful sitDown',
         );
+        // 先发 SitDown，等到 Grounded 再 disable（优雅着陆）
         m.add(const A.sitDown());
-        Future<void>.delayed(const Duration(seconds: 4), () {
+        () async {
+          try {
+            await m.stream
+                .firstWhere((s) => s is Grounded)
+                .timeout(const Duration(seconds: 8));
+            _log.info('Low voltage: reached Grounded, disabling motors');
+          } on TimeoutException {
+            _log.severe('Low voltage: Grounded timeout 8s, force disabling');
+          }
           joint.disable();
           motorOutputEnabled = false;
           _log.severe('Motors disabled due to low voltage');
-        });
+        }();
       }
     } catch (_) {}
   });
