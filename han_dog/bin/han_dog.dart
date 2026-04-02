@@ -174,18 +174,34 @@ Future<void> _run() async {
   joint.kpExt = defaultProfile.inferKp;
   joint.kdExt = defaultProfile.inferKd;
 
-  // ──── 3. YUNZHUO 遥控器（可选，打不开则仅 gRPC 控制）─────────
-  RealController? controller;
+  // ──── 3. 手柄（YUNZHUO → Xbox → gRPC-only 三级降级）────────
+  Gamepad? controller;
   {
-    final c = RealController(_cfg.yunzhuoPort);
-    if (c.open()) {
-      controller = c;
+    // 优先尝试 YUNZHUO 遥控器
+    final yunzhuo = RealController(_cfg.yunzhuoPort);
+    if (yunzhuo.open()) {
+      controller = yunzhuo;
       _log.info('YUNZHUO controller opened.');
     } else {
-      _log.warning(
-        'YUNZHUO controller not available on ${_cfg.yunzhuoPort} — '
-        'running in gRPC-only mode (no joystick control)',
-      );
+      _log.info('YUNZHUO not available, trying Xbox...');
+      // 尝试 Xbox 手柄
+      XboxConfig xboxConfig = const XboxConfig();
+      try {
+        xboxConfig = await XboxConfig.loadFromFile(_cfg.xboxConfigPath);
+        _log.info('Xbox config loaded: ${_cfg.xboxConfigPath}');
+      } catch (_) {
+        _log.fine('Xbox config not found, using defaults');
+      }
+      final xbox = XboxController(_cfg.xboxDevice, config: xboxConfig);
+      if (xbox.open()) {
+        controller = xbox;
+        _log.info('Xbox controller opened: ${_cfg.xboxDevice}');
+      } else {
+        _log.warning(
+          'No controller available (YUNZHUO=${_cfg.yunzhuoPort}, Xbox=${_cfg.xboxDevice}) — '
+          'running in gRPC-only mode',
+        );
+      }
     }
   }
 

@@ -63,6 +63,10 @@ class HanDogConfig {
       Platform.environment['HAN_DOG_IMU_PORT'] ?? '/dev/ttyUSB1';
   String get yunzhuoPort =>
       Platform.environment['HAN_DOG_YUNZHUO_PORT'] ?? '/dev/yunzhuo';
+  String get xboxDevice =>
+      Platform.environment['HAN_DOG_XBOX_DEVICE'] ?? '/dev/input/js0';
+  String get xboxConfigPath =>
+      Platform.environment['HAN_DOG_XBOX_CONFIG'] ?? 'han_dog/config/xbox.json';
 
   /// 默认策略名称（对应 profileDir 中的 JSON 文件 name 字段）。
   /// 未设置时使用加载顺序第一个策略。

@@ -7,9 +7,11 @@ import 'package:robo_device_proto/robo_device_proto.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:vector_math/vector_math.dart';
 
+import 'gamepad.dart';
+
 final _log = Logger('han_dog.controller');
 
-class RealController {
+class RealController implements Gamepad {
   final String portName;
   late SerialPortController<Never, YunZhuoState> port;
   final hz = RealFrequency();
