@@ -201,6 +201,7 @@ class XboxController implements Gamepad {
   void _onData(List<int> chunk) {
     _buf.add(chunk);
     // 每个 js_event = 8 bytes
+    var hasNewEvent = false;
     while (_buf.length >= 8) {
       final bytes = _buf.takeBytes();
       var offset = 0;
@@ -212,10 +213,13 @@ class XboxController implements Gamepad {
           bd.getUint8(6),
           bd.getUint8(7),
         );
-        if (event.isAxis) {
+        if (event.isAxis && !event.isInit) {
           _axes[event.number] = event.value / 32767.0;
-        } else if (event.isButton) {
+          hasNewEvent = true;
+        } else if (event.isButton && !event.isInit) {
           _buttons[event.number] = event.value != 0;
+          hasNewEvent = true;
+          _log.fine('btn[${event.number}]=${event.value != 0}');
         }
         offset += 8;
       }
@@ -224,6 +228,10 @@ class XboxController implements Gamepad {
         _buf.add(bytes.sublist(offset));
       }
       break;
+    }
+    // 收到实际事件时立即发 tick，确保按钮不被漏掉
+    if (hasNewEvent && !_disposed) {
+      _stateController.add(null);
     }
   }
 
