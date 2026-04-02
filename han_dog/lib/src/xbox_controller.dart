@@ -20,6 +20,7 @@ import 'package:rxdart/rxdart.dart';
 import 'package:vector_math/vector_math.dart';
 
 import 'gamepad.dart';
+import 'linux_joystick.dart';
 
 final _log = Logger('han_dog.xbox');
 
@@ -127,20 +128,6 @@ class XboxConfig {
   }
 }
 
-/// Linux joystick 事件。
-class JsEvent {
-  final int time;
-  final int value;
-  final int type;
-  final int number;
-
-  JsEvent(this.time, this.value, this.type, this.number);
-
-  bool get isButton => type & 0x01 != 0;
-  bool get isAxis => type & 0x02 != 0;
-  bool get isInit => type & 0x80 != 0;
-}
-
 /// Xbox 手柄控制器 — 读取 /dev/input/js* 提供和 RealController 兼容的流接口。
 ///
 /// 使用方式和 RealController 一样：
@@ -153,15 +140,14 @@ class XboxController implements Gamepad {
   final String devicePath;
   final XboxConfig config;
 
-  Process? _proc;
-  StreamSubscription<List<int>>? _procSub;
+  LinuxJoystick? _joystick;
+  StreamSubscription<JsEvent>? _eventSub;
   Timer? _tickTimer;
   bool _disposed = false;
 
   // 内部状态
   final Map<int, double> _axes = {};
   final Map<int, bool> _buttons = {};
-  final _buf = BytesBuilder();
 
   // 广播流
   final _stateController = StreamController<void>.broadcast();
@@ -171,75 +157,27 @@ class XboxController implements Gamepad {
   // ── 打开/关闭 ─────────────────────────────────────────────
 
   bool open() {
-    if (!File(devicePath).existsSync()) {
-      _log.severe('Xbox controller not found: $devicePath');
+    _joystick = LinuxJoystick(devicePath);
+    if (!_joystick!.open()) {
+      _joystick = null;
       return false;
     }
-    try {
-      // 用 cat 进程持续读设备文件（File.openRead 对设备文件会提前 EOF）
-      _proc = Process.runSync('true', []).pid >= 0 ? null : null; // placeholder
-    } catch (_) {}
-    _startCatProcess();
+    // 监听 joystick 事件，更新内部状态
+    _eventSub = _joystick!.eventStream.listen((event) {
+      if (event.isAxis) {
+        _axes[event.number] = event.value / 32767.0;
+      } else if (event.isButton) {
+        _buttons[event.number] = event.value != 0;
+      }
+      // 收到事件立即发 tick（按钮不漏掉）
+      if (!_disposed) _stateController.add(null);
+    });
     _log.info('Xbox controller opened: $devicePath');
-    // 50Hz tick 驱动 direction 流
+    // 50Hz tick 驱动 direction 流（无事件时也保持输出）
     _tickTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
       if (!_disposed) _stateController.add(null);
     });
     return true;
-  }
-
-  Future<void> _startCatProcess() async {
-    try {
-      _proc = await Process.start('cat', [devicePath]);
-      _procSub = _proc!.stdout.listen(
-        _onData,
-        onError: (Object e) {
-          _log.severe('Xbox read error: $e');
-        },
-        onDone: () {
-          _log.warning('Xbox cat process ended');
-        },
-      );
-    } catch (e) {
-      _log.severe('Xbox controller cat failed: $devicePath — $e');
-    }
-  }
-
-  void _onData(List<int> chunk) {
-    _buf.add(chunk);
-    // 每个 js_event = 8 bytes
-    var hasNewEvent = false;
-    while (_buf.length >= 8) {
-      final bytes = _buf.takeBytes();
-      var offset = 0;
-      while (offset + 8 <= bytes.length) {
-        final bd = ByteData.sublistView(Uint8List.fromList(bytes), offset, offset + 8);
-        final event = JsEvent(
-          bd.getUint32(0, Endian.little),
-          bd.getInt16(4, Endian.little),
-          bd.getUint8(6),
-          bd.getUint8(7),
-        );
-        if (event.isAxis && !event.isInit) {
-          _axes[event.number] = event.value / 32767.0;
-          hasNewEvent = true;
-        } else if (event.isButton && !event.isInit) {
-          _buttons[event.number] = event.value != 0;
-          hasNewEvent = true;
-          _log.fine('btn[${event.number}]=${event.value != 0}');
-        }
-        offset += 8;
-      }
-      // 剩余不足 8 字节放回 buffer
-      if (offset < bytes.length) {
-        _buf.add(bytes.sublist(offset));
-      }
-      break;
-    }
-    // 收到实际事件时立即发 tick，确保按钮不被漏掉
-    if (hasNewEvent && !_disposed) {
-      _stateController.add(null);
-    }
   }
 
   double _axis(int idx) => _axes[idx] ?? 0.0;
@@ -342,8 +280,8 @@ class XboxController implements Gamepad {
     if (_disposed) return;
     _disposed = true;
     _tickTimer?.cancel();
-    _procSub?.cancel();
-    _proc?.kill();
+    _eventSub?.cancel();
+    _joystick?.dispose();
     _stateController.close();
     _log.info('Xbox controller disposed: $devicePath');
   }
