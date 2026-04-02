@@ -343,7 +343,7 @@ Future<void> _run() async {
     arbiter: arbiter,
     threshold: _cfg.sensorLowThreshold,
   ));
-  if (controller != null) {
+  if (controller is RealController) {
     _subs.add(startControllerMonitoring(
       controller: controller,
       arbiter: arbiter,
@@ -571,7 +571,7 @@ void _registerShutdown({
   required ControlArbiter arbiter,
   required grpc.Server grpcServer,
   required RealControlDog? controlDog,
-  required RealController? controller,
+  required Gamepad? controller,
   required RealImu imu,
   required Brain brain,
   required MotorHealthManager motorHealth,
