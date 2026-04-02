@@ -8,8 +8,6 @@ import 'package:logging/logging.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 import 'package:vector_math/vector_math.dart';
 
-import 'gamepad.dart';
-
 final _log = Logger('han_dog.control');
 
 
@@ -45,7 +43,7 @@ class RealControlDog {
     required this.standUpKd,
     required this.sitDownKp,
     required this.sitDownKd,
-    required Gamepad this.controller,
+    required this.controller,
   }) {
     // 监听 CMS 状态变化，自动设置对应的 kp/kd
     _subscriptions.add(arbiter.stateStream.listen(

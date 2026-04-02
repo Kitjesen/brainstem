@@ -12,11 +12,11 @@
 ///   3. 记录显示的 CAN 通道（can0/can1/can2/can3）
 ///   4. 对 FL、RR、RL 重复
 ///   5. 根据结果修改 han_dog.dart 中的 RealJoint 通道映射
+library;
 
 import 'dart:async';
 import 'dart:io';
 
-import 'package:pcan/pcan.dart';
 import 'package:robo_device/robo_device.dart';
 import 'package:robo_device_proto/robo_device_proto.dart';
 
@@ -102,7 +102,7 @@ void main() async {
           print(
             '  ▶ ${_channelNames[ch]}  '
             'Motor $motor (ID ${state.canId})  '
-            'Δ${degDelta}°  '
+            'Δ$degDelta°  '
             'pos=${pos.toStringAsFixed(3)} rad',
           );
           // 更新基准，避免持续刷屏

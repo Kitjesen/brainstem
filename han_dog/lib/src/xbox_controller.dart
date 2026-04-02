@@ -11,9 +11,8 @@
 //   按钮0=A, 1=B, 2=X, 3=Y, 4=LB, 5=RB, 6=Back, 7=Start, 8=LS, 9=RS
 
 import 'dart:async';
-import 'dart:io';
-import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:logging/logging.dart';
 import 'package:rxdart/rxdart.dart';
@@ -196,6 +195,7 @@ class XboxController implements Gamepad {
   // ── 和 RealController 兼容的流接口 ─────────────────────────
 
   /// 行走方向流：(x=前后, y=左右, z=旋转)
+  @override
   Stream<Vector3> get direction => _stateController.stream.map((_) {
         var ly = _dz(_axis(config.axisLeftY));
         if (config.leftYInvert) ly = -ly;
@@ -215,6 +215,7 @@ class XboxController implements Gamepad {
       });
 
   /// StandUp: A 按钮按下
+  @override
   Stream<bool> get standup => _stateController.stream
       .map((_) => _btn(config.btnA))
       .distinct()
@@ -223,6 +224,7 @@ class XboxController implements Gamepad {
       .map((_) => true);
 
   /// SitDown: X 按钮按下
+  @override
   Stream<bool> get sitdown => _stateController.stream
       .map((_) => _btn(config.btnX))
       .distinct()
@@ -231,20 +233,22 @@ class XboxController implements Gamepad {
       .map((_) => true);
 
   /// Enable/Disable: Y 按钮切换
+  @override
   Stream<bool> get enabled {
-    var _enabled = false;
+    var isEnabled = false;
     return _stateController.stream
         .map((_) => _btn(config.btnY))
         .distinct()
         .pairwise()
         .where((p) => !p[0] && p[1])
         .map((_) {
-      _enabled = !_enabled;
-      return _enabled;
+      isEnabled = !isEnabled;
+      return isEnabled;
     });
   }
 
   /// Idle (StandUp): RB 按钮
+  @override
   Stream<bool> get idle => _stateController.stream
       .map((_) => _btn(config.btnRB))
       .distinct()
@@ -253,6 +257,7 @@ class XboxController implements Gamepad {
       .map((_) => true);
 
   /// 红键 (紧急停止): B 按钮
+  @override
   Stream<bool> get red => _stateController.stream
       .map((_) => _btn(config.btnB))
       .distinct()
@@ -261,6 +266,7 @@ class XboxController implements Gamepad {
       .map((_) => true);
 
   /// 标零: Back 按钮
+  @override
   Stream<void> get calibrate => _stateController.stream
       .map((_) => _btn(config.btnBack))
       .distinct()
@@ -269,6 +275,7 @@ class XboxController implements Gamepad {
       .map((_) {});
 
   /// 策略切换: Start 按钮
+  @override
   Stream<void> get switchProfile => _stateController.stream
       .map((_) => _btn(config.btnStart))
       .distinct()
@@ -276,6 +283,7 @@ class XboxController implements Gamepad {
       .where((p) => !p[0] && p[1])
       .map((_) {});
 
+  @override
   void dispose() {
     if (_disposed) return;
     _disposed = true;

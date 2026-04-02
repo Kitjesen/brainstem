@@ -118,15 +118,24 @@ brainstem/
 ├── protoframe/                       ← 帧协议解析
 │
 ├── sim/                              ← MuJoCo 仿真
-│   ├── quadruped.xml                 ← MuJoCo 机器人模型
-│   ├── walk_test.py                  ← 行走闭环测试脚本
-│   ├── verify_gestures.py            ← 动作验证（离线，不走 gRPC）
-│   └── meshes/                       ← STL 模型文件
+│   ├── robot/                        ← 机器人模型（URDF/XML/STL）
+│   │   ├── quadruped.xml             ←   MuJoCo 模型
+│   │   ├── quadruped.urdf            ←   URDF 模型
+│   │   └── meshes/                   ←   STL 模型文件
+│   ├── scripts/                      ← Python 仿真脚本
+│   │   ├── verify_gestures.py        ←   动作验证（离线，不走 gRPC）
+│   │   ├── walk_ref.py               ←   参考步态
+│   │   ├── xbox_remote.py            ←   Xbox 手柄远程控制真机
+│   │   └── xbox_config.py            ←   Xbox 配置工具
+│   └── model/                        ← 仿真用 ONNX 策略
 │
 ├── sirius/                           ← Flutter 桌面控制 App
 ├── scripts/                          ← 部署脚本
 │   └── setup_brainstem.sh            ← 一键部署（新机器跑一次即可）
-├── model/                            ← ONNX 模型（不入 git，手动部署）
+├── docs/                             ← 文档归档
+│   ├── HANDOFF_CMS_APP_SYNC_*.md     ←   工作交接记录
+│   └── sim_archive/                  ←   旧仿真脚本存档
+├── _archive/                         ← 旧版代码/资源归档（untracked，不入 git）
 └── CLAUDE.md                         ← AI 工作指南
 ```
 

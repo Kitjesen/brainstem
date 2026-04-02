@@ -1,3 +1,4 @@
+// ignore_for_file: constant_identifier_names
 // Linux Joystick FFI — 直接用 open/read/ioctl 系统调用读 /dev/input/js*。
 //
 // 非阻塞模式：O_NONBLOCK + Timer 轮询，不卡 Dart event loop。

@@ -56,7 +56,7 @@ class Idle extends Behaviour {
   });
 
   Stream<History> get doing => ts.map((_) {
-        final onnxOutput = inferAction?.call();
+        inferAction?.call();
         // 物理目标：保持上一帧的 nextAction（standingPose）
         return next(command: .idle(), nextAction: memory.latestAction);
       });

@@ -38,13 +38,17 @@ __pycache__/
 .venv/
 
 # Large binary assets (tracked separately or via LFS)
-sim/*.mp4
+*.mp4
+*.tlog
 sim/meshes/
 assets/urdf/
 assets/*.zip
 
 # Sim output (generated files)
 sim/output/
+
+# Archive (旧代码/资源归档，不进仓库)
+_archive/
 
 # Tool config (per-machine)
 .omc/
@@ -58,6 +62,5 @@ han_dog/sample/case1.json
 han_dog/sample/case1_real.json
 sim/robot/meshes/
 sim/legacy/
-sim/output/
 model/
 sim/model/

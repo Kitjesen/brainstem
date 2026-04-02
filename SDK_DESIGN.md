@@ -1,6 +1,8 @@
 # brainstem SDK 架构设计
 
 > 版本: 1.0-draft | 日期: 2026-02-26
+>
+> **状态 (2026-04-03 审计):** Phase 1-2 已完成 — UnifiedCmsServer 已替代旧的三服务器架构，han_dog_brain 已解耦 gRPC。Phase 3 (Proto 增强) 和 Phase 4 (文档/示例) 待完成。
 
 ## 1. 目标
 
