@@ -21,12 +21,7 @@ if str(PROTO_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(PROTO_PY_ROOT))
 import han_dog_message as msg
 
-DEADZONE = 0.08
-CMS_NAMES = {0: "ZERO", 1: "GROUNDED", 2: "STANDING", 3: "WALKING", 4: "TRANSITIONING"}
-
-
-def dz(val):
-    return 0.0 if abs(val) < DEADZONE else val
+from xbox_config import XboxController, load_xbox_config
 
 
 def safe_call(fn, *a, **kw):
@@ -52,6 +47,9 @@ def main():
     joy.init()
     print(f"Joystick: {joy.get_name()}")
 
+    # ── Xbox 配置 ─────────────────────────────────────────────
+    xbox = XboxController(joy)
+
     # ── gRPC ──────────────────────────────────────────────────
     target = f"{args.host}:{args.port}"
     print(f"Connecting to {target}...")
@@ -66,8 +64,6 @@ def main():
 
     enabled = False
     walking = False
-    last_btn = {}
-    last_cms = -1
 
     print()
     print("=" * 50)
@@ -84,39 +80,15 @@ def main():
     print("  B          : Quit")
     print()
 
-    def btn_pressed(idx):
-        cur = joy.get_button(idx) if idx < joy.get_numbuttons() else 0
-        prev = last_btn.get(idx, 0)
-        last_btn[idx] = cur
-        return cur and not prev
-
     try:
         while True:
             time.sleep(0.02)  # 50Hz
             pygame.event.pump()
 
-            # ── 读摇杆 ───────────────────────────────────────
-            lx = dz(joy.get_axis(0))
-            ly = dz(-joy.get_axis(1))
-            rx = dz(joy.get_axis(2) if joy.get_numaxes() > 2 else 0)
-
-            scale = 1.0
-            if joy.get_numaxes() >= 6:
-                lt = (joy.get_axis(4) + 1) / 2
-                rt = (joy.get_axis(5) + 1) / 2
-                if lt > 0.3:
-                    scale = 0.5
-                elif rt > 0.3:
-                    scale = 1.5
-
-            vx = ly * scale
-            vy = lx * scale
-            vyaw = -rx * scale
-
             # ── 按钮 ─────────────────────────────────────────
 
             # Y = Enable/Disable
-            if btn_pressed(3):
+            if xbox.btn_pressed("enable"):
                 if not enabled:
                     safe_call(stub.Enable, msg.Empty())
                     enabled = True
@@ -128,19 +100,19 @@ def main():
                     print("  >> Disable (电机关闭)")
 
             # A = StandUp
-            if btn_pressed(0):
+            if xbox.btn_pressed("standup"):
                 safe_call(stub.StandUp, msg.Empty())
                 walking = False
                 print("  >> StandUp")
 
             # X = SitDown
-            if btn_pressed(2):
+            if xbox.btn_pressed("sitdown"):
                 safe_call(stub.SitDown, msg.Empty())
                 walking = False
                 print("  >> SitDown")
 
             # Back/Select = SetZero
-            if btn_pressed(6):
+            if xbox.btn_pressed("set_zero"):
                 result = safe_call(stub.SetZero, msg.Empty())
                 if result is not None:
                     print("  >> SetZero (标零完成)")
@@ -148,16 +120,15 @@ def main():
                     print("  >> SetZero 失败 (需在 Grounded 状态)")
 
             # B = Quit
-            if btn_pressed(1):
+            if xbox.btn_pressed("quit"):
                 print("  >> Quit")
                 break
 
             # ── 摇杆 → Walk ──────────────────────────────────
-            stick_active = abs(vx) > 0.01 or abs(vy) > 0.01 or abs(vyaw) > 0.01
-            if stick_active:
-                safe_call(stub.Walk, msg.Vector3(x=vx, y=vy, z=vyaw))
+            if xbox.stick_active:
+                safe_call(stub.Walk, msg.Vector3(x=xbox.vx, y=xbox.vy, z=xbox.vyaw))
                 if not walking:
-                    print(f"  >> Walk started")
+                    print("  >> Walk started")
                     walking = True
             elif walking:
                 safe_call(stub.Walk, msg.Vector3(x=0, y=0, z=0))
@@ -165,7 +136,6 @@ def main():
     except KeyboardInterrupt:
         print("\nStopped")
     finally:
-        # 安全：退出前 SitDown + Disable
         print("  Shutting down: SitDown + Disable...")
         safe_call(stub.SitDown, msg.Empty())
         time.sleep(0.5)
