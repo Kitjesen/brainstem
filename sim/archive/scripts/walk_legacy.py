@@ -15,7 +15,13 @@ from pathlib import Path
 from scipy.spatial.transform import Rotation as R
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROTO_PY_ROOT = SCRIPT_DIR.parent.parent / "han_dog_message" / "python"
+# 默认用 brainstem proto (double)，--legacy-proto 用 legacy proto (float32)
+_USE_LEGACY_PROTO = '--legacy-proto' in sys.argv
+if _USE_LEGACY_PROTO:
+    sys.argv.remove('--legacy-proto')
+    PROTO_PY_ROOT = SCRIPT_DIR.parent / "legacy" / "han_dog_message" / "python"
+else:
+    PROTO_PY_ROOT = SCRIPT_DIR.parent.parent / "han_dog_message" / "python"
 if str(PROTO_PY_ROOT) not in sys.path:
     sys.path.insert(0, str(PROTO_PY_ROOT))
 import han_dog_message as msg

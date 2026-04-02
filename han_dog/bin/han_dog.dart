@@ -264,15 +264,8 @@ Future<void> _run() async {
   var motorOutputEnabled = false;
 
   // 推理输出 → 电机动作 (gated through MotorHealthManager)
-  var _actionCount = 0;
   _subs.add(brain.nextActionStream.listen(
     (action) {
-      _actionCount++;
-      if (_actionCount <= 3 || _actionCount % 50 == 0) {
-        _log.info('ACTION[$_actionCount] enabled=$motorOutputEnabled '
-            'state=${arbiter.state.runtimeType} '
-            'a0=${action.values[0].toStringAsFixed(3)}');
-      }
       if (!motorOutputEnabled) return;
 
       if (arbiter.state is Grounded) {

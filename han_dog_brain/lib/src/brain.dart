@@ -13,7 +13,6 @@ class Brain {
   final Memory<History> memory;
   final ImuService imu;
   final JointService joint;
-  final PolicyActionTracker policyTracker;
   JointsMatrix get standingPose => walk.observationBuilder.standingPose;
   Idle idle;
   SitDown sitDown;
@@ -35,16 +34,14 @@ class Brain {
     required ObservationBuilder observationBuilder,
     required JointsMatrix sittingPose,
     required this.memory,
-    PolicyActionTracker? policyTracker,
-  }) : policyTracker = policyTracker ??= PolicyActionTracker(),
+  }) :
        idle = .new(clock: clock, imu: imu, joint: joint, memory: memory,
-              policyTracker: policyTracker),
+),
        sitDown = .new(
          clock: clock,
          imu: imu,
          joint: joint,
          memory: memory,
-         policyTracker: policyTracker,
          sittingPose: sittingPose,
          counts: sitDownCounts,
        ),
@@ -53,7 +50,6 @@ class Brain {
          imu: imu,
          joint: joint,
          memory: memory,
-         policyTracker: policyTracker,
          standingPose: observationBuilder.standingPose,
          counts: standUpCounts,
        ),
@@ -63,7 +59,6 @@ class Brain {
          joint: joint,
          clock: clock,
          memory: memory,
-         policyTracker: policyTracker,
        );
 
   factory Brain({
@@ -131,7 +126,6 @@ class Brain {
       imu: imu,
       joint: joint,
       memory: memory,
-      policyTracker: policyTracker,
       definition: definition,
     );
   }
@@ -197,7 +191,6 @@ class Brain {
       imu: imu,
       joint: joint,
       memory: memory,
-      policyTracker: policyTracker,
       standingPose: standingPose,
       counts: standUpCounts,
     );
@@ -206,7 +199,6 @@ class Brain {
       imu: imu,
       joint: joint,
       memory: memory,
-      policyTracker: policyTracker,
       sittingPose: sittingPose,
       counts: sitDownCounts,
     );
@@ -216,7 +208,6 @@ class Brain {
       joint: joint,
       clock: clock,
       memory: memory,
-      policyTracker: policyTracker,
     );
 
     try {

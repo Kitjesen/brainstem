@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:han_dog_brain/han_dog_brain.dart';
-import 'package:han_dog_brain/src/memory.dart';
 import 'package:han_dog_brain/src/behaviour.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
@@ -46,7 +45,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
       );
 
       final results = <History>[];
@@ -81,7 +79,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
       );
 
       final results = <History>[];
@@ -104,7 +101,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
         standingPose: standingPose,
         counts: 3,
       );
@@ -141,7 +137,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
         standingPose: standingPose,
         counts: 3,
       );
@@ -184,7 +179,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
         standingPose: standingPose,
         counts: 0,
       );
@@ -222,7 +216,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
         sittingPose: sittingPose,
         counts: 3,
       );
@@ -258,7 +251,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
         sittingPose: sittingPose,
         counts: 3,
       );
