@@ -153,13 +153,14 @@ class XboxController implements Gamepad {
   final String devicePath;
   final XboxConfig config;
 
-  RandomAccessFile? _file;
-  Timer? _pollTimer;
+  StreamSubscription<List<int>>? _fileSub;
+  Timer? _tickTimer;
   bool _disposed = false;
 
   // 内部状态
   final Map<int, double> _axes = {};
   final Map<int, bool> _buttons = {};
+  final _buf = BytesBuilder();
 
   // 广播流
   final _stateController = StreamController<void>.broadcast();
@@ -169,45 +170,61 @@ class XboxController implements Gamepad {
   // ── 打开/关闭 ─────────────────────────────────────────────
 
   bool open() {
+    final file = File(devicePath);
+    if (!file.existsSync()) {
+      _log.severe('Xbox controller not found: $devicePath');
+      return false;
+    }
     try {
-      _file = File(devicePath).openSync(mode: FileMode.read);
+      // 异步流读取 — 不阻塞 Dart event loop
+      _fileSub = file.openRead().listen(
+        _onData,
+        onError: (Object e) {
+          _log.severe('Xbox read error: $e');
+        },
+        onDone: () {
+          _log.warning('Xbox device stream closed');
+        },
+      );
     } catch (e) {
       _log.severe('Xbox controller open failed: $devicePath — $e');
       return false;
     }
     _log.info('Xbox controller opened: $devicePath');
-    // 10ms 轮询（100Hz 读事件，50Hz 输出流）
-    _pollTimer = Timer.periodic(const Duration(milliseconds: 10), (_) => _poll());
+    // 50Hz tick 驱动下游流
+    _tickTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
+      if (!_disposed) _stateController.add(null);
+    });
     return true;
   }
 
-  void _poll() {
-    if (_file == null || _disposed) return;
-    try {
-      // 非阻塞读：一次读多个事件
-      while (true) {
-        final buf = Uint8List(8);
-        final n = _file!.readIntoSync(buf);
-        if (n < 8) break;
-
-        final bd = ByteData.sublistView(buf);
+  void _onData(List<int> chunk) {
+    _buf.add(chunk);
+    // 每个 js_event = 8 bytes
+    while (_buf.length >= 8) {
+      final bytes = _buf.takeBytes();
+      var offset = 0;
+      while (offset + 8 <= bytes.length) {
+        final bd = ByteData.sublistView(Uint8List.fromList(bytes), offset, offset + 8);
         final event = JsEvent(
           bd.getUint32(0, Endian.little),
           bd.getInt16(4, Endian.little),
           bd.getUint8(6),
           bd.getUint8(7),
         );
-
         if (event.isAxis) {
           _axes[event.number] = event.value / 32767.0;
         } else if (event.isButton) {
           _buttons[event.number] = event.value != 0;
         }
+        offset += 8;
       }
-    } catch (_) {
-      // 非阻塞读无数据时可能抛异常，正常
+      // 剩余不足 8 字节放回 buffer
+      if (offset < bytes.length) {
+        _buf.add(bytes.sublist(offset));
+      }
+      break;
     }
-    _stateController.add(null);
   }
 
   double _axis(int idx) => _axes[idx] ?? 0.0;
@@ -309,9 +326,9 @@ class XboxController implements Gamepad {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    _pollTimer?.cancel();
+    _tickTimer?.cancel();
+    _fileSub?.cancel();
     _stateController.close();
-    _file?.closeSync();
     _log.info('Xbox controller disposed: $devicePath');
   }
 }
