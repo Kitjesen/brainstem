@@ -153,7 +153,8 @@ class XboxController implements Gamepad {
   final String devicePath;
   final XboxConfig config;
 
-  StreamSubscription<List<int>>? _fileSub;
+  Process? _proc;
+  StreamSubscription<List<int>>? _procSub;
   Timer? _tickTimer;
   bool _disposed = false;
 
@@ -170,32 +171,38 @@ class XboxController implements Gamepad {
   // ── 打开/关闭 ─────────────────────────────────────────────
 
   bool open() {
-    final file = File(devicePath);
-    if (!file.existsSync()) {
+    if (!File(devicePath).existsSync()) {
       _log.severe('Xbox controller not found: $devicePath');
       return false;
     }
     try {
-      // 异步流读取 — 不阻塞 Dart event loop
-      _fileSub = file.openRead().listen(
+      // 用 cat 进程持续读设备文件（File.openRead 对设备文件会提前 EOF）
+      _proc = Process.runSync('true', []).pid >= 0 ? null : null; // placeholder
+    } catch (_) {}
+    _startCatProcess();
+    _log.info('Xbox controller opened: $devicePath');
+    // 50Hz tick 驱动 direction 流
+    _tickTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
+      if (!_disposed) _stateController.add(null);
+    });
+    return true;
+  }
+
+  Future<void> _startCatProcess() async {
+    try {
+      _proc = await Process.start('cat', [devicePath]);
+      _procSub = _proc!.stdout.listen(
         _onData,
         onError: (Object e) {
           _log.severe('Xbox read error: $e');
         },
         onDone: () {
-          _log.warning('Xbox device stream closed');
+          _log.warning('Xbox cat process ended');
         },
       );
     } catch (e) {
-      _log.severe('Xbox controller open failed: $devicePath — $e');
-      return false;
+      _log.severe('Xbox controller cat failed: $devicePath — $e');
     }
-    _log.info('Xbox controller opened: $devicePath');
-    // 50Hz tick 驱动下游流
-    _tickTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
-      if (!_disposed) _stateController.add(null);
-    });
-    return true;
   }
 
   void _onData(List<int> chunk) {
@@ -335,7 +342,8 @@ class XboxController implements Gamepad {
     if (_disposed) return;
     _disposed = true;
     _tickTimer?.cancel();
-    _fileSub?.cancel();
+    _procSub?.cancel();
+    _proc?.kill();
     _stateController.close();
     _log.info('Xbox controller disposed: $devicePath');
   }
