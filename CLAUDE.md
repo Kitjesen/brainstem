@@ -108,7 +108,7 @@ _log.severe('描述', error, stackTrace);  // onError 必须带 StackTrace
 - `hardware` — 有 ControlArbiter，无 SimStateInjector
 
 ### 电机输出
-`han_dog.dart` 中电机输出当前已注释（`// joint.realActionExt(action)`），这是**有意为之**（测试阶段），不要取消注释。
+`han_dog.dart` 中电机输出通过 `motorOutputEnabled` 标志控制，由遥控器 Enable 按钮或 gRPC `Enable()` RPC 激活。硬件链路已验证通过。
 
 ## .claude/ 配置
 
