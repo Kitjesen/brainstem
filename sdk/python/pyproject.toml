@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "brainstem-sdk"
-version = "0.1.0"
+version = "1.0.0"
 description = "Python SDK for Thunder quadruped robot"
 readme = "README.md"
 license = {text = "Proprietary"}
