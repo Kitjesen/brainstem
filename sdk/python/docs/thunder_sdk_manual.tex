@@ -1,6 +1,6 @@
 % !TEX program = xelatex
-% Thunder 四足机器人 Python SDK 开发手册
-% 上海穹沛科技有限公司
+% ORIX 教育版四足机器狗 Python SDK 开发手册
+% 大算机器人
 % 2026年4月
 \documentclass[a4paper,11pt,openany]{book}
 
@@ -48,9 +48,9 @@
   citecolor=thunderblue,
   bookmarks=true,
   bookmarksnumbered=true,
-  pdfauthor={上海穹沛科技有限公司},
-  pdftitle={Thunder 四足机器人 Python SDK 开发手册},
-  pdfsubject={Thunder SDK v0.1.0},
+  pdfauthor={大算机器人},
+  pdftitle={ORIX 教育版四足机器狗 Python SDK 开发手册},
+  pdfsubject={ORIX SDK v1.0.0},
 }
 
 % ============================================================
@@ -107,7 +107,7 @@
 \fancyhead[LE]{\small\leftmark}
 \fancyhead[RO]{\small\rightmark}
 \fancyfoot[C]{\small\thepage}
-\fancyfoot[LE,RO]{\small Thunder SDK v0.1.0}
+\fancyfoot[LE,RO]{\small ORIX SDK v1.0.0}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0.2pt}
 
@@ -151,15 +151,11 @@
 
 \vspace*{3cm}
 
-{\Huge\bfseries\color{thunderblue} Thunder 四足机器人\\[0.5em] Python SDK 开发手册}
+{\Huge\bfseries\color{thunderblue} ORIX 教育版四足机器狗\\[0.5em] Python SDK 开发手册}
 
-\vspace{2cm}
+\vspace{3cm}
 
-\includegraphics[width=3cm]{example-image-duck}% 占位图，可替换为公司 Logo
-
-\vspace{2cm}
-
-{\LARGE 上海穹沛科技有限公司}
+{\LARGE 大算机器人}
 
 \vspace{1cm}
 
@@ -168,14 +164,14 @@
 \vspace{2cm}
 
 \begin{tabular}{rl}
-\textbf{版本} & v0.1.0 \\
+\textbf{版本} & v1.0.0 \\
 \textbf{日期} & 2026年4月 \\
 \textbf{密级} & 内部文档 \\
 \end{tabular}
 
 \vfill
 
-{\small\color{thundergray} Copyright \copyright\ 2026 上海穹沛科技有限公司. All rights reserved.}
+{\small\color{thundergray} Copyright \copyright\ 2026 大算机器人. All rights reserved.}
 
 \end{center}
 \end{titlepage}
@@ -190,10 +186,10 @@
 \toprule
 项目 & 说明 \\
 \midrule
-文档名称 & Thunder 四足机器人 Python SDK 开发手册 \\
-版本号   & v0.1.0 \\
+文档名称 & ORIX 教育版四足机器狗 Python SDK 开发手册 \\
+版本号   & v1.0.0 \\
 编写日期 & 2026年4月 \\
-适用产品 & Thunder 四足轮腿机器人 \\
+适用产品 & ORIX 教育版四足机器狗 \\
 适用 SDK & brainstem\_sdk (Python) \\
 \bottomrule
 \end{tabular}
@@ -204,12 +200,12 @@
 \toprule
 版本 & 日期 & 作者 & 说明 \\
 \midrule
-v0.1.0 & 2026-04 & 穹沛科技 & 初始版本 \\
+v1.0.0 & 2026-04 & 大算机器人 & 初始版本 \\
 \bottomrule
 \end{tabular}
 
 \vspace{2em}
-\noindent{\small 本文档为上海穹沛科技有限公司内部技术文档，未经许可不得外传。}
+\noindent{\small 本文档为大算机器人内部技术文档，未经许可不得外传。}
 \newpage
 
 % ============================================================
@@ -224,7 +220,7 @@ v0.1.0 & 2026-04 & 穹沛科技 & 初始版本 \\
 \chapter{概述}
 \label{ch:overview}
 
-Thunder 四足机器人 Python 开发套件，3 行代码控制机器人。
+ORIX 教育版四足机器狗 Python 开发套件，3 行代码控制机器人。
 
 \section{安装}
 
@@ -343,37 +339,43 @@ for state in dog.listen_state():
 
 \section{关节编号}
 
-\begin{verbatim}
-前右 (FR)           前左 (FL)
-  0 Hip               4 Hip
-  1 Thigh             5 Thigh
-  2 Calf              6 Calf
-  3 Foot              7 Foot
+ORIX 机器人共有 16 个关节，按四条腿分组编号如下：
 
-后右 (RR)           后左 (RL)
-  8 Hip              12 Hip
-  9 Thigh            13 Thigh
- 10 Calf             14 Calf
- 11 Foot             15 Foot
-\end{verbatim}
+\begin{longtable}{clcl}
+\toprule
+\textbf{前右 (FR)} & & \textbf{前左 (FL)} & \\
+\midrule
+0 & Hip & 4 & Hip \\
+1 & Thigh & 5 & Thigh \\
+2 & Calf & 6 & Calf \\
+3 & Foot & 7 & Foot \\
+\midrule
+\textbf{后右 (RR)} & & \textbf{后左 (RL)} & \\
+\midrule
+8 & Hip & 12 & Hip \\
+9 & Thigh & 13 & Thigh \\
+10 & Calf & 14 & Calf \\
+11 & Foot & 15 & Foot \\
+\bottomrule
+\end{longtable}
 
 \section{状态机}
 
-\begin{verbatim}
-           Init
-            |
-            v
-     +-- Grounded --+
-     |      ^       |
-     |      |       v
-     |   SitDown  StandUp
-     |      ^       |
-     |      |       v
-     |   Standing --+
-     |      |
-     |      v
-     +-- Walking
-\end{verbatim}
+ORIX 的状态机包含三个主要运行状态。系统初始化后自动进入 Grounded 状态，用户通过 SDK 指令在各状态之间切换。状态转换遵循严格的顺序约束，不允许跳跃式切换。
+
+\begin{longtable}{lll}
+\toprule
+起始状态 & 触发动作 & 目标状态 \\
+\midrule
+\endhead
+Init & 自动初始化 & Grounded \\
+Grounded & \texttt{stand\_up()} & Standing \\
+Standing & \texttt{walk(vx, vy, vyaw)} & Walking \\
+Walking & \texttt{walk(0,0,0)} 或停步 & Standing \\
+Standing & \texttt{sit\_down()} & Grounded \\
+Walking & \texttt{sit\_down()} & Grounded（经由 Standing） \\
+\bottomrule
+\end{longtable}
 
 \begin{itemize}[nosep]
   \item \textbf{Grounded}：坐姿，安全状态。上电后自动进入。
@@ -411,7 +413,7 @@ for state in dog.listen_state():
 \chapter{快速开始}
 \label{ch:quickstart}
 
-本文档帮助您在 5 分钟内完成 Thunder SDK 的安装、连接和第一次控制。
+本文档帮助您在 5 分钟内完成 ORIX SDK 的安装、连接和第一次控制。
 
 \section{环境要求}
 
@@ -485,13 +487,7 @@ dog.walk(vx=0.3)  # 30% 速度前进
 
 \section{网络配置}
 
-\begin{verbatim}
-开发机 (PC/笔记本)                   Thunder 机器人
-  192.168.66.xxx          <------>   192.168.66.190
-       |                                  |
-       +---- 同一局域网 (以太网/WiFi) -----+
-                    端口: 13145/TCP
-\end{verbatim}
+开发机（PC 或笔记本，IP 为 192.168.66.xxx）与 ORIX 机器人（IP 为 192.168.66.190）需处于同一局域网内，通过以太网或 WiFi 连接。SDK 使用 TCP 端口 13145 进行 gRPC 通信，无需额外中间件。
 
 \begin{longtable}{lll}
 \toprule
@@ -516,7 +512,7 @@ dog = ThunderClient("10.0.0.100", port=13145, timeout=5.0)
 将以下脚本保存为 \texttt{verify\_connection.py} 并运行：
 
 \begin{lstlisting}[style=python]
-"""验证与 Thunder 机器人的连接。"""
+"""验证与 ORIX 机器人的连接。"""
 
 from brainstem_sdk import ThunderClient
 
@@ -682,7 +678,7 @@ grpc._channel._InactiveRpcError: ... transition in progress
 \chapter{硬件概览}
 \label{ch:hardware}
 
-本文档介绍 Thunder 四足轮腿机器人的硬件组成、传感器、执行器和通信架构。
+本文档介绍 ORIX 教育版四足机器狗的硬件组成、传感器、执行器和通信架构。
 
 \section{外观与尺寸}
 
@@ -701,28 +697,21 @@ grpc._channel._InactiveRpcError: ... transition in progress
 
 \section{整体架构}
 
-\begin{verbatim}
-                    +--------------------------+
-                    |       S100P 主控板        |
-                    |    (RDK X5 / aarch64)    |
-                    |     Ubuntu 22.04         |
-                    +--+-----+-----+-----+----+
-                       |     |     |     |
-              +--------+  +--+--+  |  +--+--------+
-              |           |     |  |  |            |
-         +----+----+  +---+--+ +--+--+--+  +------+------+
-         | HI91 IMU|  | PCAN | | 以太网  |  | SBUS/USB   |
-         | (50Hz)  |  | CAN  | | gRPC   |  | 遥控器      |
-         +---------+  +---+--+ +---------+  +-------------+
-                          |
-            +-------------+-------------+
-            |             |             |
-      +-----+-----+ +----+----+ +------+------+
-      | Robstride  | | Robstride| | Robstride  |
-      | 电机 x4    | | 电机 x4  | | 电机 x4+4  |
-      | (FR leg)   | | (FL leg) | | (RR+RL)    |
-      +------------+ +----------+ +-------------+
-\end{verbatim}
+ORIX 机器人的整体硬件架构以 S100P 主控板（RDK X5, aarch64, Ubuntu 22.04）为核心，通过多种总线连接外围设备。主控板向下分别连接四类子系统：
+
+\begin{longtable}{lll}
+\toprule
+子系统 & 接口 & 说明 \\
+\midrule
+\endhead
+HI91 IMU & 串口 (UART) & 50Hz 姿态与角速度数据采集 \\
+Robstride 电机 (16个) & PCAN CAN 总线 & 4 条腿各 4 个电机，PD 位置/速度控制 \\
+SDK 远程控制 & 以太网 (gRPC) & 开发机通过 gRPC over HTTP/2 发送指令 \\
+物理遥控器 & SBUS 串口 / USB HID & YUNZHUO 遥控器或 Xbox 手柄，最高优先级 \\
+\bottomrule
+\end{longtable}
+
+\noindent 电机通过 PCAN CAN 总线分三路连接：前右腿（FR, 4 个电机）、前左腿（FL, 4 个电机）、后两腿（RR+RL, 共 8 个电机）。所有通信均由主控板上的 brainstem 运行时统一调度。
 
 \section{计算平台}
 
@@ -754,23 +743,21 @@ AI 算力 & Nash BPU, 128 TOPS \\
 
 \subsection{关节布局}
 
-Thunder 共有 \textbf{16 个自由度}，分为 4 条腿，每条腿包含 3 个旋转关节和 1 个脚轮：
+ORIX 共有 \textbf{16 个自由度}，分为 4 条腿，每条腿包含 3 个旋转关节和 1 个脚轮：
 
-\begin{verbatim}
-        前 (Front)
-   FL +---------+ FR
-      |         |
-      |  body   |
-      |         |
-   RL +---------+ RR
-        后 (Rear)
+从俯视角度看，机器人前方左侧为 FL 腿，前方右侧为 FR 腿，后方左侧为 RL 腿，后方右侧为 RR 腿。每条腿从躯干到地面依次包含以下四个关节：
 
-每条腿的关节（由近到远）:
-  Hip   -- 髋关节（横滚方向，内外摆动）
-  Thigh -- 大腿关节（俯仰方向，前后摆动）
-  Calf  -- 小腿关节（俯仰方向，前后摆动）
-  Foot  -- 脚轮（连续旋转，轮式驱动）
-\end{verbatim}
+\begin{longtable}{ll}
+\toprule
+关节 & 功能 \\
+\midrule
+\endhead
+Hip（髋关节） & 横滚方向，控制腿的内外摆动 \\
+Thigh（大腿关节） & 俯仰方向，控制腿的前后摆动 \\
+Calf（小腿关节） & 俯仰方向，控制膝盖弯曲 \\
+Foot（脚轮） & 连续旋转，轮式驱动 \\
+\bottomrule
+\end{longtable}
 
 \subsection{电机规格}
 
@@ -919,7 +906,7 @@ gRPC 提供的 RPC 接口：
 
 \subsection{控制器输入}
 
-Thunder 支持两种物理控制器，均通过 \texttt{ControlArbiter} 仲裁控制权：
+ORIX 支持两种物理控制器，均通过 \texttt{ControlArbiter} 仲裁控制权：
 
 \begin{longtable}{llll}
 \toprule
@@ -974,11 +961,7 @@ gRPC 状态推送 & 50 Hz & 20 ms \\
 
 整个控制链路在 20ms 的时间窗口内完成：
 
-\begin{verbatim}
-IMU采样 -> 构建观测 -> ONNX推理 -> PD计算 -> CAN发送 -> 电机执行
-                        |
-                  全部在 20ms 内完成
-\end{verbatim}
+控制链路的执行顺序为：（1）IMU 采样 $\to$（2）构建观测向量 $\to$（3）ONNX 神经网络推理 $\to$（4）PD 力矩计算 $\to$（5）CAN 总线发送指令 $\to$（6）电机执行。以上全部步骤在每个 20ms 周期内完成。
 
 
 
@@ -988,22 +971,13 @@ IMU采样 -> 构建观测 -> ONNX推理 -> PD计算 -> CAN发送 -> 电机执行
 \chapter{坐标系与关节}
 \label{ch:coordinates}
 
-本文档定义 Thunder 机器人的坐标系约定、16 个关节的编号规则、运动范围和典型姿态。
+本文档定义 ORIX 机器人的坐标系约定、16 个关节的编号规则、运动范围和典型姿态。
 
 \section{机体坐标系}
 
-Thunder 使用右手坐标系，原点位于机身几何中心：
+ORIX 使用右手坐标系，原点位于机身几何中心：
 
-\begin{verbatim}
-              +Z (上)
-               |
-               |
-               |
-               +-------> +X (前)
-              /
-             /
-            +Y (左)
-\end{verbatim}
+机体坐标系采用右手定则：X 轴指向机器人前方，Y 轴指向机器人左侧，Z 轴垂直向上。原点位于机身几何中心。
 
 \begin{longtable}{lll}
 \toprule
@@ -1018,41 +992,11 @@ Z & 上方 (Up) & 垂直向上 \\
 
 \subsection{正面视图}
 
-\begin{verbatim}
-               +Z
-                |
-        FL      |      FR
-    +---+-------+-------+---+
-    |   |       |       |   |
-    |   |     body      |   |
-    |   |       |       |   |
-    +---+-------+-------+---+
-        RL      |      RR
-                |
-         +Y <--+
-\end{verbatim}
+从正面观察机器人：Z 轴向上，Y 轴向右为负、向左为正。左上方为 FL 腿，右上方为 FR 腿，左下方为 RL 腿，右下方为 RR 腿。机身（body）位于中央。
 
 \subsection{侧面视图（右侧）}
 
-\begin{verbatim}
-         +Z
-          |           前进方向 --->
-          |
-          +------ body ------+
-          |                  |
-         Hip               Hip
-          |                  |
-        Thigh             Thigh
-          |                  |
-        Calf              Calf
-          |                  |
-        [Foot]           [Foot]
-    ----地面-----------------------
-          |
-          +-------> +X (前)
-
-    后腿 (RR)           前腿 (FR)
-\end{verbatim}
+从右侧观察机器人：Z 轴向上，X 轴指向前方（即机器人前进方向）。机身上方连接两条腿，每条腿从上到下依次为 Hip、Thigh、Calf、Foot 关节，Foot（脚轮）接触地面。后方为后腿（RR），前方为前腿（FR）。
 
 \subsection{walk() 指令与坐标系的关系}
 
@@ -1069,7 +1013,7 @@ Z & 上方 (Up) & 垂直向上 \\
 
 \section{关节编号总表}
 
-Thunder 共 16 个自由度，按腿分组编号：
+ORIX 共 16 个自由度，按腿分组编号：
 
 {\small
 \begin{longtable}{clllllll}
@@ -1101,61 +1045,44 @@ Thunder 共 16 个自由度，按腿分组编号：
 
 \subsection{按腿分组}
 
-\begin{verbatim}
-前右 (FR): [0, 1, 2, 3]    前左 (FL): [4, 5, 6, 7]
-后右 (RR): [8, 9, 10, 11]  后左 (RL): [12, 13, 14, 15]
-\end{verbatim}
+\begin{longtable}{ll}
+\toprule
+腿 & 关节索引 \\
+\midrule
+前右 (FR) & {[}0, 1, 2, 3{]} \\
+前左 (FL) & {[}4, 5, 6, 7{]} \\
+后右 (RR) & {[}8, 9, 10, 11{]} \\
+后左 (RL) & {[}12, 13, 14, 15{]} \\
+\bottomrule
+\end{longtable}
 
 \subsection{按关节类型分组}
 
-\begin{verbatim}
-所有 Hip:   [0, 4, 8, 12]   -- 髋关节，控制腿的内外摆动
-所有 Thigh: [1, 5, 9, 13]   -- 大腿关节，控制腿的前后摆动
-所有 Calf:  [2, 6, 10, 14]  -- 小腿关节，控制膝盖弯曲
-所有 Foot:  [3, 7, 11, 15]  -- 脚轮，控制轮式移动
-\end{verbatim}
+\begin{longtable}{lll}
+\toprule
+关节类型 & 索引 & 功能 \\
+\midrule
+所有 Hip & {[}0, 4, 8, 12{]} & 髋关节，控制腿的内外摆动 \\
+所有 Thigh & {[}1, 5, 9, 13{]} & 大腿关节，控制腿的前后摆动 \\
+所有 Calf & {[}2, 6, 10, 14{]} & 小腿关节，控制膝盖弯曲 \\
+所有 Foot & {[}3, 7, 11, 15{]} & 脚轮，控制轮式移动 \\
+\bottomrule
+\end{longtable}
 
 \subsection{俯瞰图 (Top View)}
 
-\begin{verbatim}
-        前 (Head)
-          X+
-          |
-   FL[4-7]|  FR[0-3]
-     +-----+-----+
-     |     |     |
-     |   body    |
- Y+--+     O     +-- Y-
-     |           |
-     |           |
-     +-----+-----+
-   RL[12-15] RR[8-11]
-          |
-          X-
-        后 (Tail)
-\end{verbatim}
+从俯瞰角度看，X 轴正方向朝前（Head），X 轴负方向朝后（Tail），Y 轴正方向朝左，Y 轴负方向朝右。四条腿的关节索引分布为：左前 FL{[}4--7{]} 位于左前方，右前 FR{[}0--3{]} 位于右前方，左后 RL{[}12--15{]} 位于左后方，右后 RR{[}8--11{]} 位于右后方。机身中心为坐标原点。
 
 \subsection{侧面图------单腿结构}
 
-\begin{verbatim}
-        body
-         |
-    [0] Hip -------- 横滚轴 (绕 X 轴)
-         |
-         |  上臂
-         |
-    [1] Thigh ------ 俯仰轴 (绕 Y 轴)
-         |
-         |  下臂
-         |
-    [2] Calf ------- 俯仰轴 (绕 Y 轴)
-         |
-         |  小腿
-         |
-    [3] Foot ------- 连续旋转 (轮轴)
-        (o)          脚轮触地
-    ============== 地面
-\end{verbatim}
+以前右腿（FR）为例，单腿从躯干到地面的关节链结构如下：
+
+\begin{enumerate}[nosep]
+  \item \textbf{{[}0{]} Hip}（髋关节）：连接躯干，绕 X 轴旋转（横滚），控制腿的内外摆动。
+  \item \textbf{{[}1{]} Thigh}（大腿关节）：连接上臂段，绕 Y 轴旋转（俯仰），控制腿的前后摆动。
+  \item \textbf{{[}2{]} Calf}（小腿关节）：连接下臂段，绕 Y 轴旋转（俯仰），控制膝盖弯曲。
+  \item \textbf{{[}3{]} Foot}（脚轮）：末端执行器，连续旋转驱动轮毂，脚轮触地。
+\end{enumerate}
 
 \section{典型姿态}
 
@@ -1203,29 +1130,15 @@ sitting_pose = [0, 0, 0, 0,   # FR
 
 \subsection{姿态可视化}
 
-\begin{verbatim}
-站立 (Standing)                  坐下 (Sitting / Zero)
-
-    +-------+                        +-------+
-    |  body |                        |  body |
-    +--+-+--+                        +--+-+--+
-       | |                             /   \
-      /   \                           /     \
-     /     \                      ---/-------\---
-    /       \                        (地面)
-   |         |
-   |         |
-  (o)       (o)
----地面-----------
-\end{verbatim}
+站立姿态（Standing）时，机器人四腿伸展支撑躯干离地，重心较高，脚轮接触地面。坐下姿态（Sitting / Zero）时，所有关节归零，腿部折叠收拢，躯干贴近地面，这是最稳定的安全状态。
 
 \section{PD 控制参数}
 
 每个关节的运动由 PD 控制器驱动：
 
-\begin{verbatim}
-torque = Kp * (target_pos - current_pos) + Kd * (target_vel - current_vel)
-\end{verbatim}
+\[
+\tau = K_p \cdot (q_{\text{target}} - q_{\text{current}}) + K_d \cdot (\dot{q}_{\text{target}} - \dot{q}_{\text{current}})
+\]
 
 \subsection{推理阶段（行走时）}
 
@@ -1243,9 +1156,9 @@ torque = Kp * (target_pos - current_pos) + Kd * (target_vel - current_vel)
 
 \texttt{actionScale} 是 RL 策略输出到实际弧度的缩放系数。策略输出值经过以下变换得到目标关节角度：
 
-\begin{verbatim}
-target_position = action_output * actionScale + standingPose
-\end{verbatim}
+\[
+q_{\text{target}} = \text{action\_output} \times \text{actionScale} + \text{standingPose}
+\]
 
 \subsection{过渡阶段（站起/坐下）}
 
@@ -1313,54 +1226,32 @@ dog.clear_motor_fault(joint_ids=[0, 1, 2, 3])
 \chapter{状态机与运动控制}
 \label{ch:fsm}
 
-本文档详细说明 Thunder 机器人的有限状态机 (FSM)、状态转换规则、运动控制接口和安全机制。
+本文档详细说明 ORIX 机器人的有限状态机 (FSM)、状态转换规则、运动控制接口和安全机制。
 
 \section{状态机总览}
 
-Thunder 的运动控制由一个严格的有限状态机管理。所有 SDK 指令必须遵循状态机规则，非法的状态转换会被拒绝。
+ORIX 的运动控制由一个严格的有限状态机管理。所有 SDK 指令必须遵循状态机规则，非法的状态转换会被拒绝。
 
 \subsection{状态图}
 
-\begin{verbatim}
-                   +---------+
-                   |  Zero   |     上电初始状态
-                   +----+----+
-                        |
-                      Init()
-                        |
-                        v
-                   +---------+
-          +------->|Grounded |<--------+
-          |        +----+----+         |
-          |             |              |
-       SitDown()    StandUp()     SitDown 完成
-       完成             |          或 Fault
-          |             v              |
-          |     +-------+-------+      |
-          |     | Transitioning |------+
-          |     |  (StandUp)    |
-          |     +-------+-------+
-          |             |
-          |          Done()
-          |             |
-          |             v
-          |        +---------+
-          +--------|Standing |<--------+
-          |        +----+----+         |
-          |             |              |
-       SitDown()    Walk(dir)     Idle() / Fault
-          |             |          或 StandUp()
-          |             v              |
-          |     +-------+-------+      |
-          |     | Transitioning |      |
-          |     |  (SitDown)    |      |
-          |     +-------+-------+      |
-          |             |              |
-          |             v              |
-          |        +---------+         |
-          +--------|Walking  |---------+
-                   +---------+
-\end{verbatim}
+ORIX 的有限状态机包含五个状态，以下是完整的状态转换路径：
+
+\begin{longtable}{llll}
+\toprule
+起始状态 & 触发条件 & 中间状态 & 目标状态 \\
+\midrule
+\endhead
+Zero & 系统初始化 Init() & -- & Grounded \\
+Grounded & \texttt{stand\_up()} & Transitioning (StandUp) & Standing \\
+Standing & \texttt{walk(vx, vy, vyaw)} & -- & Walking \\
+Walking & \texttt{walk()} 停步或 Idle & Transitioning (StandUp) & Standing \\
+Standing & \texttt{sit\_down()} & Transitioning (SitDown) & Grounded \\
+Walking & \texttt{sit\_down()} & 先 StandUp 再 SitDown & Grounded \\
+任意运动状态 & Fault 故障 & 自动过渡 & Grounded（安全坐下） \\
+\bottomrule
+\end{longtable}
+
+\noindent 状态机的核心原则是：所有运动指令必须遵循状态转换顺序，Transitioning（过渡中）状态下拒绝新的运动指令，Fault 触发时系统会自动执行安全着陆。
 
 \subsection{五个状态}
 
@@ -1411,11 +1302,7 @@ PD 参数 & Kp=200, Kd=8（高刚度，确保平稳） \\
 
 站起过程是一段 150 帧的线性插值动画：
 
-\begin{verbatim}
-第 0 帧:   关节角度 = 当前位置 (sittingPose)
-第 75 帧:  关节角度 = 50% 位置 (中间态)
-第 150 帧: 关节角度 = standingPose (完全站立)
-\end{verbatim}
+站起过程分为 150 帧，按线性插值平滑过渡：第 0 帧为当前坐姿（sittingPose），第 75 帧为中间过渡态（50\% 位置），第 150 帧为完全站立姿态（standingPose）。
 
 \subsection{Standing $\to$ Walking（开始行走）}
 
@@ -1556,46 +1443,13 @@ dog.walk()
 
 \subsection{运动方向参考图}
 
-\begin{verbatim}
-                  vx > 0 (前进)
-                     ^
-                     |
-                     |
-    vy > 0 (左) <----O----> vy < 0 (右)
-                     |
-                     |
-                     v
-                  vx < 0 (后退)
-
-            vyaw > 0        vyaw < 0
-              (CCW)           (CW)
-               <--             -->
-              /   \           /   \
-             |  O  |         |  O  |
-              \   /           \   /
-               -->             <--
-\end{verbatim}
+运动方向与参数的对应关系：\texttt{vx > 0} 为前进，\texttt{vx < 0} 为后退；\texttt{vy > 0} 为向左平移，\texttt{vy < 0} 为向右平移；\texttt{vyaw > 0} 为逆时针旋转（CCW），\texttt{vyaw < 0} 为顺时针旋转（CW）。三个参数可以组合使用，实现边走边转等复合运动。
 
 \section{电机使能/禁用生命周期}
 
 \subsection{完整生命周期}
 
-\begin{verbatim}
-  上电 (Power On)
-       |
-       v
-  [电机禁用] ---enable()---> [电机使能]
-       ^                         |
-       |                     正常使用:
-   disable()               stand_up/walk/sit_down
-       |                         |
-       +-------disable()----<----+
-       |
-       v
-  [电机禁用]
-       |
-  下电 (Power Off)
-\end{verbatim}
+电机的生命周期如下：上电后电机默认处于禁用状态。调用 \texttt{enable()} 使能电机后，可以执行 \texttt{stand\_up()}、\texttt{walk()}、\texttt{sit\_down()} 等运动操作。在任何使能状态下调用 \texttt{disable()} 都会立即释放所有电机力矩，电机回到禁用状态。最终下电关闭电源。
 
 \subsection{关键规则}
 
@@ -1634,15 +1488,9 @@ dog.disable()
 
 \subsection{优先级机制}
 
-Thunder 支持多个控制源同时存在，通过 ControlArbiter 仲裁控制权：
+ORIX 支持多个控制源同时存在，通过 ControlArbiter 仲裁控制权：
 
-\begin{verbatim}
-优先级高                                     优先级低
-+-----------+     +-----------+     +-----------+
-| YUNZHUO   | >>> | Xbox 手柄 | >>> | SDK gRPC  |
-| 遥控器    |     |           |     |           |
-+-----------+     +-----------+     +-----------+
-\end{verbatim}
+控制权优先级从高到低依次为：YUNZHUO 遥控器（最高优先级）、Xbox 手柄、SDK gRPC（最低优先级）。高优先级控制源活跃时，低优先级的指令将被忽略。
 
 \subsection{仲裁规则}
 
@@ -1716,15 +1564,13 @@ dog.clear_motor_fault(joint_ids=[0, 1, 2])
 
 当任一电机总线电压低于 42V 时触发：
 
-\begin{verbatim}
-检测低压 -> 触发 graceful sit_down -> 等待 Grounded -> 禁用电机
-\end{verbatim}
+低压保护触发后，系统依次执行以下步骤：（1）检测到低压（低于 42V）$\to$（2）自动发送坐下指令 $\to$（3）等待机器人进入 Grounded 状态 $\to$（4）禁用全部电机。
 
 低压保护是\textbf{不可逆的}（单次触发后标记 \texttt{lowVoltageTriggered}），需要重新上电才能恢复。
 
 \section{策略切换}
 
-Thunder 支持多种运动策略（Profile），每种策略包含不同的 ONNX 模型和 PD 参数。
+ORIX 支持多种运动策略（Profile），每种策略包含不同的 ONNX 模型和 PD 参数。
 
 \subsection{查询和切换}
 
@@ -1898,7 +1744,7 @@ RPC 超时 & 5 秒 & SDK 默认 RPC 超时 \\
 \chapter{传感器数据}
 \label{ch:sensors}
 
-本章介绍 Thunder 四足机器人所有传感器的数据类型、坐标约定、采集方式和编程接口。
+本章介绍 ORIX 教育版四足机器狗所有传感器的数据类型、坐标约定、采集方式和编程接口。
 
 \section{传感器总览}
 
@@ -1921,7 +1767,7 @@ IMU & HI91 & 角速度 + 四元数 & \texttt{listen\_imu()} & \textasciitilde 50
 
 \subsection{硬件与数据}
 
-Thunder 搭载 HI91 惯性测量单元，安装于机身躯干中心，通过串口 (\texttt{/dev/ttyUSB1}) 以约 50 Hz 频率上报数据。每帧包含：
+ORIX 搭载 HI91 惯性测量单元，安装于机身躯干中心，通过串口 (\texttt{/dev/ttyUSB1}) 以约 50 Hz 频率上报数据。每帧包含：
 
 \begin{longtable}{llll}
 \toprule
@@ -1943,19 +1789,7 @@ Thunder 搭载 HI91 惯性测量单元，安装于机身躯干中心，通过串
 
 IMU 数据使用\textbf{机体坐标系 (Body Frame)}：
 
-\begin{verbatim}
-               +X (前进方向)
-                ^
-                |
-                |
-   +Y (左) <---O---> -Y (右)
-                |
-                |
-                v
-               -X (后退方向)
-
-   +Z 向上 (垂直地面)
-\end{verbatim}
+IMU 坐标系与机体坐标系一致：+X 指向前进方向，+Y 指向左侧，-Y 指向右侧，+Z 垂直向上。
 
 \begin{itemize}[nosep]
   \item X 轴：指向机器人前方
@@ -1965,7 +1799,7 @@ IMU 数据使用\textbf{机体坐标系 (Body Frame)}：
 
 \subsection{四元数约定}
 
-Thunder SDK 使用 \textbf{Hamilton 约定}，四元数顺序为 \texttt{(w, x, y, z)}：
+ORIX SDK 使用 \textbf{Hamilton 约定}，四元数顺序为 \texttt{(w, x, y, z)}：
 
 \[
 q = w + x\mathbf{i} + y\mathbf{j} + z\mathbf{k}
@@ -2051,21 +1885,9 @@ def quat_to_euler(q):
 
 \subsection{关节布局}
 
-Thunder 共有 16 个自由度，每条腿 3 个旋转关节 + 1 个脚轮：
+ORIX 共有 16 个自由度，每条腿 3 个旋转关节 + 1 个脚轮：
 
-\begin{verbatim}
-  前右 (FR)          前左 (FL)
-    0  Hip             4  Hip
-    1  Thigh           5  Thigh
-    2  Calf            6  Calf
-    3  Foot            7  Foot
-
-  后右 (RR)          后左 (RL)
-    8  Hip            12  Hip
-    9  Thigh          13  Thigh
-   10  Calf           14  Calf
-   11  Foot           15  Foot
-\end{verbatim}
+关节编号按四条腿分组：前右 FR（0--3）、前左 FL（4--7）、后右 RR（8--11）、后左 RL（12--15）。每条腿内部依次为 Hip、Thigh、Calf、Foot。
 
 \begin{itemize}[nosep]
   \item \textbf{Hip}：髋关节，控制腿的前后/内外摆动
@@ -2413,7 +2235,7 @@ FSM 状态变化 & \texttt{listen\_state()} & str & -- & 事件驱动 & 状态�
 \chapter{API 参考}
 \label{ch:api}
 
-本章提供 Thunder Python SDK (\texttt{brainstem\_sdk}) 全部公开接口的完整参考。
+本章提供 ORIX Python SDK (\texttt{brainstem\_sdk}) 全部公开接口的完整参考。
 
 \section{ThunderClient 构造与连接}
 
@@ -3001,7 +2823,7 @@ gRPC 状态码 & 含义 & 常见原因 \\
 
 \subsection{Arbiter 控制权冲突}
 
-Thunder 的控制仲裁器（ControlArbiter）确保遥控器始终具有最高优先级。当遥控器在线时，gRPC 指令可能被拒绝：
+ORIX 的控制仲裁器（ControlArbiter）确保遥控器始终具有最高优先级。当遥控器在线时，gRPC 指令可能被拒绝：
 
 \begin{itemize}[nosep]
   \item 遥控器在线且正在操作：gRPC 运动指令将被忽略
@@ -3084,7 +2906,7 @@ finally:
 \chapter{安全指南}
 \label{ch:safety}
 
-Thunder 四足机器人是一台具有高扭矩电机的自主运动设备。操作不当可能造成设备损坏或人员伤害。请在使用前仔细阅读本章全部内容。
+ORIX 教育版四足机器狗是一台具有高扭矩电机的自主运动设备。操作不当可能造成设备损坏或人员伤害。请在使用前仔细阅读本章全部内容。
 
 \section{操作前检查清单}
 
@@ -3165,21 +2987,15 @@ dog.close()
 
 当任一电机报告的母线电压低于 \textbf{42.0V} 时，系统自动触发低压保护：
 
-\begin{verbatim}
-检测到低压 (< 42V)
-       |
-       v
-  发送 SitDown 指令
-       |
-       v
-  等待进入 Grounded 状态
-       |
-       v
-  禁用全部电机 (Disable)
-       |
-       v
-  日志输出: "LOW VOLTAGE: xx.xV < 42.0V -- graceful sitDown"
-\end{verbatim}
+低压保护的完整流程如下：
+
+\begin{enumerate}[nosep]
+  \item 检测到任一电机母线电压低于 42V
+  \item 自动发送 SitDown 指令
+  \item 等待机器人进入 Grounded 状态（安全着地）
+  \item 禁用全部电机（Disable）
+  \item 日志输出：\texttt{LOW VOLTAGE: xx.xV < 42.0V -- graceful sitDown}
+\end{enumerate}
 
 此保护是\textbf{优雅坐下}流程，不是直接断电。系统会等待机器人安全着地后才禁用电机，避免从站立姿态跌落。
 
@@ -3267,28 +3083,14 @@ dog.clear_motor_fault(joint_ids=[0, 1, 2])
 
 \subsection{故障处理流程}
 
-\begin{verbatim}
-发现电机故障
-       |
-       v
-  机器人是否在运动中?
-       |
-    是/        \否
-    v            v
-  立即坐下     直接清除故障
-  dog.sit_down()    dog.clear_motor_fault()
-       |            |
-       v            v
-  等待 Grounded   重新检查
-       |            |
-       v            v
-  清除故障       故障清除?
-  dog.clear_motor_fault()   |
-       |          是/    \否
-       v          v        v
-  重新检查     恢复运动   检查硬件
-                          (CAN线/电源/电机)
-\end{verbatim}
+发现电机故障后，推荐按以下步骤处理：
+
+\begin{enumerate}[nosep]
+  \item 判断机器人是否正在运动中。
+  \item \textbf{如果在运动中}：先调用 \texttt{dog.sit\_down()} 安全坐下，等待进入 Grounded 状态，再调用 \texttt{dog.clear\_motor\_fault()} 清除故障，最后重新检查电机状态。
+  \item \textbf{如果未在运动中}：直接调用 \texttt{dog.clear\_motor\_fault()} 清除故障，然后重新检查。
+  \item 如果故障清除成功，可恢复正常运动；如果故障持续存在，需检查硬件（CAN 线缆、电源、电机本体）。
+\end{enumerate}
 
 \subsection{反复出现的故障}
 
@@ -3346,20 +3148,25 @@ dog.disable()
 
 \subsection{急停优先级}
 
-\begin{verbatim}
-优先级从高到低:
+急停方式按优先级从高到低排列：
 
-  [1] 硬件断电       -- 物理级，不可覆盖
-  [2] 遥控器控制     -- Arbiter 保证最高软件优先级
-  [3] SDK disable()  -- gRPC 调用
-  [4] 低压自动保护   -- 系统自动触发
-\end{verbatim}
+\begin{longtable}{cll}
+\toprule
+优先级 & 方式 & 说明 \\
+\midrule
+\endhead
+1 & 硬件断电 & 物理级，不可覆盖 \\
+2 & 遥控器控制 & Arbiter 保证最高软件优先级 \\
+3 & SDK \texttt{disable()} & gRPC 调用 \\
+4 & 低压自动保护 & 系统自动触发 \\
+\bottomrule
+\end{longtable}
 
 \section{Arbiter 控制仲裁安全}
 
 \subsection{仲裁规则}
 
-Thunder 的 ControlArbiter（控制仲裁器）实施以下安全规则：
+ORIX 的 ControlArbiter（控制仲裁器）实施以下安全规则：
 
 \begin{longtable}{ll}
 \toprule
@@ -3375,18 +3182,7 @@ Thunder 的 ControlArbiter（控制仲裁器）实施以下安全规则：
 
 \subsection{对 SDK 开发者的影响}
 
-\begin{verbatim}
-SDK 发送 walk() 指令
-       |
-       v
-  Arbiter 检查控制权
-       |
-   gRPC 有控制权?
-     |
-   是/      \否 (遥控器占用)
-   v          v
- 执行指令    指令被忽略或拒绝
-\end{verbatim}
+当 SDK 发送 \texttt{walk()} 等运动指令时，Arbiter 首先检查当前控制权归属。如果 gRPC 拥有控制权，指令正常执行；如果遥控器正在占用控制权，指令将被忽略或拒绝。
 
 \begin{itemize}[nosep]
   \item 当遥控器在线并活跃时，SDK 的运动指令将被忽略
@@ -3489,55 +3285,32 @@ def safe_shutdown(dog, timeout=10.0):
 
 遇到问题时，按以下诊断树逐步排查：
 
-\begin{verbatim}
-问题: 机器人异常
-       |
-       v
-  机器人是否有响应?
-       |
-    否/        \是
-    v            v
-  检查电源      机器人在运动吗?
-  检查网络        |
-  重启服务      是/        \否
-       |       v            v
-       |    运动是否正常?   能查询状态吗?
-       |      |              dog.get_state()
-       |    否/  \是           |
-       |    v      v        是/   \否
-       |  运动异常  正常     查电机状态  网络问题
-       |         get_motor_status()
-       v                     |
-  [电源/网络故障]         有故障码?
-  1. 电池是否有电           |
-  2. 电池开关是否打开    是/    \否
-  3. CAN 线是否连好      v        v
-  4. SSH 能否连通      清除故障  检查状态机
-  5. brainstem 服务    clear_motor_fault()
-     是否运行
-\end{verbatim}
+遇到机器人异常时，按以下步骤逐级排查：
+
+\begin{enumerate}[nosep]
+  \item \textbf{机器人是否有响应？}
+  \begin{itemize}[nosep]
+    \item \textbf{无响应}：检查电源（电池是否有电、开关是否打开）、检查网络连通性（ping 测试）、检查 CAN 线缆连接、SSH 是否可连通、brainstem 服务是否运行。
+    \item \textbf{有响应}：进入下一步。
+  \end{itemize}
+  \item \textbf{机器人是否在运动中？}
+  \begin{itemize}[nosep]
+    \item \textbf{在运动中}：检查运动是否正常。如运动异常，参考下方运动异常诊断。
+    \item \textbf{未运动}：调用 \texttt{dog.get\_state()} 查询状态。如可查询，再用 \texttt{dog.get\_motor\_status()} 检查电机状态和故障码；如不可查询，排查网络问题。
+  \end{itemize}
+  \item \textbf{有故障码}：调用 \texttt{dog.clear\_motor\_fault()} 清除后重新检查。
+  \item \textbf{无故障码}：检查状态机当前状态是否正确。
+\end{enumerate}
 
 \noindent\textbf{运动异常诊断：}
 
-\begin{verbatim}
-运动异常
-    |
-    v
-  机器人摔倒了?
-    |
-  是/        \否
-  v            v
- 检查电压    运动不流畅?
- get_voltage()   |
-    |         是/     \否
-    v         v         v
- < 42V?    检查温度    指令无效?
-    |      temperature    |
-  是/ \否     |          v
-  v     v    > 70C?   检查 Arbiter
- 低压   检查   |      (遥控器是否在线)
- 保护  关节限位
-\end{verbatim}
+运动异常诊断步骤：
+
+\begin{enumerate}[nosep]
+  \item \textbf{机器人摔倒}：首先用 \texttt{get\_voltage()} 检查电压。低于 42V 说明是低压保护触发；电压正常则检查关节限位是否超限。
+  \item \textbf{运动不流畅}：用 \texttt{get\_motor\_status()} 检查电机温度。温度超过 70\textdegree C 说明过热，需暂停运动等待冷却。
+  \item \textbf{指令无效}：检查 Arbiter 状态，确认遥控器是否在线占用控制权。
+\end{enumerate}
 
 \section*{附录：安全相关环境变量}
 
@@ -3556,17 +3329,14 @@ def safe_shutdown(dog, timeout=10.0):
 
 \section*{附录：安全操作总结}
 
-\begin{verbatim}
-+------------------------------------------------------+
-|              Thunder 安全操作五条铁律                   |
-|                                                      |
-|  1. 永远带遥控器 -- 遥控器是最终安全手段               |
-|  2. 先坐再断电   -- disable() 前必须 sit_down()       |
-|  3. 关注电压     -- 低于 44V 准备收工                  |
-|  4. 监控温度     -- 超过 70C 立即休息                  |
-|  5. 地面运行     -- 永远在地面操作，永远不上桌          |
-+------------------------------------------------------+
-\end{verbatim}
+\warning{\textbf{ORIX 安全操作五条铁律：}
+\begin{enumerate}[nosep]
+  \item \textbf{永远带遥控器} --- 遥控器是最终安全手段
+  \item \textbf{先坐再断电} --- \texttt{disable()} 前必须 \texttt{sit\_down()}
+  \item \textbf{关注电压} --- 低于 44V 准备收工
+  \item \textbf{监控温度} --- 超过 70\textdegree C 立即休息
+  \item \textbf{地面运行} --- 永远在地面操作，永远不上桌
+\end{enumerate}}
 
 
 
@@ -3576,7 +3346,7 @@ def safe_shutdown(dog, timeout=10.0):
 \chapter{常见问题}
 \label{ch:faq}
 
-本章汇总使用 Thunder Python SDK 过程中的常见问题及解决方案。
+本章汇总使用 ORIX Python SDK 过程中的常见问题及解决方案。
 
 \section{连接问题}
 
@@ -3882,7 +3652,7 @@ dog.switch_profile(profile.available[0])
 
 \noindent\textbf{Hamilton vs ROS 约定}：
 
-Thunder SDK 使用 Hamilton 约定：\texttt{(w, x, y, z)}
+ORIX SDK 使用 Hamilton 约定：\texttt{(w, x, y, z)}
 
 \begin{lstlisting}[style=python]
 imu = next(iter(dog.listen_imu()))
@@ -3913,10 +3683,7 @@ euler = r.as_euler('xyz', degrees=True)
 
 IMU 的陀螺仪存在零偏（bias），静止时读数不会严格为零。典型零偏范围：
 
-\begin{verbatim}
-|gyro.x| < 0.02 rad/s  -- 正常
-|gyro.x| > 0.05 rad/s  -- 可能需要标定
-\end{verbatim}
+典型零偏范围：$|\text{gyro.x}| < 0.02$ rad/s 属于正常；$|\text{gyro.x}| > 0.05$ rad/s 可能需要重新标定。
 
 如需高精度角速度，可在启动时采集 100 帧静止数据取均值作为零偏，后续数据减去此偏移。
 
@@ -3947,7 +3714,7 @@ IMU 标称频率约 50Hz，实际可能在 48--52Hz 波动。这是正常的。�
 
 \subsection{Q: 50Hz 控制频率够用吗？}
 
-Thunder 的运动控制循环固定为 50Hz（20ms 周期）。SDK 发送的指令在下一个控制周期生效。这意味着：
+ORIX 的运动控制循环固定为 50Hz（20ms 周期）。SDK 发送的指令在下一个控制周期生效。这意味着：
 \begin{itemize}[nosep]
   \item 指令最大延迟：20ms（一个控制周期）
   \item 不需要以超过 50Hz 的频率发送 walk() 指令
@@ -4077,13 +3844,7 @@ New-NetFirewallRule -DisplayName "Thunder gRPC" -Direction Outbound -Protocol TC
 
 \subsection{网络拓扑要求}
 
-\begin{verbatim}
-开发机                    Thunder 机器人
-(192.168.66.x)           (192.168.66.190)
-     |                         |
-     +--- 同一局域网/交换机 ---+
-           (无 NAT、无代理)
-\end{verbatim}
+开发机（192.168.66.x）与 ORIX 机器人（192.168.66.190）必须处于同一局域网或交换机下，不经过 NAT 和代理直连。
 
 \begin{itemize}[nosep]
   \item SDK 使用 gRPC over HTTP/2，需要直连（不经过 HTTP 代理）
@@ -4151,7 +3912,7 @@ except Exception as e:
     sdk_ver = f"导入失败: {e}"
 
 print("=" * 50)
-print("Thunder SDK 诊断信息")
+print("ORIX SDK 诊断信息")
 print("=" * 50)
 print(f"SDK 版本:    {sdk_ver}")
 print(f"Python:      {sys.version}")

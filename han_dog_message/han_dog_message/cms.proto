@@ -79,6 +79,13 @@ service Cms {
   // 获取当前策略信息。
   rpc GetProfile(google.protobuf.Empty) returns (ProfileInfo);
 
+  // ──── 动作系统 ────
+
+  // 播放预设动作（鞠躬/点头/扭动/伸展/跳舞等）。机器人必须在 Standing 状态。
+  rpc PlayGesture(GestureRequest) returns (google.protobuf.Empty);
+  // 获取所有可用的预设动作列表。
+  rpc ListGestures(google.protobuf.Empty) returns (GestureList);
+
   // ──── 诊断 ────
 
   // 读取全部 16 个电机的总线电压 (V)。
@@ -263,4 +270,27 @@ message Command {
     // 行走：(x=前后, y=左右, z=旋转)，范围 [-1, 1]。
     Vector3 walk = 4;
   }
+}
+
+// ──── 动作系统消息 ────
+
+// 播放动作请求。
+message GestureRequest {
+  // 动作名称（见 ListGestures 返回的列表）。
+  string name = 1;
+}
+
+// 可用动作列表。
+message GestureList {
+  repeated GestureInfo gestures = 1;
+}
+
+// 单个动作的信息。
+message GestureInfo {
+  // 动作名称（用于 PlayGesture 的 name 字段）。
+  string name = 1;
+  // 动作描述。
+  string description = 2;
+  // 预计执行时长（毫秒）。
+  int32 duration_ms = 3;
 }

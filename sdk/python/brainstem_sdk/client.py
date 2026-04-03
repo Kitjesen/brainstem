@@ -217,6 +217,48 @@ class ThunderClient:
             descriptions=list(resp.descriptions),
         )
 
+    # ── Gesture (动作系统) ───────────────────────────────
+
+    def list_gestures(self) -> list[dict]:
+        """List all available preset gestures.
+
+        Returns:
+            List of dicts with keys: name, description, duration_ms.
+
+        Example::
+
+            gestures = dog.list_gestures()
+            for g in gestures:
+                print(f"{g['name']}: {g['description']} ({g['duration_ms']}ms)")
+        """
+        resp = self._stub.ListGestures(Empty(), timeout=self._timeout)
+        return [
+            {
+                "name": g.name,
+                "description": g.description,
+                "duration_ms": g.duration_ms,
+            }
+            for g in resp.gestures
+        ]
+
+    def play_gesture(self, name: str):
+        """Play a preset gesture. Robot must be standing.
+
+        Available gestures: bow (鞠躬), nod (点头), wiggle (扭动),
+        stretch (伸展), dance (跳舞).
+
+        Args:
+            name: Gesture name (see list_gestures()).
+
+        Example::
+
+            dog.stand_up()
+            dog.play_gesture("bow")    # 鞠躬
+            dog.play_gesture("dance")  # 跳舞
+        """
+        req = cms_pb2.GestureRequest(name=name)
+        self._stub.PlayGesture(req, timeout=30.0)  # gestures can take long
+
     # ── Diagnostics ─────────────────────────────────────────
 
     def clear_motor_fault(self, joint_ids: list[int] | None = None):
