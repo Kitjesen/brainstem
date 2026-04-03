@@ -1,0 +1,4264 @@
+% !TEX program = xelatex
+% Thunder 四足机器人 Python SDK 开发手册
+% 上海穹沛科技有限公司
+% 2026年4月
+\documentclass[a4paper,11pt,openany]{book}
+
+% ============================================================
+%  基础包
+% ============================================================
+\usepackage[UTF8, heading=true]{ctex}
+\usepackage[margin=2.5cm, top=3cm, bottom=3cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{pifont}
+\usepackage{tocloft}
+
+% ============================================================
+%  颜色定义
+% ============================================================
+\definecolor{thunderblue}{RGB}{0, 82, 155}
+\definecolor{thundergray}{RGB}{100, 100, 100}
+\definecolor{codebg}{RGB}{245, 245, 245}
+\definecolor{codeframe}{RGB}{200, 200, 200}
+\definecolor{keywordcolor}{RGB}{0, 0, 180}
+\definecolor{stringcolor}{RGB}{0, 128, 0}
+\definecolor{commentcolor}{RGB}{128, 128, 128}
+\definecolor{warnorange}{RGB}{200, 120, 0}
+
+% ============================================================
+%  超链接配置
+% ============================================================
+\hypersetup{
+  colorlinks=true,
+  linkcolor=thunderblue,
+  urlcolor=thunderblue,
+  citecolor=thunderblue,
+  bookmarks=true,
+  bookmarksnumbered=true,
+  pdfauthor={上海穹沛科技有限公司},
+  pdftitle={Thunder 四足机器人 Python SDK 开发手册},
+  pdfsubject={Thunder SDK v0.1.0},
+}
+
+% ============================================================
+%  代码高亮配置
+% ============================================================
+\lstset{
+  basicstyle=\small\ttfamily,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  breaklines=true,
+  breakatwhitespace=false,
+  tabsize=4,
+  showstringspaces=false,
+  numbers=left,
+  numberstyle=\tiny\color{thundergray},
+  numbersep=8pt,
+  xleftmargin=1.5em,
+  framexleftmargin=1.5em,
+  aboveskip=1em,
+  belowskip=0.8em,
+  literate={-}{-}1,
+}
+
+\lstdefinestyle{python}{
+  language=Python,
+  keywordstyle=\color{keywordcolor}\bfseries,
+  stringstyle=\color{stringcolor},
+  commentstyle=\color{commentcolor}\itshape,
+  morekeywords={self, True, False, None, as, with, yield, async, await, f},
+}
+
+\lstdefinestyle{bash}{
+  language=bash,
+  keywordstyle=\color{keywordcolor}\bfseries,
+  stringstyle=\color{stringcolor},
+  commentstyle=\color{commentcolor}\itshape,
+  morekeywords={ssh, ping, nmap, systemctl, pip, python, nc, scp, grep, cat, tail, ls, cd, export},
+}
+
+\lstdefinestyle{plain}{
+  language={},
+  keywordstyle={},
+  stringstyle={},
+  commentstyle={},
+  numbers=none,
+}
+
+% ============================================================
+%  页眉页脚
+% ============================================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\small\leftmark}
+\fancyhead[RO]{\small\rightmark}
+\fancyfoot[C]{\small\thepage}
+\fancyfoot[LE,RO]{\small Thunder SDK v0.1.0}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.2pt}
+
+% ============================================================
+%  章节标题样式
+% ============================================================
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{thunderblue}}
+  {\chaptertitlename\ \thechapter}{20pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{-20pt}{30pt}
+
+% ============================================================
+%  自定义命令
+% ============================================================
+\newcommand{\warning}[1]{%
+  \begin{center}
+  \fcolorbox{warnorange}{warnorange!10}{%
+    \parbox{0.9\textwidth}{\textcolor{warnorange}{\textbf{注意：}}#1}%
+  }
+  \end{center}
+}
+
+\newcommand{\apimethod}[1]{%
+  \paragraph{\texttt{#1}}%
+}
+
+% longtable 支持 booktabs
+\setlength{\LTpre}{0.8em}
+\setlength{\LTpost}{0.8em}
+
+% ============================================================
+%  文档开始
+% ============================================================
+\begin{document}
+
+% ============================================================
+%  封面
+% ============================================================
+\begin{titlepage}
+\begin{center}
+
+\vspace*{3cm}
+
+{\Huge\bfseries\color{thunderblue} Thunder 四足机器人\\[0.5em] Python SDK 开发手册}
+
+\vspace{2cm}
+
+\includegraphics[width=3cm]{example-image-duck}% 占位图，可替换为公司 Logo
+
+\vspace{2cm}
+
+{\LARGE 上海穹沛科技有限公司}
+
+\vspace{1cm}
+
+{\Large\color{thundergray} Brainstem SDK for Python}
+
+\vspace{2cm}
+
+\begin{tabular}{rl}
+\textbf{版本} & v0.1.0 \\
+\textbf{日期} & 2026年4月 \\
+\textbf{密级} & 内部文档 \\
+\end{tabular}
+
+\vfill
+
+{\small\color{thundergray} Copyright \copyright\ 2026 上海穹沛科技有限公司. All rights reserved.}
+
+\end{center}
+\end{titlepage}
+
+% ============================================================
+%  版权页
+% ============================================================
+\thispagestyle{empty}
+\vspace*{\fill}
+\noindent\textbf{文档信息}\\[0.5em]
+\begin{tabular}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+文档名称 & Thunder 四足机器人 Python SDK 开发手册 \\
+版本号   & v0.1.0 \\
+编写日期 & 2026年4月 \\
+适用产品 & Thunder 四足轮腿机器人 \\
+适用 SDK & brainstem\_sdk (Python) \\
+\bottomrule
+\end{tabular}
+
+\vspace{2em}
+\noindent\textbf{版本历史}\\[0.5em]
+\begin{tabular}{llll}
+\toprule
+版本 & 日期 & 作者 & 说明 \\
+\midrule
+v0.1.0 & 2026-04 & 穹沛科技 & 初始版本 \\
+\bottomrule
+\end{tabular}
+
+\vspace{2em}
+\noindent{\small 本文档为上海穹沛科技有限公司内部技术文档，未经许可不得外传。}
+\newpage
+
+% ============================================================
+%  目录
+% ============================================================
+\tableofcontents
+\newpage
+
+% ============================================================
+%  概述 (来自 README.md)
+% ============================================================
+\chapter{概述}
+\label{ch:overview}
+
+Thunder 四足机器人 Python 开发套件，3 行代码控制机器人。
+
+\section{安装}
+
+\begin{lstlisting}[style=bash]
+cd sdk/python
+pip install -e .
+\end{lstlisting}
+
+\section{快速开始}
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import ThunderClient
+
+# 连接机器人 (默认 192.168.66.190:13145)
+dog = ThunderClient("192.168.66.190")
+
+# 使能电机 -> 站起 -> 走路 -> 坐下 -> 禁用
+dog.enable()
+dog.stand_up()
+dog.walk(vx=0.3)       # 30% 速度前进
+dog.walk(vx=0, vyaw=0.2)  # 原地左转
+dog.sit_down()
+dog.disable()
+\end{lstlisting}
+
+\section{API 参考}
+
+\subsection{连接}
+
+\begin{lstlisting}[style=python]
+# 默认连接
+dog = ThunderClient("192.168.66.190")
+
+# 自定义端口和超时
+dog = ThunderClient("10.0.0.1", port=13145, timeout=5.0)
+
+# 支持 with 语句
+with ThunderClient("192.168.66.190") as dog:
+    dog.stand_up()
+\end{lstlisting}
+
+\subsection{运动控制}
+
+\begin{longtable}{lll}
+\toprule
+方法 & 说明 & 参数 \\
+\midrule
+\endhead
+\texttt{dog.enable()} & 使能全部电机 & -- \\
+\texttt{dog.disable()} & 禁用全部电机 & -- \\
+\texttt{dog.stand\_up()} & 坐姿 $\to$ 站立 & -- \\
+\texttt{dog.sit\_down()} & 站立 $\to$ 坐姿 & -- \\
+\texttt{dog.walk(vx, vy, vyaw)} & 行走 & \parbox[t]{5cm}{vx: 前后 [-1,1]\\vy: 左右 [-1,1]\\vyaw: 旋转 [-1,1]} \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{walk() 参数约定：}
+\begin{itemize}[nosep]
+  \item \texttt{vx > 0} = 前进，\texttt{vx < 0} = 后退
+  \item \texttt{vy > 0} = 向左，\texttt{vy < 0} = 向右
+  \item \texttt{vyaw > 0} = 逆时针，\texttt{vyaw < 0} = 顺时针
+  \item \texttt{dog.walk()} (无参数) = 原地停步
+\end{itemize}
+
+\subsection{状态查询}
+
+\begin{lstlisting}[style=python]
+# 获取当前状态
+state = dog.get_state()
+# 返回: "zero" | "grounded" | "standing" | "walking" | "transitioning"
+
+# 获取当前策略
+profile = dog.get_profile()
+print(profile.current)     # "default"
+print(profile.available)   # ["default", "mini"]
+
+# 切换策略 (机器人必须在 grounded 状态)
+dog.switch_profile("mini")
+\end{lstlisting}
+
+\subsection{诊断}
+
+\begin{lstlisting}[style=python]
+# 电压
+voltages = dog.get_voltage()  # [42.1, 42.0, ...] 16个电机
+
+# 电机状态
+motors = dog.get_motor_status()
+for m in motors:
+    print(f"Joint {m.id}: online={m.online} temp={m.temperature}C")
+
+# 清除电机故障
+dog.clear_motor_fault()          # 清除全部
+dog.clear_motor_fault([0, 1, 2]) # 只清前右腿
+
+# 标零 (grounded 状态下)
+dog.set_zero()
+\end{lstlisting}
+
+\subsection{实时数据流}
+
+\begin{lstlisting}[style=python]
+# IMU 数据 (~50Hz)
+for imu in dog.listen_imu():
+    print(f"gyro: {imu.gyroscope.x:.3f}, {imu.gyroscope.y:.3f}, {imu.gyroscope.z:.3f}")
+    print(f"quat: w={imu.quaternion.w:.3f}")
+
+# 关节数据
+for joint in dog.listen_joint():
+    print(f"Joint {joint.id}: pos={joint.position:.3f} rad")
+
+# 状态变化
+for state in dog.listen_state():
+    print(f"State changed: {state}")
+\end{lstlisting}
+
+\section{关节编号}
+
+\begin{verbatim}
+前右 (FR)           前左 (FL)
+  0 Hip               4 Hip
+  1 Thigh             5 Thigh
+  2 Calf              6 Calf
+  3 Foot              7 Foot
+
+后右 (RR)           后左 (RL)
+  8 Hip              12 Hip
+  9 Thigh            13 Thigh
+ 10 Calf             14 Calf
+ 11 Foot             15 Foot
+\end{verbatim}
+
+\section{状态机}
+
+\begin{verbatim}
+           Init
+            |
+            v
+     +-- Grounded --+
+     |      ^       |
+     |      |       v
+     |   SitDown  StandUp
+     |      ^       |
+     |      |       v
+     |   Standing --+
+     |      |
+     |      v
+     +-- Walking
+\end{verbatim}
+
+\begin{itemize}[nosep]
+  \item \textbf{Grounded}：坐姿，安全状态。上电后自动进入。
+  \item \textbf{Standing}：站立，可以接收 walk 指令。
+  \item \textbf{Walking}：行走中。发送 \texttt{walk(0,0,0)} 回到 Standing。
+\end{itemize}
+
+\section{示例}
+
+\begin{longtable}{ll}
+\toprule
+示例 & 说明 \\
+\midrule
+\endhead
+\texttt{examples/01\_hello\_walk.py} & 最简走路示例 \\
+\texttt{examples/02\_read\_imu.py} & 读取 IMU 数据流 \\
+\texttt{examples/03\_motor\_diagnostics.py} & 电机诊断 \\
+\texttt{examples/04\_keyboard\_control.py} & WASD 键盘控制 \\
+\bottomrule
+\end{longtable}
+
+\section{网络要求}
+
+\begin{itemize}[nosep]
+  \item 开发机和机器人在同一局域网
+  \item 默认 gRPC 端口：\textbf{13145}
+  \item 无需安装额外中间件（纯 gRPC over HTTP/2）
+\end{itemize}
+
+
+
+% ============================================================
+%  第 1 章：快速开始
+% ============================================================
+\chapter{快速开始}
+\label{ch:quickstart}
+
+本文档帮助您在 5 分钟内完成 Thunder SDK 的安装、连接和第一次控制。
+
+\section{环境要求}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 要求 \\
+\midrule
+\endhead
+Python & >= 3.8 \\
+操作系统 & Windows / Linux / macOS \\
+网络 & 开发机与机器人在同一局域网 \\
+端口 & TCP 13145（gRPC over HTTP/2） \\
+\bottomrule
+\end{longtable}
+
+\warning{不需要安装 ROS、消息中间件或其他额外组件。SDK 通过纯 gRPC 直连机器人。}
+
+\section{安装}
+
+\subsection{方式一：本地开发安装（推荐）}
+
+\begin{lstlisting}[style=bash]
+cd sdk/python
+pip install -e .
+\end{lstlisting}
+
+\subsection{方式二：直接安装依赖}
+
+\begin{lstlisting}[style=bash]
+pip install grpcio>=1.50.0 protobuf>=4.21.0
+\end{lstlisting}
+
+安装完成后验证：
+
+\begin{lstlisting}[style=bash]
+python -c "from brainstem_sdk import ThunderClient; print('OK')"
+\end{lstlisting}
+
+输出 \texttt{OK} 即安装成功。
+
+\section{三行代码控制机器人}
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import ThunderClient
+
+dog = ThunderClient("192.168.66.190")
+dog.walk(vx=0.3)  # 30% 速度前进
+\end{lstlisting}
+
+这三行代码做了以下事情：
+\begin{enumerate}[nosep]
+  \item 导入 SDK
+  \item 通过 gRPC 连接到机器人（默认端口 13145）
+  \item 发送前进指令
+\end{enumerate}
+
+\warning{实际使用中，您需要先 \texttt{enable()} 使能电机并 \texttt{stand\_up()} 站起来，才能执行 \texttt{walk()}。完整的操作流程见下方``第一次完整操作''。}
+
+\section{首次连接检查清单}
+
+在第一次连接机器人之前，请逐项确认：
+
+\begin{itemize}[nosep]
+  \item[$\square$] 机器人已上电，电池电压 > 42V
+  \item[$\square$] 机器人主控板（S100P）已启动完成（约 30 秒）
+  \item[$\square$] brainstem 服务已运行（\texttt{systemctl status brainstem}）
+  \item[$\square$] 开发机与机器人在同一局域网（可以 \texttt{ping 192.168.66.190}）
+  \item[$\square$] 遥控器已关闭或置于空闲状态（遥控器优先级高于 SDK）
+  \item[$\square$] 机器人放置在平坦地面上，四足触地
+\end{itemize}
+
+\section{网络配置}
+
+\begin{verbatim}
+开发机 (PC/笔记本)                   Thunder 机器人
+  192.168.66.xxx          <------>   192.168.66.190
+       |                                  |
+       +---- 同一局域网 (以太网/WiFi) -----+
+                    端口: 13145/TCP
+\end{verbatim}
+
+\begin{longtable}{lll}
+\toprule
+参数 & 默认值 & 说明 \\
+\midrule
+\endhead
+机器人 IP & \texttt{192.168.66.190} & S100P 主控板默认地址 \\
+gRPC 端口 & \texttt{13145} & 无需修改 \\
+协议 & gRPC (HTTP/2) & 无加密（局域网内使用） \\
+超时 & 5.0 秒 & 可通过 \texttt{timeout} 参数调整 \\
+\bottomrule
+\end{longtable}
+
+如果机器人 IP 不同，连接时指定即可：
+
+\begin{lstlisting}[style=python]
+dog = ThunderClient("10.0.0.100", port=13145, timeout=5.0)
+\end{lstlisting}
+
+\section{验证连接脚本}
+
+将以下脚本保存为 \texttt{verify\_connection.py} 并运行：
+
+\begin{lstlisting}[style=python]
+"""验证与 Thunder 机器人的连接。"""
+
+from brainstem_sdk import ThunderClient
+
+ROBOT_IP = "192.168.66.190"
+
+print(f"正在连接 Thunder @ {ROBOT_IP}:13145 ...")
+
+try:
+    dog = ThunderClient(ROBOT_IP, timeout=3.0)
+
+    # 1. 查询状态机
+    state = dog.get_state()
+    print(f"[OK] 状态机: {state}")
+
+    # 2. 查询电压
+    voltages = dog.get_voltage()
+    if voltages:
+        avg_v = sum(voltages) / len(voltages)
+        print(f"[OK] 平均电压: {avg_v:.1f}V ({len(voltages)} 个电机)")
+    else:
+        print("[OK] 电压查询成功（无数据）")
+
+    # 3. 查询电机状态
+    motors = dog.get_motor_status()
+    online = sum(1 for m in motors if m.online)
+    print(f"[OK] 电机在线: {online}/{len(motors)}")
+
+    # 4. 查询当前策略
+    profile = dog.get_profile()
+    print(f"[OK] 当前策略: {profile.current}")
+    print(f"     可用策略: {profile.available}")
+
+    print("\n--- 连接验证通过 ---")
+
+    dog.close()
+
+except Exception as e:
+    print(f"\n[FAIL] 连接失败: {e}")
+    print("\n排查步骤:")
+    print("  1. 确认机器人已上电并启动完成")
+    print("  2. 确认网络连通: ping 192.168.66.190")
+    print("  3. 确认服务运行: ssh sunrise@192.168.66.190 'systemctl status brainstem'")
+    print("  4. 确认端口可达: 无防火墙阻断 13145/TCP")
+\end{lstlisting}
+
+运行：
+
+\begin{lstlisting}[style=bash]
+python verify_connection.py
+\end{lstlisting}
+
+预期输出：
+
+\begin{lstlisting}[style=plain,numbers=none]
+正在连接 Thunder @ 192.168.66.190:13145 ...
+[OK] 状态机: grounded
+[OK] 平均电压: 48.2V (16 个电机)
+[OK] 电机在线: 16/16
+[OK] 当前策略: default
+     可用策略: ['default', 'mini']
+
+--- 连接验证通过 ---
+\end{lstlisting}
+
+\section{第一次完整操作}
+
+确认连接验证通过后，尝试完整的站起-行走-坐下流程：
+
+\begin{lstlisting}[style=python]
+import time
+from brainstem_sdk import ThunderClient
+
+dog = ThunderClient("192.168.66.190")
+
+# 使能电机
+dog.enable()
+print(f"状态: {dog.get_state()}")   # grounded
+
+# 站起来（约 3 秒过渡）
+dog.stand_up()
+time.sleep(4)
+print(f"状态: {dog.get_state()}")   # standing
+
+# 前进
+dog.walk(vx=0.3)
+time.sleep(3)
+
+# 停步
+dog.walk()    # 无参数 = 停步
+time.sleep(1)
+
+# 坐下（约 3 秒过渡）
+dog.sit_down()
+time.sleep(4)
+print(f"状态: {dog.get_state()}")   # grounded
+
+# 禁用电机
+dog.disable()
+dog.close()
+\end{lstlisting}
+
+\warning{首次操作建议在台架上进行，或有人在旁边准备随时用遥控器接管。遥控器具有最高优先级，任何时候拨动遥控器都可以立即接管控制权。}
+
+\section{使用 with 语句}
+
+SDK 支持上下文管理器，退出时自动关闭连接：
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import ThunderClient
+
+with ThunderClient("192.168.66.190") as dog:
+    state = dog.get_state()
+    print(f"当前状态: {state}")
+# 退出 with 块时自动调用 dog.close()
+\end{lstlisting}
+
+\section{常见问题}
+
+\subsection{连接超时}
+
+\begin{lstlisting}[style=plain,numbers=none]
+grpc._channel._InactiveRpcError: ... UNAVAILABLE
+\end{lstlisting}
+
+\noindent\textbf{排查步骤}：
+\begin{enumerate}[nosep]
+  \item 确认机器人已上电且启动完成
+  \item \texttt{ping 192.168.66.190} 确认网络连通
+  \item SSH 登录确认服务运行：\texttt{ssh sunrise@192.168.66.190 'systemctl status brainstem'}
+  \item 检查防火墙是否阻断了 13145/TCP
+\end{enumerate}
+
+\subsection{walk() 没反应}
+
+必须按照状态机顺序操作：\texttt{enable()} $\to$ \texttt{stand\_up()} $\to$ 等待站稳 $\to$ \texttt{walk()}。
+
+\begin{lstlisting}[style=python]
+state = dog.get_state()
+print(state)  # 如果不是 "standing"，walk() 不会生效
+\end{lstlisting}
+
+\subsection{电机不动}
+
+\begin{enumerate}[nosep]
+  \item 确认已调用 \texttt{dog.enable()}
+  \item 遥控器在线时会抢占控制权------关闭或放下遥控器
+  \item 查看电机状态：\texttt{dog.get\_motor\_status()}
+\end{enumerate}
+
+\subsection{操作被拒绝}
+
+\begin{lstlisting}[style=plain,numbers=none]
+grpc._channel._InactiveRpcError: ... transition in progress
+\end{lstlisting}
+
+状态机正在过渡中（如站起/坐下动画），请等待过渡完成后再发送新指令。
+
+
+
+% ============================================================
+%  第 2 章：硬件概览
+% ============================================================
+\chapter{硬件概览}
+\label{ch:hardware}
+
+本文档介绍 Thunder 四足轮腿机器人的硬件组成、传感器、执行器和通信架构。
+
+\section{外观与尺寸}
+
+\begin{longtable}{ll}
+\toprule
+参数 & 值 \\
+\midrule
+\endhead
+类型 & 四足轮腿机器人 \\
+自由度 & 16 DOF（4腿 $\times$ 3关节 + 4脚轮） \\
+重量 & （待确认） \\
+尺寸 (长$\times$宽$\times$高) & （待确认） \\
+站立高度 & （待确认） \\
+\bottomrule
+\end{longtable}
+
+\section{整体架构}
+
+\begin{verbatim}
+                    +--------------------------+
+                    |       S100P 主控板        |
+                    |    (RDK X5 / aarch64)    |
+                    |     Ubuntu 22.04         |
+                    +--+-----+-----+-----+----+
+                       |     |     |     |
+              +--------+  +--+--+  |  +--+--------+
+              |           |     |  |  |            |
+         +----+----+  +---+--+ +--+--+--+  +------+------+
+         | HI91 IMU|  | PCAN | | 以太网  |  | SBUS/USB   |
+         | (50Hz)  |  | CAN  | | gRPC   |  | 遥控器      |
+         +---------+  +---+--+ +---------+  +-------------+
+                          |
+            +-------------+-------------+
+            |             |             |
+      +-----+-----+ +----+----+ +------+------+
+      | Robstride  | | Robstride| | Robstride  |
+      | 电机 x4    | | 电机 x4  | | 电机 x4+4  |
+      | (FR leg)   | | (FL leg) | | (RR+RL)    |
+      +------------+ +----------+ +-------------+
+\end{verbatim}
+
+\section{计算平台}
+
+\begin{longtable}{ll}
+\toprule
+参数 & 规格 \\
+\midrule
+\endhead
+主控板 & 地瓜机器人 S100P (RDK X5) \\
+处理器 & Horizon J6, aarch64 \\
+AI 算力 & Nash BPU, 128 TOPS \\
+操作系统 & Ubuntu 22.04 \\
+中间件 & ROS2 Humble (可选) \\
+控制程序 & brainstem (Dart runtime) \\
+\bottomrule
+\end{longtable}
+
+\noindent 主控板负责：
+\begin{itemize}[nosep]
+  \item 50Hz 实时控制循环
+  \item ONNX 神经网络推理（步态策略）
+  \item gRPC 服务端（接收 SDK 指令）
+  \item IMU 数据采集与融合
+  \item CAN 总线电机通信
+  \item 低压保护与安全监控
+\end{itemize}
+
+\section{关节与执行器}
+
+\subsection{关节布局}
+
+Thunder 共有 \textbf{16 个自由度}，分为 4 条腿，每条腿包含 3 个旋转关节和 1 个脚轮：
+
+\begin{verbatim}
+        前 (Front)
+   FL +---------+ FR
+      |         |
+      |  body   |
+      |         |
+   RL +---------+ RR
+        后 (Rear)
+
+每条腿的关节（由近到远）:
+  Hip   -- 髋关节（横滚方向，内外摆动）
+  Thigh -- 大腿关节（俯仰方向，前后摆动）
+  Calf  -- 小腿关节（俯仰方向，前后摆动）
+  Foot  -- 脚轮（连续旋转，轮式驱动）
+\end{verbatim}
+
+\subsection{电机规格}
+
+\begin{longtable}{lll}
+\toprule
+参数 & 腿部关节 (Hip/Thigh/Calf) & 脚轮 (Foot) \\
+\midrule
+\endhead
+电机 & Robstride & Robstride \\
+总线 & PCAN CAN & PCAN CAN \\
+最大力矩 & 50 Nm & 30 Nm \\
+控制模式 & PD 位置控制 & 速度控制 (Kp=0) \\
+反馈 & 位置 / 速度 / 力矩 / 温度 & 位置 / 速度 / 力矩 / 温度 \\
+\bottomrule
+\end{longtable}
+
+\subsection{PD 控制参数（default 策略）}
+
+行走推理阶段的 PD 增益：
+
+\begin{longtable}{llll}
+\toprule
+关节类型 & Kp & Kd & 动作缩放 \\
+\midrule
+\endhead
+Hip (髋) & 80 & 10 & 0.15 \\
+Thigh (大腿) & 100 & 10 & 0.25 \\
+Calf (小腿) & 120 & 15 & 0.25 \\
+Foot (脚轮) & 0 & 1 & 5.0 \\
+\bottomrule
+\end{longtable}
+
+\warning{脚轮的 Kp=0 表示不做位置控制，仅通过速度指令驱动。}
+
+站起/坐下阶段使用更高的刚度：Kp=200, Kd=8（全部 16 个关节统一）。
+
+\section{传感器}
+
+\subsection{惯性测量单元 (IMU)}
+
+\begin{longtable}{ll}
+\toprule
+参数 & 规格 \\
+\midrule
+\endhead
+型号 & HI91 \\
+数据 & 三轴陀螺仪 + 四元数姿态 \\
+频率 & \textasciitilde 50Hz \\
+安装位置 & 机身中央 \\
+坐标系 & x=前, y=左, z=上 \\
+\bottomrule
+\end{longtable}
+
+IMU 提供两类数据：
+\begin{itemize}[nosep]
+  \item \textbf{陀螺仪} (\texttt{gyroscope})：三轴角速度 (rad/s)，用于步态平衡
+  \item \textbf{四元数} (\texttt{quaternion})：当前姿态 (w,x,y,z Hamilton 约定)，用于重力投影
+\end{itemize}
+
+SDK 获取方式：
+
+\begin{lstlisting}[style=python]
+for imu in dog.listen_imu():
+    print(f"陀螺仪: x={imu.gyroscope.x:.3f} y={imu.gyroscope.y:.3f} z={imu.gyroscope.z:.3f}")
+    print(f"姿态:   w={imu.quaternion.w:.3f} x={imu.quaternion.x:.3f}")
+\end{lstlisting}
+
+\subsection{关节编码器}
+
+每个电机内置编码器，提供：
+
+\begin{longtable}{lll}
+\toprule
+数据 & 单位 & 说明 \\
+\midrule
+\endhead
+位置 (position) & rad & 当前关节角度 \\
+速度 (velocity) & rad/s & 当前关节角速度 \\
+力矩 (torque) & Nm & 当前输出力矩 \\
+\bottomrule
+\end{longtable}
+
+SDK 获取方式：
+
+\begin{lstlisting}[style=python]
+for joint in dog.listen_joint():
+    print(f"关节{joint.id}: pos={joint.position:.3f}rad vel={joint.velocity:.3f}rad/s")
+\end{lstlisting}
+
+\subsection{总线电压}
+
+通过 CAN 总线读取电机端电压，反映电池状态：
+
+\begin{lstlisting}[style=python]
+voltages = dog.get_voltage()  # 返回 16 个电机的电压值 (V)
+avg = sum(voltages) / len(voltages)
+print(f"平均电压: {avg:.1f}V")
+\end{lstlisting}
+
+\section{通信接口}
+
+\subsection{接口一览}
+
+\begin{longtable}{llll}
+\toprule
+接口 & 协议 & 用途 & 方向 \\
+\midrule
+\endhead
+以太网 & gRPC (HTTP/2) & SDK 远程控制 & 双向 \\
+PCAN CAN & CAN 2.0B & 电机指令/反馈 & 双向 \\
+SBUS 串口 & SBUS & YUNZHUO 遥控器 & 输入 \\
+USB & HID & Xbox 手柄 (备选) & 输入 \\
+串口 & UART & HI91 IMU & 输入 \\
+\bottomrule
+\end{longtable}
+
+\subsection{gRPC 服务}
+
+\begin{longtable}{ll}
+\toprule
+参数 & 值 \\
+\midrule
+\endhead
+端口 & 13145 \\
+协议 & gRPC (Protobuf) \\
+加密 & 无（局域网内使用） \\
+服务名 & CMS (Central Motor System) \\
+\bottomrule
+\end{longtable}
+
+gRPC 提供的 RPC 接口：
+
+\begin{longtable}{lll}
+\toprule
+类别 & 方法 & 说明 \\
+\midrule
+\endhead
+电机控制 & \texttt{Enable} / \texttt{Disable} & 使能/禁用电机 \\
+运动指令 & \texttt{Walk} / \texttt{StandUp} / \texttt{SitDown} & 状态机动作 \\
+状态查询 & \texttt{GetCmsState} / \texttt{GetVoltage} / \texttt{GetMotorStatus} & 读取当前状态 \\
+策略管理 & \texttt{GetProfile} / \texttt{SwitchProfile} & 切换运动策略 \\
+诊断 & \texttt{ClearMotorFault} / \texttt{SetZero} & 清错/标零 \\
+数据流 & \texttt{ListenImu} / \texttt{ListenJoint} / \texttt{ListenCmsState} & 实时推送 \\
+\bottomrule
+\end{longtable}
+
+\subsection{控制器输入}
+
+Thunder 支持两种物理控制器，均通过 \texttt{ControlArbiter} 仲裁控制权：
+
+\begin{longtable}{llll}
+\toprule
+控制器 & 接口 & 优先级 & 说明 \\
+\midrule
+\endhead
+YUNZHUO 遥控器 & SBUS 串口 & 高 & 硬件遥控，最高优先级 \\
+Xbox 手柄 & USB HID & 高 & Linux Joystick FFI 读取 \\
+SDK (gRPC) & 以太网 & 低 & 被遥控器/手柄抢占 \\
+\bottomrule
+\end{longtable}
+
+\warning{遥控器/手柄信号到达时立即抢占 SDK 控制权。遥控器松开 3 秒后自动释放控制权回 SDK。}
+
+\section{电源与电池}
+
+\begin{longtable}{ll}
+\toprule
+参数 & 值 \\
+\midrule
+\endhead
+供电 & 锂电池组 \\
+工作电压范围 & （待确认满电电压）\textasciitilde{} 42V \\
+低压保护阈值 & \textbf{42V} \\
+低压保护行为 & 自动坐下 (graceful sit down) \\
+\bottomrule
+\end{longtable}
+
+低压保护流程：
+\begin{enumerate}[nosep]
+  \item 控制循环每帧检测所有电机总线电压
+  \item 当最低电压 $<$ 42V 时触发保护
+  \item 机器人自动执行坐下动作
+  \item 等待完全坐稳（Grounded 状态）后才禁用电机
+  \item 不会直接断电，确保安全着地
+\end{enumerate}
+
+\section{控制频率}
+
+\begin{longtable}{lll}
+\toprule
+环节 & 频率 & 周期 \\
+\midrule
+\endhead
+主控制循环 & 50 Hz & 20 ms \\
+ONNX 推理 & 50 Hz & 20 ms（每帧一次） \\
+IMU 采样 & \textasciitilde 50 Hz & \textasciitilde 20 ms \\
+CAN 电机通信 & 50 Hz & 20 ms \\
+gRPC 状态推送 & 50 Hz & 20 ms \\
+\bottomrule
+\end{longtable}
+
+整个控制链路在 20ms 的时间窗口内完成：
+
+\begin{verbatim}
+IMU采样 -> 构建观测 -> ONNX推理 -> PD计算 -> CAN发送 -> 电机执行
+                        |
+                  全部在 20ms 内完成
+\end{verbatim}
+
+
+
+% ============================================================
+%  第 3 章：坐标系与关节
+% ============================================================
+\chapter{坐标系与关节}
+\label{ch:coordinates}
+
+本文档定义 Thunder 机器人的坐标系约定、16 个关节的编号规则、运动范围和典型姿态。
+
+\section{机体坐标系}
+
+Thunder 使用右手坐标系，原点位于机身几何中心：
+
+\begin{verbatim}
+              +Z (上)
+               |
+               |
+               |
+               +-------> +X (前)
+              /
+             /
+            +Y (左)
+\end{verbatim}
+
+\begin{longtable}{lll}
+\toprule
+轴 & 正方向 & 说明 \\
+\midrule
+\endhead
+X & 前方 (Forward) & 机器人头部方向 \\
+Y & 左方 (Left) & 机器人左侧方向 \\
+Z & 上方 (Up) & 垂直向上 \\
+\bottomrule
+\end{longtable}
+
+\subsection{正面视图}
+
+\begin{verbatim}
+               +Z
+                |
+        FL      |      FR
+    +---+-------+-------+---+
+    |   |       |       |   |
+    |   |     body      |   |
+    |   |       |       |   |
+    +---+-------+-------+---+
+        RL      |      RR
+                |
+         +Y <--+
+\end{verbatim}
+
+\subsection{侧面视图（右侧）}
+
+\begin{verbatim}
+         +Z
+          |           前进方向 --->
+          |
+          +------ body ------+
+          |                  |
+         Hip               Hip
+          |                  |
+        Thigh             Thigh
+          |                  |
+        Calf              Calf
+          |                  |
+        [Foot]           [Foot]
+    ----地面-----------------------
+          |
+          +-------> +X (前)
+
+    后腿 (RR)           前腿 (FR)
+\end{verbatim}
+
+\subsection{walk() 指令与坐标系的关系}
+
+\begin{longtable}{llll}
+\toprule
+参数 & 正值 & 负值 & 对应轴 \\
+\midrule
+\endhead
+\texttt{vx} & 前进 & 后退 & +X / -X \\
+\texttt{vy} & 向左 & 向右 & +Y / -Y \\
+\texttt{vyaw} & 逆时针 & 顺时针 & 绕 +Z 轴 \\
+\bottomrule
+\end{longtable}
+
+\section{关节编号总表}
+
+Thunder 共 16 个自由度，按腿分组编号：
+
+{\small
+\begin{longtable}{clllllll}
+\toprule
+索引 & 名称 & 腿 & 关节类型 & URDF 名称 & 范围 (rad) & 正方向 & 最大力矩 \\
+\midrule
+\endhead
+0 & FR Hip & 前右 & 髋 (横滚) & \texttt{fr\_hip\_joint} & -0.41 \textasciitilde{} +0.41 & 外展 & 50 Nm \\
+1 & FR Thigh & 前右 & 大腿 (俯仰) & \texttt{fr\_thigh\_joint} & -3.14 \textasciitilde{} 0 & 后摆 & 50 Nm \\
+2 & FR Calf & 前右 & 小腿 (俯仰) & \texttt{fr\_calf\_joint} & 0 \textasciitilde{} +3.14 & 伸展 & 50 Nm \\
+3 & FR Foot & 前右 & 脚轮 (连续) & \texttt{fr\_foot\_joint} & 连续旋转 & -- & 30 Nm \\
+4 & FL Hip & 前左 & 髋 (横滚) & \texttt{fl\_hip\_joint} & -0.41 \textasciitilde{} +0.41 & 外展 & 50 Nm \\
+5 & FL Thigh & 前左 & 大腿 (俯仰) & \texttt{fl\_thigh\_joint} & 0 \textasciitilde{} +3.14 & 前摆 & 50 Nm \\
+6 & FL Calf & 前左 & 小腿 (俯仰) & \texttt{fl\_calf\_joint} & -3.14 \textasciitilde{} 0 & 收缩 & 50 Nm \\
+7 & FL Foot & 前左 & 脚轮 (连续) & \texttt{fl\_foot\_joint} & 连续旋转 & -- & 30 Nm \\
+8 & RR Hip & 后右 & 髋 (横滚) & \texttt{rr\_hip\_joint} & -0.41 \textasciitilde{} +0.41 & 外展 & 50 Nm \\
+9 & RR Thigh & 后右 & 大腿 (俯仰) & \texttt{rr\_thigh\_joint} & 0 \textasciitilde{} +3.14 & 前摆 & 50 Nm \\
+10 & RR Calf & 后右 & 小腿 (俯仰) & \texttt{rr\_calf\_joint} & -6.28 \textasciitilde{} 0 & 收缩 & 50 Nm \\
+11 & RR Foot & 后右 & 脚轮 (连续) & \texttt{rr\_foot\_joint} & 连续旋转 & -- & 30 Nm \\
+12 & RL Hip & 后左 & 髋 (横滚) & \texttt{rl\_hip\_joint} & -0.41 \textasciitilde{} +0.41 & 外展 & 50 Nm \\
+13 & RL Thigh & 后左 & 大腿 (俯仰) & \texttt{rl\_thigh\_joint} & -3.14 \textasciitilde{} 0 & 后摆 & 50 Nm \\
+14 & RL Calf & 后左 & 小腿 (俯仰) & \texttt{rl\_calf\_joint} & 0 \textasciitilde{} +6.28 & 伸展 & 50 Nm \\
+15 & RL Foot & 后左 & 脚轮 (连续) & \texttt{rl\_foot\_joint} & 连续旋转 & -- & 30 Nm \\
+\bottomrule
+\end{longtable}
+}
+
+\section{关节分组}
+
+\subsection{按腿分组}
+
+\begin{verbatim}
+前右 (FR): [0, 1, 2, 3]    前左 (FL): [4, 5, 6, 7]
+后右 (RR): [8, 9, 10, 11]  后左 (RL): [12, 13, 14, 15]
+\end{verbatim}
+
+\subsection{按关节类型分组}
+
+\begin{verbatim}
+所有 Hip:   [0, 4, 8, 12]   -- 髋关节，控制腿的内外摆动
+所有 Thigh: [1, 5, 9, 13]   -- 大腿关节，控制腿的前后摆动
+所有 Calf:  [2, 6, 10, 14]  -- 小腿关节，控制膝盖弯曲
+所有 Foot:  [3, 7, 11, 15]  -- 脚轮，控制轮式移动
+\end{verbatim}
+
+\subsection{俯瞰图 (Top View)}
+
+\begin{verbatim}
+        前 (Head)
+          X+
+          |
+   FL[4-7]|  FR[0-3]
+     +-----+-----+
+     |     |     |
+     |   body    |
+ Y+--+     O     +-- Y-
+     |           |
+     |           |
+     +-----+-----+
+   RL[12-15] RR[8-11]
+          |
+          X-
+        后 (Tail)
+\end{verbatim}
+
+\subsection{侧面图------单腿结构}
+
+\begin{verbatim}
+        body
+         |
+    [0] Hip -------- 横滚轴 (绕 X 轴)
+         |
+         |  上臂
+         |
+    [1] Thigh ------ 俯仰轴 (绕 Y 轴)
+         |
+         |  下臂
+         |
+    [2] Calf ------- 俯仰轴 (绕 Y 轴)
+         |
+         |  小腿
+         |
+    [3] Foot ------- 连续旋转 (轮轴)
+        (o)          脚轮触地
+    ============== 地面
+\end{verbatim}
+
+\section{典型姿态}
+
+\subsection{站立姿态 (Standing Pose)}
+
+站立姿态是机器人正常直立时各关节的目标角度：
+
+\begin{lstlisting}[style=python]
+standing_pose = [
+    -0.1, -0.8,  1.8,  0,    # FR: hip, thigh, calf, foot
+     0.1,  0.8, -1.8,  0,    # FL: hip, thigh, calf, foot
+     0.1,  0.8, -1.8,  0,    # RR: hip, thigh, calf, foot
+    -0.1, -0.8,  1.8,  0,    # RL: hip, thigh, calf, foot
+]
+\end{lstlisting}
+
+各关节含义：
+
+\begin{longtable}{lll}
+\toprule
+关节 & FR 值 & 含义 \\
+\midrule
+\endhead
+Hip & -0.1 rad ($-5.7\degree$) & 微微内收，保持稳定 \\
+Thigh & -0.8 rad ($-45.8\degree$) & 大腿向后摆约 46 度 \\
+Calf & 1.8 rad ($103.1\degree$) & 小腿弯曲约 103 度 \\
+Foot & 0 rad & 脚轮不转 \\
+\bottomrule
+\end{longtable}
+
+\warning{注意左右对称：FR 和 RL 的符号相同，FL 和 RR 的符号相同（镜像关系）。}
+
+\subsection{坐下姿态 (Sitting Pose)}
+
+坐下姿态即电机零位，所有关节角度为 0：
+
+\begin{lstlisting}[style=python]
+sitting_pose = [0, 0, 0, 0,   # FR
+                0, 0, 0, 0,   # FL
+                0, 0, 0, 0,   # RR
+                0, 0, 0, 0]   # RL
+\end{lstlisting}
+
+这是机器人趴在地面上的姿态，也是电机标零后的参考位。
+
+\subsection{姿态可视化}
+
+\begin{verbatim}
+站立 (Standing)                  坐下 (Sitting / Zero)
+
+    +-------+                        +-------+
+    |  body |                        |  body |
+    +--+-+--+                        +--+-+--+
+       | |                             /   \
+      /   \                           /     \
+     /     \                      ---/-------\---
+    /       \                        (地面)
+   |         |
+   |         |
+  (o)       (o)
+---地面-----------
+\end{verbatim}
+
+\section{PD 控制参数}
+
+每个关节的运动由 PD 控制器驱动：
+
+\begin{verbatim}
+torque = Kp * (target_pos - current_pos) + Kd * (target_vel - current_vel)
+\end{verbatim}
+
+\subsection{推理阶段（行走时）}
+
+\begin{longtable}{lllll}
+\toprule
+索引 & 关节 & Kp & Kd & actionScale \\
+\midrule
+\endhead
+0, 4, 8, 12 & Hip & 80 & 10 & 0.15 \\
+1, 5, 9, 13 & Thigh & 100 & 10 & 0.25 \\
+2, 6, 10, 14 & Calf & 120 & 15 & 0.25 \\
+3, 7, 11, 15 & Foot & 0 & 1 & 5.0 \\
+\bottomrule
+\end{longtable}
+
+\texttt{actionScale} 是 RL 策略输出到实际弧度的缩放系数。策略输出值经过以下变换得到目标关节角度：
+
+\begin{verbatim}
+target_position = action_output * actionScale + standingPose
+\end{verbatim}
+
+\subsection{过渡阶段（站起/坐下）}
+
+站起和坐下使用统一的高刚度参数，确保平稳过渡：
+
+\begin{longtable}{lll}
+\toprule
+参数 & 值 & 说明 \\
+\midrule
+\endhead
+Kp & 200 & 全部 16 个关节 \\
+Kd & 8 & 全部 16 个关节 \\
+\bottomrule
+\end{longtable}
+
+\section{关节速度缩放}
+
+IMU 陀螺仪和关节速度在输入观测向量前会进行缩放：
+
+\begin{longtable}{lll}
+\toprule
+参数 & 缩放系数 & 说明 \\
+\midrule
+\endhead
+\texttt{imuGyroscopeScale} & 0.25 & IMU 陀螺仪数据缩放 \\
+\texttt{jointVelocityScale} & {[}0.05, 0.05, 0.05, 0.05{]} & 各类型关节速度缩放 \\
+\bottomrule
+\end{longtable}
+
+\section{编程中的关节操作}
+
+\subsection{读取关节数据}
+
+\begin{lstlisting}[style=python]
+# 实时流式读取
+for joint in dog.listen_joint():
+    print(f"关节 {joint.id}: "
+          f"位置={joint.position:.3f}rad "
+          f"速度={joint.velocity:.3f}rad/s "
+          f"力矩={joint.torque:.2f}Nm")
+\end{lstlisting}
+
+\subsection{诊断单条腿}
+
+\begin{lstlisting}[style=python]
+# 检查前右腿 (FR) 的 4 个电机
+motors = dog.get_motor_status()
+fr_motors = [m for m in motors if m.id in [0, 1, 2, 3]]
+for m in fr_motors:
+    print(f"  关节{m.id}: online={m.online} temp={m.temperature:.1f}C")
+\end{lstlisting}
+
+\subsection{清除单腿故障}
+
+\begin{lstlisting}[style=python]
+# 只清除前右腿的电机故障
+dog.clear_motor_fault(joint_ids=[0, 1, 2, 3])
+\end{lstlisting}
+
+
+
+% ============================================================
+%  第 4 章：状态机与运动控制
+% ============================================================
+\chapter{状态机与运动控制}
+\label{ch:fsm}
+
+本文档详细说明 Thunder 机器人的有限状态机 (FSM)、状态转换规则、运动控制接口和安全机制。
+
+\section{状态机总览}
+
+Thunder 的运动控制由一个严格的有限状态机管理。所有 SDK 指令必须遵循状态机规则，非法的状态转换会被拒绝。
+
+\subsection{状态图}
+
+\begin{verbatim}
+                   +---------+
+                   |  Zero   |     上电初始状态
+                   +----+----+
+                        |
+                      Init()
+                        |
+                        v
+                   +---------+
+          +------->|Grounded |<--------+
+          |        +----+----+         |
+          |             |              |
+       SitDown()    StandUp()     SitDown 完成
+       完成             |          或 Fault
+          |             v              |
+          |     +-------+-------+      |
+          |     | Transitioning |------+
+          |     |  (StandUp)    |
+          |     +-------+-------+
+          |             |
+          |          Done()
+          |             |
+          |             v
+          |        +---------+
+          +--------|Standing |<--------+
+          |        +----+----+         |
+          |             |              |
+       SitDown()    Walk(dir)     Idle() / Fault
+          |             |          或 StandUp()
+          |             v              |
+          |     +-------+-------+      |
+          |     | Transitioning |      |
+          |     |  (SitDown)    |      |
+          |     +-------+-------+      |
+          |             |              |
+          |             v              |
+          |        +---------+         |
+          +--------|Walking  |---------+
+                   +---------+
+\end{verbatim}
+
+\subsection{五个状态}
+
+\begin{longtable}{lll}
+\toprule
+状态 & SDK 返回值 & 说明 \\
+\midrule
+\endhead
+\textbf{Zero} & \texttt{"zero"} & 上电初始态，FSM 尚未初始化。不接受任何运动指令。 \\
+\textbf{Grounded} & \texttt{"grounded"} & 坐姿/趴地。安全状态，电机可使能但不运动。 \\
+\textbf{Standing} & \texttt{"standing"} & 直立站稳。可以接收 \texttt{walk()} 或 \texttt{sit\_down()} 指令。 \\
+\textbf{Walking} & \texttt{"walking"} & 行走中。RL 策略以 50Hz 推理驱动步态。 \\
+\textbf{Transitioning} & \texttt{"transitioning"} & 过渡中（站起/坐下/动作播放）。拒绝新的运动指令。 \\
+\bottomrule
+\end{longtable}
+
+\section{状态转换详解}
+
+\subsection{Zero $\to$ Grounded}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & 系统自动初始化 (Init) \\
+耗时 & 即时 \\
+用户操作 & 无需操作，上电后自动完成 \\
+\bottomrule
+\end{longtable}
+
+上电启动 brainstem 服务后，FSM 自动从 Zero 进入 Grounded。
+
+\subsection{Grounded $\to$ Standing（站起）}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & \texttt{dog.stand\_up()} \\
+中间状态 & Transitioning (StandUp) \\
+耗时 & 150 ticks $\times$ 20ms = \textbf{3 秒} \\
+过程 & 从当前姿态线性插值到 standingPose \\
+PD 参数 & Kp=200, Kd=8（高刚度，确保平稳） \\
+\bottomrule
+\end{longtable}
+
+站起过程是一段 150 帧的线性插值动画：
+
+\begin{verbatim}
+第 0 帧:   关节角度 = 当前位置 (sittingPose)
+第 75 帧:  关节角度 = 50% 位置 (中间态)
+第 150 帧: 关节角度 = standingPose (完全站立)
+\end{verbatim}
+
+\subsection{Standing $\to$ Walking（开始行走）}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & \texttt{dog.walk(vx, vy, vyaw)} \\
+耗时 & 即时切换 \\
+过程 & RL 策略接管，以 50Hz 推理输出关节指令 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Walking 中更新方向}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & 再次调用 \texttt{dog.walk(vx, vy, vyaw)} \\
+耗时 & 即时生效（下一帧） \\
+过程 & 仅更新方向向量，不切换状态 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Walking $\to$ Standing（停步）}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & \texttt{dog.walk()} 无参数，或发送全零后超时自动触发 Idle \\
+中间状态 & Transitioning (StandUp)，从当前行走姿态插值到 standingPose \\
+耗时 & \textasciitilde 3 秒 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Standing $\to$ Grounded（坐下）}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & \texttt{dog.sit\_down()} \\
+中间状态 & Transitioning (SitDown) \\
+耗时 & 150 ticks $\times$ 20ms = \textbf{3 秒} \\
+过程 & 从 standingPose 线性插值到 sittingPose (全零) \\
+\bottomrule
+\end{longtable}
+
+\subsection{Walking $\to$ Grounded（行走中直接坐下）}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & 在 Walking 状态调用 \texttt{dog.sit\_down()} \\
+过程 & 复合过渡：先自动站稳 (StandUp)，再坐下 (SitDown) \\
+耗时 & \textasciitilde 6 秒（两段过渡串联） \\
+\bottomrule
+\end{longtable}
+
+\section{非法操作处理}
+
+在错误的状态下发送指令不会导致错误，但指令会被静默忽略：
+
+\begin{longtable}{lll}
+\toprule
+当前状态 & 发送的指令 & 结果 \\
+\midrule
+\endhead
+Grounded & \texttt{walk()} & 忽略。必须先 \texttt{stand\_up()} \\
+Grounded & \texttt{sit\_down()} & 忽略。已在坐姿 \\
+Standing & \texttt{stand\_up()} & 忽略。已站立 \\
+Walking & \texttt{stand\_up()} & 触发从行走过渡到站立 \\
+Transitioning & 任何运动指令 & \textbf{拒绝}。过渡期间不接受新指令 \\
+Zero & 任何运动指令 & 忽略。FSM 未初始化 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{最佳实践}：在发送指令前先查询状态，确认状态机处于正确状态。
+
+\begin{lstlisting}[style=python]
+state = dog.get_state()
+if state == "standing":
+    dog.walk(vx=0.3)
+elif state == "grounded":
+    dog.stand_up()
+\end{lstlisting}
+
+\section{walk() 速度约定}
+
+\subsection{参数说明}
+
+\begin{lstlisting}[style=python]
+dog.walk(vx=0.0, vy=0.0, vyaw=0.0)
+\end{lstlisting}
+
+\begin{longtable}{lllll}
+\toprule
+参数 & 范围 & 正值 & 负值 & 零值 \\
+\midrule
+\endhead
+\texttt{vx} & {[}-1.0, 1.0{]} & 前进 (+X) & 后退 (-X) & 不动 \\
+\texttt{vy} & {[}-1.0, 1.0{]} & 向左 (+Y) & 向右 (-Y) & 不动 \\
+\texttt{vyaw} & {[}-1.0, 1.0{]} & 逆时针 (+Z) & 顺时针 (-Z) & 不转 \\
+\bottomrule
+\end{longtable}
+
+三个参数均为\textbf{归一化速度}，1.0 对应最大速度，具体物理速度由 RL 策略决定。
+
+\subsection{常见用法}
+
+\begin{lstlisting}[style=python]
+# 前进
+dog.walk(vx=0.5)
+
+# 后退
+dog.walk(vx=-0.3)
+
+# 向左平移
+dog.walk(vy=0.3)
+
+# 原地逆时针转
+dog.walk(vyaw=0.3)
+
+# 边走边转（前进 + 左转）
+dog.walk(vx=0.3, vyaw=0.2)
+
+# 停步（发送零速度）
+dog.walk()
+\end{lstlisting}
+
+\subsection{运动方向参考图}
+
+\begin{verbatim}
+                  vx > 0 (前进)
+                     ^
+                     |
+                     |
+    vy > 0 (左) <----O----> vy < 0 (右)
+                     |
+                     |
+                     v
+                  vx < 0 (后退)
+
+            vyaw > 0        vyaw < 0
+              (CCW)           (CW)
+               <--             -->
+              /   \           /   \
+             |  O  |         |  O  |
+              \   /           \   /
+               -->             <--
+\end{verbatim}
+
+\section{电机使能/禁用生命周期}
+
+\subsection{完整生命周期}
+
+\begin{verbatim}
+  上电 (Power On)
+       |
+       v
+  [电机禁用] ---enable()---> [电机使能]
+       ^                         |
+       |                     正常使用:
+   disable()               stand_up/walk/sit_down
+       |                         |
+       +-------disable()----<----+
+       |
+       v
+  [电机禁用]
+       |
+  下电 (Power Off)
+\end{verbatim}
+
+\subsection{关键规则}
+
+\begin{enumerate}[nosep]
+  \item \textbf{上电后电机默认禁用}。必须调用 \texttt{enable()} 才能运动。
+  \item \textbf{\texttt{disable()} 随时可调用}。会立即释放所有电机力矩（机器人会瘫软）。
+  \item \textbf{先坐下再禁用}。建议流程：\texttt{sit\_down()} $\to$ 等待 Grounded $\to$ \texttt{disable()}。
+  \item \textbf{低压自动禁用}。电压低于 42V 时，系统会先坐下再禁用，不会直接断电。
+\end{enumerate}
+
+\subsection{安全的关机流程}
+
+\begin{lstlisting}[style=python]
+import time
+
+# 确保从任何状态安全关闭
+state = dog.get_state()
+
+if state == "walking":
+    dog.sit_down()      # Walking -> StandUp -> SitDown (复合)
+    time.sleep(7)       # 等待两段过渡完成
+elif state == "standing":
+    dog.sit_down()
+    time.sleep(4)
+elif state == "transitioning":
+    time.sleep(4)       # 等待当前过渡完成
+
+# 确认已坐下
+assert dog.get_state() == "grounded"
+
+# 安全禁用
+dog.disable()
+\end{lstlisting}
+
+\section{控制权仲裁 (ControlArbiter)}
+
+\subsection{优先级机制}
+
+Thunder 支持多个控制源同时存在，通过 ControlArbiter 仲裁控制权：
+
+\begin{verbatim}
+优先级高                                     优先级低
++-----------+     +-----------+     +-----------+
+| YUNZHUO   | >>> | Xbox 手柄 | >>> | SDK gRPC  |
+| 遥控器    |     |           |     |           |
++-----------+     +-----------+     +-----------+
+\end{verbatim}
+
+\subsection{仲裁规则}
+
+\begin{longtable}{ll}
+\toprule
+场景 & 行为 \\
+\midrule
+\endhead
+SDK 控制中，遥控器摇杆动 & SDK 被立即抢占，遥控器接管 \\
+遥控器控制中，SDK 发指令 & SDK 指令被忽略 \\
+遥控器松手不动 & 3 秒超时后自动释放，SDK 恢复控制权 \\
+SDK 控制中，遥控器关机 & SDK 保持控制权，不受影响 \\
+\bottomrule
+\end{longtable}
+
+\subsection{超时参数}
+
+\begin{longtable}{llll}
+\toprule
+参数 & 默认值 & 环境变量 & 说明 \\
+\midrule
+\endhead
+\texttt{arbiterTimeout} & 3 秒 & \texttt{HAN\_DOG\_ARBITER\_TIMEOUT} & 遥控器释放控制权的超时时间 \\
+\bottomrule
+\end{longtable}
+
+\subsection{SDK 开发建议}
+
+\begin{enumerate}[nosep]
+  \item \textbf{首次调试时关闭遥控器}，避免控制权冲突
+  \item \textbf{保留遥控器作为安全手段}，紧急情况下随时接管
+  \item \textbf{不要轮询状态来检测控制权}，SDK 指令被拒绝时不会报错，只是静默忽略
+\end{enumerate}
+
+\section{故障处理}
+
+\subsection{Fault 状态转换}
+
+当系统检测到异常时，会触发 Fault 动作。不同状态下的 Fault 行为：
+
+\begin{longtable}{ll}
+\toprule
+当前状态 & Fault 行为 \\
+\midrule
+\endhead
+Grounded & 忽略（已在安全状态） \\
+Standing & 忽略（已在安全状态） \\
+Walking & 自动过渡到 StandUp（先站稳） \\
+Transitioning (StandUp) & 中止站起，转为 SitDown \\
+Transitioning (SitDown) & 强制进入 Grounded（避免死循环） \\
+\bottomrule
+\end{longtable}
+
+\subsection{电机故障清除}
+
+\begin{lstlisting}[style=python]
+# 查看电机状态
+motors = dog.get_motor_status()
+for m in motors:
+    if m.errors:
+        print(f"关节 {m.id} 故障: {m.errors}")
+
+# 清除全部故障
+dog.clear_motor_fault()
+
+# 清除指定关节的故障
+dog.clear_motor_fault(joint_ids=[0, 1, 2])
+\end{lstlisting}
+
+\subsection{低压保护}
+
+当任一电机总线电压低于 42V 时触发：
+
+\begin{verbatim}
+检测低压 -> 触发 graceful sit_down -> 等待 Grounded -> 禁用电机
+\end{verbatim}
+
+低压保护是\textbf{不可逆的}（单次触发后标记 \texttt{lowVoltageTriggered}），需要重新上电才能恢复。
+
+\section{策略切换}
+
+Thunder 支持多种运动策略（Profile），每种策略包含不同的 ONNX 模型和 PD 参数。
+
+\subsection{查询和切换}
+
+\begin{lstlisting}[style=python]
+# 查看当前策略
+profile = dog.get_profile()
+print(f"当前: {profile.current}")
+print(f"可用: {profile.available}")
+
+# 切换策略（必须在 Grounded 状态）
+dog.switch_profile("mini")
+\end{lstlisting}
+
+\subsection{切换规则}
+
+\begin{itemize}[nosep]
+  \item 只能在 \textbf{Grounded} 状态下切换策略
+  \item 切换后会重新加载 ONNX 模型
+  \item 新策略的 PD 参数和动作缩放会立即生效
+\end{itemize}
+
+\section{典型使用流程}
+
+\subsection{标准操作序列}
+
+\begin{lstlisting}[style=python]
+import time
+from brainstem_sdk import ThunderClient
+
+# 连接
+dog = ThunderClient("192.168.66.190")
+
+# 1. 诊断检查
+state = dog.get_state()
+print(f"初始状态: {state}")          # 应为 "grounded"
+
+voltages = dog.get_voltage()
+avg_v = sum(voltages) / len(voltages) if voltages else 0
+print(f"电池电压: {avg_v:.1f}V")     # 应 > 42V
+
+motors = dog.get_motor_status()
+offline = [m.id for m in motors if not m.online]
+if offline:
+    print(f"警告: 关节 {offline} 离线")
+
+# 2. 使能电机
+dog.enable()
+
+# 3. 站起 (3 秒过渡)
+dog.stand_up()
+time.sleep(4)
+assert dog.get_state() == "standing"
+
+# 4. 行走
+dog.walk(vx=0.3)                     # 前进
+time.sleep(3)
+
+dog.walk(vx=0.3, vyaw=0.2)          # 前进 + 左转
+time.sleep(2)
+
+dog.walk()                            # 停步
+time.sleep(1)
+
+# 5. 坐下 (3 秒过渡)
+dog.sit_down()
+time.sleep(4)
+assert dog.get_state() == "grounded"
+
+# 6. 禁用电机
+dog.disable()
+
+# 7. 断开连接
+dog.close()
+\end{lstlisting}
+
+\subsection{实时数据监控}
+
+\begin{lstlisting}[style=python]
+import threading
+import time
+from brainstem_sdk import ThunderClient
+
+dog = ThunderClient("192.168.66.190")
+
+# 在后台线程中监听 IMU
+def monitor_imu():
+    for imu in dog.listen_imu():
+        gx, gy, gz = imu.gyroscope.x, imu.gyroscope.y, imu.gyroscope.z
+        print(f"\rIMU: gx={gx:+.2f} gy={gy:+.2f} gz={gz:+.2f}", end="")
+
+imu_thread = threading.Thread(target=monitor_imu, daemon=True)
+imu_thread.start()
+
+# 在后台线程中监听状态变化
+def monitor_state():
+    for state in dog.listen_state():
+        print(f"\n[STATE] -> {state}")
+
+state_thread = threading.Thread(target=monitor_state, daemon=True)
+state_thread.start()
+
+# 主线程执行操作
+dog.enable()
+dog.stand_up()
+time.sleep(4)
+dog.walk(vx=0.3)
+time.sleep(5)
+dog.sit_down()
+time.sleep(4)
+dog.disable()
+dog.close()
+\end{lstlisting}
+
+\subsection{安全包装器}
+
+建议在生产代码中使用 try/finally 确保安全退出：
+
+\begin{lstlisting}[style=python]
+import time
+from brainstem_sdk import ThunderClient
+
+dog = ThunderClient("192.168.66.190")
+
+try:
+    dog.enable()
+    dog.stand_up()
+    time.sleep(4)
+
+    # ... 您的业务逻辑 ...
+    dog.walk(vx=0.3)
+    time.sleep(5)
+
+finally:
+    # 无论发生什么异常，都确保安全坐下并禁用
+    try:
+        dog.sit_down()
+        time.sleep(5)
+    except Exception:
+        pass
+    try:
+        dog.disable()
+    except Exception:
+        pass
+    dog.close()
+\end{lstlisting}
+
+\section{关键参数速查}
+
+\begin{longtable}{lll}
+\toprule
+参数 & 值 & 说明 \\
+\midrule
+\endhead
+控制频率 & 50 Hz (20ms) & 主控制循环和推理频率 \\
+gRPC 端口 & 13145 & SDK 连接端口 \\
+站起耗时 & 3 秒 (150 ticks) & Grounded $\to$ Standing \\
+坐下耗时 & 3 秒 (150 ticks) & Standing $\to$ Grounded \\
+仲裁超时 & 3 秒 & 遥控器释放控制权的等待时间 \\
+低压阈值 & 42V & 低于此值触发保护坐下 \\
+启动超时 & 10 秒 & FSM 等待 Grounded 的超时 \\
+关机超时 & 8 秒 & 安全关机等待超时 \\
+RPC 超时 & 5 秒 & SDK 默认 RPC 超时 \\
+\bottomrule
+\end{longtable}
+
+
+
+% ============================================================
+%  第 5 章：传感器数据
+% ============================================================
+\chapter{传感器数据}
+\label{ch:sensors}
+
+本章介绍 Thunder 四足机器人所有传感器的数据类型、坐标约定、采集方式和编程接口。
+
+\section{传感器总览}
+
+{\small
+\begin{longtable}{llllll}
+\toprule
+传感器 & 硬件 & 数据内容 & 接口方法 & 更新频率 & 传输方式 \\
+\midrule
+\endhead
+IMU & HI91 & 角速度 + 四元数 & \texttt{listen\_imu()} & \textasciitilde 50 Hz & 串口 $\to$ gRPC 流 \\
+关节编码器 & Robstride 内置 & 位置/速度/力矩 & \texttt{listen\_joint()} & \textasciitilde 50 Hz & CAN $\to$ gRPC 流 \\
+电机状态 & Robstride & 在线/温度/电压/故障 & \texttt{get\_motor\_status()} & 按需查询 & CAN $\to$ gRPC 单次 \\
+总线电压 & Robstride & 16 路母线电压 (V) & \texttt{get\_voltage()} & 按需查询 & CAN $\to$ gRPC 单次 \\
+状态机 & 软件 & FSM 状态字符串 & \texttt{listen\_state()} & 事件驱动 & gRPC 流 \\
+\bottomrule
+\end{longtable}
+}
+
+\section{IMU 惯性测量单元}
+
+\subsection{硬件与数据}
+
+Thunder 搭载 HI91 惯性测量单元，安装于机身躯干中心，通过串口 (\texttt{/dev/ttyUSB1}) 以约 50 Hz 频率上报数据。每帧包含：
+
+\begin{longtable}{llll}
+\toprule
+字段 & 类型 & 单位 & 说明 \\
+\midrule
+\endhead
+\texttt{gyroscope.x} & float & rad/s & 绕机体 X 轴角速度 (Roll) \\
+\texttt{gyroscope.y} & float & rad/s & 绕机体 Y 轴角速度 (Pitch) \\
+\texttt{gyroscope.z} & float & rad/s & 绕机体 Z 轴角速度 (Yaw) \\
+\texttt{quaternion.w} & float & 无量纲 & 四元数实部 \\
+\texttt{quaternion.x} & float & 无量纲 & 四元数虚部 i \\
+\texttt{quaternion.y} & float & 无量纲 & 四元数虚部 j \\
+\texttt{quaternion.z} & float & 无量纲 & 四元数虚部 k \\
+\texttt{timestamp\_ms} & float & ms & 数据时间戳（毫秒） \\
+\bottomrule
+\end{longtable}
+
+\subsection{坐标系}
+
+IMU 数据使用\textbf{机体坐标系 (Body Frame)}：
+
+\begin{verbatim}
+               +X (前进方向)
+                ^
+                |
+                |
+   +Y (左) <---O---> -Y (右)
+                |
+                |
+                v
+               -X (后退方向)
+
+   +Z 向上 (垂直地面)
+\end{verbatim}
+
+\begin{itemize}[nosep]
+  \item X 轴：指向机器人前方
+  \item Y 轴：指向机器人左侧
+  \item Z 轴：指向上方（右手坐标系）
+\end{itemize}
+
+\subsection{四元数约定}
+
+Thunder SDK 使用 \textbf{Hamilton 约定}，四元数顺序为 \texttt{(w, x, y, z)}：
+
+\[
+q = w + x\mathbf{i} + y\mathbf{j} + z\mathbf{k}
+\]
+
+\begin{itemize}[nosep]
+  \item 表示\textbf{世界坐标系到机体坐标系}的旋转
+  \item 单位四元数满足 $w^2 + x^2 + y^2 + z^2 = 1$
+  \item 机器人水平静止时：$q = (1, 0, 0, 0)$
+\end{itemize}
+
+\warning{ROS 等系统常用 \texttt{(x, y, z, w)} 顺序，与本 SDK 不同。如需与 ROS 对接，请手动调整字段顺序。}
+
+\subsection{订阅 IMU 数据}
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import ThunderClient
+
+dog = ThunderClient("192.168.66.190")
+
+# listen_imu() 返回一个迭代器，持续产出 ImuData
+for imu in dog.listen_imu():
+    gx, gy, gz = imu.gyroscope.x, imu.gyroscope.y, imu.gyroscope.z
+    qw, qx, qy, qz = (
+        imu.quaternion.w,
+        imu.quaternion.x,
+        imu.quaternion.y,
+        imu.quaternion.z,
+    )
+
+    print(f"角速度: ({gx:+.4f}, {gy:+.4f}, {gz:+.4f}) rad/s")
+    print(f"四元数: ({qw:.4f}, {qx:.4f}, {qy:.4f}, {qz:.4f})")
+    print(f"时间戳: {imu.timestamp_ms:.0f} ms")
+\end{lstlisting}
+
+\texttt{listen\_imu()} 是一个阻塞式 gRPC 服务端流，循环会持续运行直到：
+\begin{itemize}[nosep]
+  \item 手动 \texttt{break} 跳出
+  \item 按 \texttt{Ctrl+C} 中断
+  \item 网络断开或服务端关闭连接
+\end{itemize}
+
+\subsection{数据解读}
+
+\noindent\textbf{角速度解读：}
+
+\begin{longtable}{llll}
+\toprule
+运动场景 & gyro.x (Roll) & gyro.y (Pitch) & gyro.z (Yaw) \\
+\midrule
+\endhead
+机器人静止 & \textasciitilde 0 & \textasciitilde 0 & \textasciitilde 0 \\
+直线行走 & 小幅波动 & 周期性波动 & \textasciitilde 0 \\
+原地左转 & \textasciitilde 0 & \textasciitilde 0 & > 0 \\
+左侧倾斜 & > 0 & \textasciitilde 0 & \textasciitilde 0 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{四元数转欧拉角（参考）：}
+
+\begin{lstlisting}[style=python]
+import math
+
+def quat_to_euler(q):
+    """Hamilton 四元数 (w,x,y,z) 转欧拉角 (roll, pitch, yaw)，单位 rad。"""
+    w, x, y, z = q.w, q.x, q.y, q.z
+    # Roll (X)
+    sinr = 2.0 * (w * x + y * z)
+    cosr = 1.0 - 2.0 * (x * x + y * y)
+    roll = math.atan2(sinr, cosr)
+    # Pitch (Y)
+    sinp = 2.0 * (w * y - z * x)
+    sinp = max(-1.0, min(1.0, sinp))
+    pitch = math.asin(sinp)
+    # Yaw (Z)
+    siny = 2.0 * (w * z + x * y)
+    cosy = 1.0 - 2.0 * (y * y + z * z)
+    yaw = math.atan2(siny, cosy)
+    return roll, pitch, yaw
+\end{lstlisting}
+
+\section{关节编码器}
+
+\subsection{关节布局}
+
+Thunder 共有 16 个自由度，每条腿 3 个旋转关节 + 1 个脚轮：
+
+\begin{verbatim}
+  前右 (FR)          前左 (FL)
+    0  Hip             4  Hip
+    1  Thigh           5  Thigh
+    2  Calf            6  Calf
+    3  Foot            7  Foot
+
+  后右 (RR)          后左 (RL)
+    8  Hip            12  Hip
+    9  Thigh          13  Thigh
+   10  Calf           14  Calf
+   11  Foot           15  Foot
+\end{verbatim}
+
+\begin{itemize}[nosep]
+  \item \textbf{Hip}：髋关节，控制腿的前后/内外摆动
+  \item \textbf{Thigh}：大腿关节，控制大腿抬起/放下
+  \item \textbf{Calf}：小腿关节，控制小腿伸展/收缩
+  \item \textbf{Foot}：脚轮关节，控制脚部轮毂转动
+\end{itemize}
+
+\subsection{数据内容}
+
+每个关节上报以下数据：
+
+\begin{longtable}{llll}
+\toprule
+字段 & 类型 & 单位 & 说明 \\
+\midrule
+\endhead
+\texttt{id} & int & -- & 关节编号 (0--15) \\
+\texttt{position} & float & rad & 当前角位置 \\
+\texttt{velocity} & float & rad/s & 当前角速度 \\
+\texttt{torque} & float & Nm & 当前力矩 \\
+\texttt{status} & int & -- & 状态码 (0 = 正常) \\
+\bottomrule
+\end{longtable}
+
+\subsection{订阅关节数据}
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import ThunderClient
+
+dog = ThunderClient("192.168.66.190")
+
+print("订阅关节数据 (Ctrl+C 退出)...")
+try:
+    for joint in dog.listen_joint():
+        print(
+            f"Joint {joint.id:2d}: "
+            f"pos={joint.position:+.4f} rad  "
+            f"vel={joint.velocity:+.4f} rad/s  "
+            f"torque={joint.torque:+.4f} Nm  "
+            f"status={joint.status}"
+        )
+except KeyboardInterrupt:
+    print("\n停止。")
+finally:
+    dog.close()
+\end{lstlisting}
+
+\warning{\texttt{listen\_joint()} 逐关节上报，每次 \texttt{yield} 一个关节的数据。要获取完整的 16 关节快照，需要自行缓存最近一帧的所有关节数据。}
+
+\begin{lstlisting}[style=python]
+latest = [None] * 16
+
+for joint in dog.listen_joint():
+    latest[joint.id] = joint
+
+    # 检查是否收齐了所有 16 个关节
+    if all(j is not None for j in latest):
+        # 处理完整快照
+        for j in latest:
+            print(f"  Joint {j.id}: {j.position:+.3f} rad")
+        latest = [None] * 16  # 重置，等待下一帧
+\end{lstlisting}
+
+\subsection{关节位置安全限位}
+
+系统默认关节绝对限位为 3.14 rad。任一关节位置的绝对值超过此阈值将立即触发故障保护。该阈值可通过环境变量 \texttt{HAN\_DOG\_JOINT\_LIMIT\_RAD} 调整（设置更小的值可提供提前保护）。
+
+\section{电机状态}
+
+\subsection{查询电机状态}
+
+\texttt{get\_motor\_status()} 返回 16 个 \texttt{MotorInfo} 对象，包含完整的电机健康信息：
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import ThunderClient
+
+dog = ThunderClient("192.168.66.190")
+
+motors = dog.get_motor_status()
+for m in motors:
+    status = "在线" if m.online else "离线"
+    fault = f"故障码: {m.errors}" if m.errors else "无故障"
+    print(
+        f"Joint {m.id:2d}: {status}  "
+        f"温度={m.temperature:.0f}C  "
+        f"电压={m.voltage:.1f}V  "
+        f"位置={m.position:+.3f}rad  "
+        f"速度={m.velocity:+.3f}rad/s  "
+        f"力矩={m.torque:+.3f}Nm  "
+        f"{fault}"
+    )
+\end{lstlisting}
+
+\subsection{MotorInfo 字段说明}
+
+\begin{longtable}{llll}
+\toprule
+字段 & 类型 & 单位 & 说明 \\
+\midrule
+\endhead
+\texttt{id} & int & -- & 关节编号 (0--15) \\
+\texttt{online} & bool & -- & 电机是否在线（CAN 通信正常） \\
+\texttt{temperature} & float & C & 电机内部温度 \\
+\texttt{voltage} & float & V & 电机母线电压 \\
+\texttt{position} & float & rad & 当前编码器位置 \\
+\texttt{velocity} & float & rad/s & 当前转速 \\
+\texttt{torque} & float & Nm & 当前输出力矩 \\
+\texttt{errors} & list[int] & -- & 故障码列表，空列表表示无故障 \\
+\bottomrule
+\end{longtable}
+
+\subsection{故障码解读}
+
+\begin{longtable}{lll}
+\toprule
+场景 & 表现 & 处理方式 \\
+\midrule
+\endhead
+\texttt{online=False} & 电机未响应 CAN 通信 & 检查 CAN 线缆连接和电源 \\
+\texttt{errors} 非空 & 电机报告故障 & 调用 \texttt{clear\_motor\_fault()} 清除 \\
+\texttt{temperature > 80} & 电机过热 & 降低负载或暂停运动，等待冷却 \\
+\texttt{voltage < 42} & 母线电压过低 & 立即充电，系统将自动触发低压保护 \\
+\bottomrule
+\end{longtable}
+
+\subsection{清除电机故障}
+
+\begin{lstlisting}[style=python]
+# 清除所有电机故障
+dog.clear_motor_fault()
+
+# 只清除特定关节（例如前右腿的 3 个关节）
+dog.clear_motor_fault(joint_ids=[0, 1, 2])
+\end{lstlisting}
+
+\section{电压监控}
+
+\subsection{读取电压}
+
+\texttt{get\_voltage()} 返回 16 个浮点数，对应 16 个电机的母线电压（单位 V）：
+
+\begin{lstlisting}[style=python]
+voltages = dog.get_voltage()
+print(f"电压范围: {min(voltages):.1f}V ~ {max(voltages):.1f}V")
+
+for i, v in enumerate(voltages):
+    warning = " [低压!]" if v < 42.0 else ""
+    print(f"  Joint {i:2d}: {v:.1f}V{warning}")
+\end{lstlisting}
+
+\subsection{低压保护机制}
+
+\begin{longtable}{ll}
+\toprule
+阈值 & 行为 \\
+\midrule
+\endhead
+$<$ 42.0 V & 系统自动执行坐下动作，等待 Grounded 状态确认后禁用电机 \\
+\bottomrule
+\end{longtable}
+
+低压保护是\textbf{不可绕过}的安全机制。当任一电机报告的母线电压低于 42V，控制系统将：
+
+\begin{enumerate}[nosep]
+  \item 立即发送 \texttt{SitDown} 指令
+  \item 等待机器人进入 Grounded 状态
+  \item 禁用所有电机
+\end{enumerate}
+
+此过程通过日志输出 \texttt{LOW VOLTAGE: xx.xV < 42.0V -- graceful sitDown}。
+
+\subsection{电压监控最佳实践}
+
+\begin{lstlisting}[style=python]
+import time
+
+def monitor_voltage(dog, interval=5.0, warn_threshold=44.0):
+    """周期性检查电压，提前预警。"""
+    while True:
+        voltages = dog.get_voltage()
+        min_v = min(voltages)
+        if min_v < warn_threshold:
+            print(f"[警告] 电压偏低: {min_v:.1f}V (阈值 {warn_threshold}V)")
+            if min_v < 42.0:
+                print("[严重] 已触发低压保护，请立即充电！")
+                break
+        else:
+            print(f"电压正常: {min_v:.1f}V")
+        time.sleep(interval)
+\end{lstlisting}
+
+\section{综合示例：传感器数据记录到 CSV}
+
+以下示例同时订阅 IMU 和关节数据，记录到 CSV 文件，便于后续分析：
+
+\begin{lstlisting}[style=python]
+"""传感器数据记录器 -- 同时采集 IMU 和关节数据写入 CSV。"""
+
+import csv
+import time
+import threading
+from datetime import datetime
+from brainstem_sdk import ThunderClient
+
+
+def record_sensors(host="192.168.66.190", duration=30.0):
+    """记录传感器数据到 CSV 文件。
+
+    Args:
+        host: 机器人 IP 地址。
+        duration: 记录时长（秒）。
+    """
+    dog = ThunderClient(host)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stop_event = threading.Event()
+
+    # ---- IMU 记录线程 ----
+    def record_imu():
+        imu_file = f"imu_{timestamp}.csv"
+        with open(imu_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "timestamp_ms",
+                "gyro_x", "gyro_y", "gyro_z",
+                "quat_w", "quat_x", "quat_y", "quat_z",
+            ])
+            try:
+                for imu in dog.listen_imu():
+                    if stop_event.is_set():
+                        break
+                    writer.writerow([
+                        f"{imu.timestamp_ms:.1f}",
+                        f"{imu.gyroscope.x:.6f}",
+                        f"{imu.gyroscope.y:.6f}",
+                        f"{imu.gyroscope.z:.6f}",
+                        f"{imu.quaternion.w:.6f}",
+                        f"{imu.quaternion.x:.6f}",
+                        f"{imu.quaternion.y:.6f}",
+                        f"{imu.quaternion.z:.6f}",
+                    ])
+            except Exception as e:
+                print(f"IMU 记录异常: {e}")
+        print(f"IMU 数据已保存: {imu_file}")
+
+    # ---- 关节记录线程 ----
+    def record_joints():
+        joint_file = f"joint_{timestamp}.csv"
+        with open(joint_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "time_s", "joint_id",
+                "position_rad", "velocity_rad_s", "torque_nm",
+                "status",
+            ])
+            t0 = time.monotonic()
+            try:
+                for joint in dog.listen_joint():
+                    if stop_event.is_set():
+                        break
+                    elapsed = time.monotonic() - t0
+                    writer.writerow([
+                        f"{elapsed:.4f}",
+                        joint.id,
+                        f"{joint.position:.6f}",
+                        f"{joint.velocity:.6f}",
+                        f"{joint.torque:.6f}",
+                        joint.status,
+                    ])
+            except Exception as e:
+                print(f"关节记录异常: {e}")
+        print(f"关节数据已保存: {joint_file}")
+
+    # ---- 启动记录 ----
+    imu_thread = threading.Thread(target=record_imu, daemon=True)
+    joint_thread = threading.Thread(target=record_joints, daemon=True)
+
+    print(f"开始记录 {duration} 秒...")
+    imu_thread.start()
+    joint_thread.start()
+
+    try:
+        time.sleep(duration)
+    except KeyboardInterrupt:
+        print("\n手动中断。")
+
+    stop_event.set()
+    dog.close()
+
+    imu_thread.join(timeout=3.0)
+    joint_thread.join(timeout=3.0)
+    print("记录完成。")
+
+
+if __name__ == "__main__":
+    record_sensors(duration=30.0)
+\end{lstlisting}
+
+\noindent\textbf{输出文件格式：}
+
+\texttt{imu\_20260403\_143000.csv}:
+\begin{lstlisting}[style=plain,numbers=none]
+timestamp_ms,gyro_x,gyro_y,gyro_z,quat_w,quat_x,quat_y,quat_z
+1234567.0,0.001234,-0.002345,0.000456,0.999800,0.012300,0.005600,0.001200
+...
+\end{lstlisting}
+
+\texttt{joint\_20260403\_143000.csv}:
+\begin{lstlisting}[style=plain,numbers=none]
+time_s,joint_id,position_rad,velocity_rad_s,torque_nm,status
+0.0000,0,0.123456,0.001234,0.456789,0
+0.0001,1,-0.234567,0.002345,-0.567890,0
+...
+\end{lstlisting}
+
+\section*{附录：传感器数据速查表}
+
+{\small
+\begin{longtable}{llllll}
+\toprule
+数据项 & SDK 方法 & 返回类型 & 单位 & 频率 & 备注 \\
+\midrule
+\endhead
+角速度 & \texttt{listen\_imu()} & \texttt{ImuData.gyroscope} & rad/s & \textasciitilde 50 Hz & 机体坐标系 \\
+姿态四元数 & \texttt{listen\_imu()} & \texttt{ImuData.quaternion} & 无量纲 & \textasciitilde 50 Hz & Hamilton (w,x,y,z) \\
+IMU 时间戳 & \texttt{listen\_imu()} & \texttt{ImuData.timestamp\_ms} & ms & \textasciitilde 50 Hz & -- \\
+关节位置 & \texttt{listen\_joint()} & \texttt{JointData.position} & rad & \textasciitilde 50 Hz & 绝对位置 \\
+关节速度 & \texttt{listen\_joint()} & \texttt{JointData.velocity} & rad/s & \textasciitilde 50 Hz & -- \\
+关节力矩 & \texttt{listen\_joint()} & \texttt{JointData.torque} & Nm & \textasciitilde 50 Hz & -- \\
+电机在线状态 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.online} & bool & 按需 & CAN 通信 \\
+电机温度 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.temperature} & C & 按需 & 内部温度 \\
+电机电压 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.voltage} & V & 按需 & 母线电压 \\
+电机故障码 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.errors} & list[int] & 按需 & 空=无故障 \\
+母线电压(16路) & \texttt{get\_voltage()} & list[float] & V & 按需 & 低压阈值 42V \\
+FSM 状态变化 & \texttt{listen\_state()} & str & -- & 事件驱动 & 状态切换时触发 \\
+\bottomrule
+\end{longtable}
+}
+
+
+
+% ============================================================
+%  第 6 章：API 参考
+% ============================================================
+\chapter{API 参考}
+\label{ch:api}
+
+本章提供 Thunder Python SDK (\texttt{brainstem\_sdk}) 全部公开接口的完整参考。
+
+\section{ThunderClient 构造与连接}
+
+\subsection{构造函数}
+
+\begin{lstlisting}[style=python]
+ThunderClient(host="192.168.66.190", port=13145, timeout=5.0)
+\end{lstlisting}
+
+\begin{longtable}{llll}
+\toprule
+参数 & 类型 & 默认值 & 说明 \\
+\midrule
+\endhead
+\texttt{host} & str & \texttt{"192.168.66.190"} & 机器人 IP 地址 \\
+\texttt{port} & int & \texttt{13145} & gRPC 服务端口 \\
+\texttt{timeout} & float & \texttt{5.0} & 默认 RPC 超时时间（秒） \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{说明}：构造函数创建一个 gRPC 不安全通道（insecure channel），连接到 \texttt{host:port}。通道创建即连接，无需额外调用。
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import ThunderClient
+
+# 默认连接
+dog = ThunderClient("192.168.66.190")
+
+# 自定义参数
+dog = ThunderClient("10.0.0.100", port=13145, timeout=10.0)
+\end{lstlisting}
+
+\subsection{close()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.close() -> None
+\end{lstlisting}
+
+关闭 gRPC 通道，释放网络资源。关闭后不可再调用任何方法。
+
+\subsection{上下文管理器}
+
+\texttt{ThunderClient} 支持 \texttt{with} 语句，退出时自动调用 \texttt{close()}：
+
+\begin{lstlisting}[style=python]
+with ThunderClient("192.168.66.190") as dog:
+    dog.enable()
+    dog.stand_up()
+    dog.walk(vx=0.3)
+    dog.sit_down()
+    dog.disable()
+# 退出 with 块后通道自动关闭
+\end{lstlisting}
+
+\section{电机控制}
+
+\subsection{enable()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.enable() -> None
+\end{lstlisting}
+
+使能全部 16 个电机。调用后电机通电并进入闭环控制。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & gRPC 连接正常，控制权未被遥控器占用 \\
+异常 & \texttt{grpc.RpcError} -- 超时或连接失败 \\
+\bottomrule
+\end{longtable}
+
+\subsection{disable()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.disable() -> None
+\end{lstlisting}
+
+禁用全部电机（安全停止）。电机断电，关节自由落体。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 无（任何状态下均可调用） \\
+建议 & 在 Grounded 状态下调用，避免机器人从站立姿态跌落 \\
+异常 & \texttt{grpc.RpcError} -- 超时或连接失败 \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}[style=python]
+# 安全关机序列
+dog.walk(vx=0.0)   # 停步
+dog.sit_down()      # 坐下
+# 等待机器人坐稳...
+dog.disable()       # 禁用电机
+\end{lstlisting}
+
+\section{运动指令}
+
+\subsection{walk()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.walk(vx=0.0, vy=0.0, vyaw=0.0) -> None
+\end{lstlisting}
+
+发送行走速度指令。
+
+\begin{longtable}{lllll}
+\toprule
+参数 & 类型 & 默认值 & 范围 & 说明 \\
+\midrule
+\endhead
+\texttt{vx} & float & \texttt{0.0} & {[}-1.0, 1.0{]} & 前后速度。正值=前进，负值=后退 \\
+\texttt{vy} & float & \texttt{0.0} & {[}-1.0, 1.0{]} & 左右速度。正值=向左，负值=向右 \\
+\texttt{vyaw} & float & \texttt{0.0} & {[}-1.0, 1.0{]} & 旋转速度。正值=逆时针，负值=顺时针 \\
+\bottomrule
+\end{longtable}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 机器人处于 Standing 或 Walking 状态 \\
+停步 & 调用 \texttt{dog.walk()} 或 \texttt{dog.walk(0, 0, 0)} \\
+异常 & \texttt{grpc.RpcError} -- 超时、连接失败或 Arbiter 拒绝 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{速度参数为归一化值}，不是物理速度。\texttt{vx=1.0} 表示当前策略允许的最大前进速度，实际物理速度取决于所加载的运动策略。
+
+\begin{lstlisting}[style=python]
+# 前进
+dog.walk(vx=0.5)
+
+# 向左平移
+dog.walk(vy=0.3)
+
+# 前进 + 左转
+dog.walk(vx=0.3, vyaw=0.2)
+
+# 原地停步
+dog.walk()
+\end{lstlisting}
+
+\subsection{stand\_up()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.stand_up() -> None
+\end{lstlisting}
+
+从坐姿过渡到站立。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 机器人处于 Grounded 状态，电机已使能 \\
+状态变化 & Grounded $\to$ Transitioning $\to$ Standing \\
+异常 & \texttt{grpc.RpcError} -- 超时或连接失败 \\
+\bottomrule
+\end{longtable}
+
+\subsection{sit\_down()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.sit_down() -> None
+\end{lstlisting}
+
+从站立过渡到坐姿。如果正在行走，会先停步再坐下。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 机器人处于 Standing 或 Walking 状态 \\
+状态变化 & Standing/Walking $\to$ Transitioning $\to$ Grounded \\
+异常 & \texttt{grpc.RpcError} -- 超时或连接失败 \\
+\bottomrule
+\end{longtable}
+
+\section{状态查询}
+
+\subsection{get\_state()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.get_state() -> str
+\end{lstlisting}
+
+查询当前机器人状态。
+
+\begin{longtable}{ll}
+\toprule
+返回值 & 说明 \\
+\midrule
+\endhead
+\texttt{"zero"} & 初始化 / 未使能 \\
+\texttt{"grounded"} & 坐姿（安全状态） \\
+\texttt{"standing"} & 站立，可接收行走指令 \\
+\texttt{"walking"} & 行走中 \\
+\texttt{"transitioning"} & 状态过渡中（站起 / 坐下） \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}[style=python]
+state = dog.get_state()
+print(f"当前状态: {state}")
+
+if state == "standing":
+    dog.walk(vx=0.3)
+\end{lstlisting}
+
+\subsection{get\_voltage()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.get_voltage() -> list[float]
+\end{lstlisting}
+
+读取 16 个电机的母线电压。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+返回值 & 长度为 16 的浮点数列表，单位 V \\
+索引 & 对应关节编号 0--15 \\
+低压阈值 & 42.0V，低于此值系统自动触发保护 \\
+\bottomrule
+\end{longtable}
+
+\subsection{get\_motor\_status()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.get_motor_status() -> list[MotorInfo]
+\end{lstlisting}
+
+获取全部 16 个电机的健康状态。
+
+\begin{lstlisting}[style=python]
+motors = dog.get_motor_status()
+for m in motors:
+    if not m.online:
+        print(f"Joint {m.id} 离线!")
+    if m.errors:
+        print(f"Joint {m.id} 故障: {m.errors}")
+    if m.temperature > 70:
+        print(f"Joint {m.id} 温度偏高: {m.temperature}C")
+\end{lstlisting}
+
+\section{策略管理}
+
+\subsection{get\_profile()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.get_profile() -> ProfileInfo
+\end{lstlisting}
+
+获取当前运动策略信息及可用策略列表。
+
+\begin{lstlisting}[style=python]
+profile = dog.get_profile()
+print(f"当前策略: {profile.current}")
+print(f"可用策略: {profile.available}")
+for name, desc in zip(profile.available, profile.descriptions):
+    print(f"  {name}: {desc}")
+\end{lstlisting}
+
+\subsection{switch\_profile()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.switch_profile(name: str) -> ProfileInfo
+\end{lstlisting}
+
+切换运动策略。
+
+\begin{longtable}{lll}
+\toprule
+参数 & 类型 & 说明 \\
+\midrule
+\endhead
+\texttt{name} & str & 目标策略名称，必须在 \texttt{get\_profile().available} 列表中 \\
+\bottomrule
+\end{longtable}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 机器人处于 \textbf{Grounded} 状态 \\
+返回值 & 切换后的 \texttt{ProfileInfo} \\
+异常 & \texttt{grpc.RpcError} -- 策略不存在、状态不对或超时 \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}[style=python]
+# 查看可用策略
+profile = dog.get_profile()
+print(f"可用: {profile.available}")
+
+# 切换策略（必须先坐下）
+dog.sit_down()
+# 等待 Grounded ...
+new_profile = dog.switch_profile("thunder2v1")
+print(f"已切换到: {new_profile.current}")
+\end{lstlisting}
+
+\section{诊断与标定}
+
+\subsection{clear\_motor\_fault()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.clear_motor_fault(joint_ids=None) -> None
+\end{lstlisting}
+
+清除电机故障码。
+
+\begin{longtable}{llll}
+\toprule
+参数 & 类型 & 默认值 & 说明 \\
+\midrule
+\endhead
+\texttt{joint\_ids} & list[int] | None & \texttt{None} & 要清除的关节编号列表 (0--15)。\texttt{None} 表示清除全部 \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}[style=python]
+# 清除所有电机故障
+dog.clear_motor_fault()
+
+# 只清除前右腿
+dog.clear_motor_fault(joint_ids=[0, 1, 2, 3])
+
+# 只清除单个关节
+dog.clear_motor_fault(joint_ids=[5])
+\end{lstlisting}
+
+\subsection{set\_zero()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.set_zero() -> None
+\end{lstlisting}
+
+将当前关节位置标定为零位。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 机器人处于 \textbf{Grounded} 状态 \\
+用途 & 出厂标定或维修后重新校准零位 \\
+注意 & 错误的零位会导致运动异常，非必要不调用 \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}[style=python]
+# 确保在 Grounded 状态下执行
+state = dog.get_state()
+if state == "grounded":
+    dog.set_zero()
+    print("零位标定完成。")
+else:
+    print(f"当前状态 {state}，请先坐下。")
+\end{lstlisting}
+
+\section{实时数据流}
+
+所有 \texttt{listen\_*} 方法返回 Python 迭代器（\texttt{Iterator}），底层为 gRPC 服务端流。迭代器在以下情况终止：
+
+\begin{itemize}[nosep]
+  \item 手动 \texttt{break}
+  \item 键盘中断 (\texttt{Ctrl+C})
+  \item 调用 \texttt{dog.close()} 关闭通道
+  \item 网络断开
+\end{itemize}
+
+\subsection{listen\_imu()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.listen_imu() -> Iterator[ImuData]
+\end{lstlisting}
+
+订阅 IMU 实时数据流，约 50Hz。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+产出 & \texttt{ImuData}（含 \texttt{gyroscope}, \texttt{quaternion}, \texttt{timestamp\_ms}） \\
+频率 & \textasciitilde 50 Hz \\
+阻塞 & 是（在 \texttt{for} 循环中阻塞等待下一帧） \\
+\bottomrule
+\end{longtable}
+
+\subsection{listen\_joint()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.listen_joint() -> Iterator[JointData]
+\end{lstlisting}
+
+订阅关节实时数据流。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+产出 & \texttt{JointData}（含 \texttt{id}, \texttt{position}, \texttt{velocity}, \texttt{torque}, \texttt{status}） \\
+频率 & \textasciitilde 50 Hz（逐关节上报） \\
+阻塞 & 是 \\
+\bottomrule
+\end{longtable}
+
+\subsection{listen\_state()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.listen_state() -> Iterator[str]
+\end{lstlisting}
+
+订阅状态机变化事件。仅在状态切换时产出，不定频。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+产出 & 状态字符串：\texttt{"zero"}, \texttt{"grounded"}, \texttt{"standing"}, \texttt{"walking"}, \texttt{"transitioning"} \\
+频率 & 事件驱动（仅状态变化时触发） \\
+阻塞 & 是 \\
+\bottomrule
+\end{longtable}
+
+\section{数据类型参考}
+
+\subsection{Vec3}
+
+三维向量。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class Vec3:
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+\end{lstlisting}
+
+\subsection{Quat}
+
+四元数（Hamilton 约定：w, x, y, z）。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class Quat:
+    w: float = 1.0    # 实部
+    x: float = 0.0    # 虚部 i
+    y: float = 0.0    # 虚部 j
+    z: float = 0.0    # 虚部 k
+\end{lstlisting}
+
+\subsection{ImuData}
+
+IMU 惯性测量数据帧。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class ImuData:
+    gyroscope: Vec3       # 角速度 (rad/s)
+    quaternion: Quat      # 姿态四元数 (Hamilton w,x,y,z)
+    timestamp_ms: float   # 时间戳 (ms)
+\end{lstlisting}
+
+\subsection{JointData}
+
+单个关节的实时数据。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class JointData:
+    id: int            # 关节编号 (0-15)
+    position: float    # 角位置 (rad)
+    velocity: float    # 角速度 (rad/s)
+    torque: float      # 力矩 (Nm)
+    status: int        # 状态码 (0=正常)
+\end{lstlisting}
+
+\subsection{MotorInfo}
+
+电机完整健康状态。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class MotorInfo:
+    id: int              # 关节编号 (0-15)
+    online: bool         # 是否在线
+    temperature: float   # 温度 (C)
+    voltage: float       # 母线电压 (V)
+    position: float      # 编码器位置 (rad)
+    velocity: float      # 转速 (rad/s)
+    torque: float        # 输出力矩 (Nm)
+    errors: list[int]    # 故障码列表 (空=无故障)
+\end{lstlisting}
+
+\subsection{ProfileInfo}
+
+运动策略信息。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class ProfileInfo:
+    current: str           # 当前激活的策略名称
+    available: list[str]   # 所有可用策略名称
+    descriptions: list[str] # 各策略说明文字
+\end{lstlisting}
+
+\subsection{RobotState}
+
+状态机常量（字符串）。
+
+\begin{lstlisting}[style=python]
+class RobotState:
+    ZERO = "zero"
+    GROUNDED = "grounded"
+    STANDING = "standing"
+    WALKING = "walking"
+    TRANSITIONING = "transitioning"
+\end{lstlisting}
+
+使用方式：
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import RobotState
+
+state = dog.get_state()
+if state == RobotState.STANDING:
+    dog.walk(vx=0.3)
+\end{lstlisting}
+
+\section{错误处理}
+
+所有 RPC 调用可能抛出 \texttt{grpc.RpcError}。以下是常见错误场景及处理方式：
+
+\subsection{连接超时}
+
+\begin{lstlisting}[style=python]
+import grpc
+
+try:
+    dog = ThunderClient("192.168.66.190", timeout=3.0)
+    dog.get_state()
+except grpc.RpcError as e:
+    if e.code() == grpc.StatusCode.UNAVAILABLE:
+        print("无法连接到机器人。请检查：")
+        print("  1. 机器人是否已开机")
+        print("  2. IP 地址是否正确")
+        print("  3. brainstem 服务是否正在运行")
+    elif e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
+        print("请求超时。网络可能不稳定。")
+    else:
+        print(f"gRPC 错误: {e.code()} - {e.details()}")
+\end{lstlisting}
+
+\subsection{常见错误码}
+
+\begin{longtable}{lll}
+\toprule
+gRPC 状态码 & 含义 & 常见原因 \\
+\midrule
+\endhead
+\texttt{UNAVAILABLE} & 服务不可达 & 机器人未开机、IP 错误、服务未启动 \\
+\texttt{DEADLINE\_EXCEEDED} & 请求超时 & 网络延迟、服务端无响应 \\
+\texttt{FAILED\_PRECONDITION} & 前置条件不满足 & 状态不对（如在 Zero 状态下调用 walk） \\
+\texttt{PERMISSION\_DENIED} & 权限被拒 & Arbiter 控制权被遥控器占用 \\
+\texttt{INTERNAL} & 服务端内部错误 & 硬件异常或程序错误 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Arbiter 控制权冲突}
+
+Thunder 的控制仲裁器（ControlArbiter）确保遥控器始终具有最高优先级。当遥控器在线时，gRPC 指令可能被拒绝：
+
+\begin{itemize}[nosep]
+  \item 遥控器在线且正在操作：gRPC 运动指令将被忽略
+  \item 遥控器在线但空闲超过 3 秒：gRPC 自动获得控制权
+  \item 遥控器离线：gRPC 始终拥有控制权
+\end{itemize}
+
+\begin{lstlisting}[style=python]
+import grpc
+import time
+
+def safe_walk(dog, vx=0.0, vy=0.0, vyaw=0.0, retries=3):
+    """带重试的行走指令。"""
+    for attempt in range(retries):
+        try:
+            dog.walk(vx=vx, vy=vy, vyaw=vyaw)
+            return True
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.PERMISSION_DENIED:
+                print(f"控制权被遥控器占用，等待 ({attempt+1}/{retries})...")
+                time.sleep(1.0)
+            else:
+                raise
+    print("无法获得控制权。请确认遥控器已松开操控杆。")
+    return False
+\end{lstlisting}
+
+\subsection{流式接口异常处理}
+
+\begin{lstlisting}[style=python]
+try:
+    for imu in dog.listen_imu():
+        # 处理数据...
+        pass
+except grpc.RpcError as e:
+    if e.code() == grpc.StatusCode.UNAVAILABLE:
+        print("连接断开，尝试重连...")
+    else:
+        print(f"流异常: {e.code()}")
+except KeyboardInterrupt:
+    print("用户中断。")
+finally:
+    dog.close()
+\end{lstlisting}
+
+\section*{附录：方法速查表}
+
+{\small
+\begin{longtable}{llll}
+\toprule
+分类 & 方法 & 返回值 & 说明 \\
+\midrule
+\endhead
+\textbf{连接} & \texttt{ThunderClient(host, port, timeout)} & -- & 构造并连接 \\
+ & \texttt{close()} & None & 关闭连接 \\
+\textbf{电机} & \texttt{enable()} & None & 使能全部电机 \\
+ & \texttt{disable()} & None & 禁用全部电机 \\
+\textbf{运动} & \texttt{walk(vx, vy, vyaw)} & None & 行走指令 \\
+ & \texttt{stand\_up()} & None & 坐姿 $\to$ 站立 \\
+ & \texttt{sit\_down()} & None & 站立 $\to$ 坐姿 \\
+\textbf{状态} & \texttt{get\_state()} & str & 查询 FSM 状态 \\
+ & \texttt{get\_voltage()} & list[float] & 16 路母线电压 \\
+ & \texttt{get\_motor\_status()} & list[MotorInfo] & 16 个电机健康状态 \\
+\textbf{策略} & \texttt{get\_profile()} & ProfileInfo & 当前策略信息 \\
+ & \texttt{switch\_profile(name)} & ProfileInfo & 切换运动策略 \\
+\textbf{诊断} & \texttt{clear\_motor\_fault(joint\_ids)} & None & 清除电机故障 \\
+ & \texttt{set\_zero()} & None & 标定零位 \\
+\textbf{数据流} & \texttt{listen\_imu()} & Iterator[ImuData] & IMU 实时流 \\
+ & \texttt{listen\_joint()} & Iterator[JointData] & 关节实时流 \\
+ & \texttt{listen\_state()} & Iterator[str] & 状态变化流 \\
+\bottomrule
+\end{longtable}
+}
+
+
+
+% ============================================================
+%  第 7 章：安全指南
+% ============================================================
+\chapter{安全指南}
+\label{ch:safety}
+
+Thunder 四足机器人是一台具有高扭矩电机的自主运动设备。操作不当可能造成设备损坏或人员伤害。请在使用前仔细阅读本章全部内容。
+
+\section{操作前检查清单}
+
+\textbf{每次启动机器人前，必须逐项确认以下事项：}
+
+{\small
+\begin{longtable}{clll}
+\toprule
+序号 & 检查项 & 确认方法 & 通过标准 \\
+\midrule
+\endhead
+1 & 电池电量充足 & \texttt{dog.get\_voltage()} & 所有电机电压 >= 44V \\
+2 & 操作区域净空 & 目视检查 & 周围 1.5 米内无人员/易碎物品 \\
+3 & 机器人放置在地面 & 目视检查 & 四脚均接触平坦地面 \\
+4 & 急停装置就绪 & 确认遥控器在手 & 遥控器已开机，电量充足 \\
+5 & CAN 总线连接牢固 & 目视检查 & 所有 CAN 线缆插头无松动 \\
+6 & 控制服务已启动 & SSH 检查 & \texttt{systemctl status brainstem} 显示 active \\
+7 & 电机状态正常 & \texttt{get\_motor\_status()} & 16 个电机全部在线，无故障 \\
+8 & 关节位置合理 & \texttt{get\_motor\_status()} & 所有关节位置绝对值 $<$ 1.0 rad \\
+9 & 遥控器优先级确认 & 操控遥控器摇杆 & 遥控器能正常控制机器人 \\
+10 & 运行环境温度适宜 & 环境检查 & 0--40\textdegree C 室温，非湿滑地面 \\
+\bottomrule
+\end{longtable}
+}
+
+\noindent\textbf{完整的启动前检查代码：}
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import ThunderClient
+
+dog = ThunderClient("192.168.66.190")
+
+# 1. 检查电压
+voltages = dog.get_voltage()
+min_v = min(voltages)
+print(f"电压: {min_v:.1f}V", "-- 通过" if min_v >= 44.0 else "-- 不通过! 请充电")
+
+# 2. 检查电机状态
+motors = dog.get_motor_status()
+offline = [m for m in motors if not m.online]
+faulted = [m for m in motors if m.errors]
+
+if offline:
+    print(f"离线电机: {[m.id for m in offline]} -- 不通过!")
+else:
+    print("电机在线: 全部 16/16 -- 通过")
+
+if faulted:
+    print(f"故障电机: {[m.id for m in faulted]} -- 尝试清除...")
+    dog.clear_motor_fault()
+else:
+    print("电机故障: 无 -- 通过")
+
+# 3. 检查关节位置
+bad_joints = [m for m in motors if abs(m.position) > 1.0]
+if bad_joints:
+    print(f"关节位置异常: {[(m.id, f'{m.position:.2f}rad') for m in bad_joints]}")
+else:
+    print("关节位置: 正常 -- 通过")
+
+# 4. 检查温度
+hot = [m for m in motors if m.temperature > 60]
+if hot:
+    print(f"温度偏高: {[(m.id, f'{m.temperature:.0f}C') for m in hot]}")
+else:
+    print("电机温度: 正常 -- 通过")
+
+# 5. 检查状态
+state = dog.get_state()
+print(f"当前状态: {state}", "-- 通过" if state == "grounded" else "-- 注意: 非 Grounded")
+
+dog.close()
+\end{lstlisting}
+
+\section{低压保护}
+
+\subsection{保护机制}
+
+当任一电机报告的母线电压低于 \textbf{42.0V} 时，系统自动触发低压保护：
+
+\begin{verbatim}
+检测到低压 (< 42V)
+       |
+       v
+  发送 SitDown 指令
+       |
+       v
+  等待进入 Grounded 状态
+       |
+       v
+  禁用全部电机 (Disable)
+       |
+       v
+  日志输出: "LOW VOLTAGE: xx.xV < 42.0V -- graceful sitDown"
+\end{verbatim}
+
+此保护是\textbf{优雅坐下}流程，不是直接断电。系统会等待机器人安全着地后才禁用电机，避免从站立姿态跌落。
+
+\subsection{电压等级参考}
+
+\begin{longtable}{lll}
+\toprule
+电压范围 & 状态 & 建议 \\
+\midrule
+\endhead
+$\geq$ 48V & 满电 & 正常使用 \\
+44V -- 48V & 正常 & 正常使用，关注电量 \\
+42V -- 44V & 低电量 & 尽快结束任务，准备充电 \\
+$<$ 42V & 危险 & 自动触发保护，必须立即充电 \\
+\bottomrule
+\end{longtable}
+
+\subsection{注意事项}
+
+\begin{itemize}[nosep]
+  \item 低压保护\textbf{不可通过 SDK 绕过}
+  \item 大电流运动（快速行走、爬坡）会导致瞬时压降，可能在电池未耗尽时触发保护
+  \item 建议在电压低于 44V 时即结束运动任务
+  \item 触发低压保护后，必须充电至 44V 以上才可重新启动
+\end{itemize}
+
+\section{关节限位保护}
+
+\subsection{保护机制}
+
+每个关节的位置都受到绝对限位保护。默认限位为 \textbf{3.14 rad}（即 $\pi$，约 180 度）。任一关节位置绝对值超过此阈值将立即触发故障（Fault）。
+
+\begin{longtable}{llll}
+\toprule
+配置 & 环境变量 & 默认值 & 说明 \\
+\midrule
+\endhead
+关节限位 & \texttt{HAN\_DOG\_JOINT\_LIMIT\_RAD} & 3.14 & 绝对值限位，单位 rad \\
+\bottomrule
+\end{longtable}
+
+\subsection{触发后果}
+
+关节超限后：
+\begin{enumerate}[nosep]
+  \item 对应电机立即进入故障状态
+  \item 机器人可能失去该腿的控制，导致摔倒
+  \item 必须手动清除故障后才能恢复
+\end{enumerate}
+
+\subsection{预防措施}
+
+\begin{itemize}[nosep]
+  \item 确保零位标定正确（\texttt{set\_zero()} 在标准坐姿下执行）
+  \item 不要在关节卡住或受阻的情况下强行运动
+  \item 如果需要更严格的保护，可设置更小的限位值：
+\end{itemize}
+
+\begin{lstlisting}[style=bash]
+export HAN_DOG_JOINT_LIMIT_RAD=2.5  # 约 143 度
+\end{lstlisting}
+
+\section{电机故障处理}
+
+\subsection{检测故障}
+
+\begin{lstlisting}[style=python]
+motors = dog.get_motor_status()
+for m in motors:
+    if m.errors:
+        print(f"Joint {m.id} 故障码: {m.errors}")
+    if not m.online:
+        print(f"Joint {m.id} 离线 (CAN 通信中断)")
+\end{lstlisting}
+
+\subsection{清除故障}
+
+\begin{lstlisting}[style=python]
+# 方法 1: 清除所有电机故障
+dog.clear_motor_fault()
+
+# 方法 2: 只清除特定关节
+dog.clear_motor_fault(joint_ids=[0, 1, 2])
+\end{lstlisting}
+
+\subsection{故障处理流程}
+
+\begin{verbatim}
+发现电机故障
+       |
+       v
+  机器人是否在运动中?
+       |
+    是/        \否
+    v            v
+  立即坐下     直接清除故障
+  dog.sit_down()    dog.clear_motor_fault()
+       |            |
+       v            v
+  等待 Grounded   重新检查
+       |            |
+       v            v
+  清除故障       故障清除?
+  dog.clear_motor_fault()   |
+       |          是/    \否
+       v          v        v
+  重新检查     恢复运动   检查硬件
+                          (CAN线/电源/电机)
+\end{verbatim}
+
+\subsection{反复出现的故障}
+
+如果 \texttt{clear\_motor\_fault()} 后故障立即重新出现，说明存在持续性硬件问题：
+
+\begin{longtable}{lll}
+\toprule
+表现 & 可能原因 & 处理 \\
+\midrule
+\endhead
+单个电机反复故障 & CAN 线缆松动 & 重新插拔对应 CAN 接头 \\
+多个电机同时故障 & 母线问题 & 检查电池和配电板 \\
+故障码伴随高温 & 电机过热 & 停止运动，等待冷却至 50\textdegree C 以下 \\
+关节位置跳变后故障 & 编码器异常 & 重新标零 \texttt{set\_zero()} \\
+\bottomrule
+\end{longtable}
+
+\section{急停程序}
+
+按紧急程度从低到高，有三种急停方式：
+
+\subsection{软件急停（SDK）}
+
+适用于程序可控的紧急情况：
+
+\begin{lstlisting}[style=python]
+# 优雅急停：停步 -> 坐下 -> 禁用
+dog.walk(vx=0.0, vy=0.0, vyaw=0.0)
+dog.sit_down()
+# 等待进入 Grounded ...
+dog.disable()
+\end{lstlisting}
+
+\subsection{遥控器急停}
+
+适用于现场操作人员发现危险时：
+
+\begin{enumerate}[nosep]
+  \item \textbf{立即操控遥控器摇杆} -- 遥控器自动获得最高控制权，接管机器人
+  \item 通过遥控器操作坐下
+  \item 遥控器上的急停按钮可直接断开电机使能
+\end{enumerate}
+
+\warning{遥控器始终具有最高优先级，可在任何时刻覆盖 SDK 指令。}
+
+\subsection{硬件断电}
+
+适用于最紧急的情况（机器人失控、硬件冒烟等）：
+
+\begin{enumerate}[nosep]
+  \item \textbf{直接关闭电池开关或拔出电池}
+  \item 机器人将立即断电跌落
+  \item 注意：断电跌落可能造成机械损伤，仅在绝对必要时使用
+\end{enumerate}
+
+\subsection{急停优先级}
+
+\begin{verbatim}
+优先级从高到低:
+
+  [1] 硬件断电       -- 物理级，不可覆盖
+  [2] 遥控器控制     -- Arbiter 保证最高软件优先级
+  [3] SDK disable()  -- gRPC 调用
+  [4] 低压自动保护   -- 系统自动触发
+\end{verbatim}
+
+\section{Arbiter 控制仲裁安全}
+
+\subsection{仲裁规则}
+
+Thunder 的 ControlArbiter（控制仲裁器）实施以下安全规则：
+
+\begin{longtable}{ll}
+\toprule
+规则 & 说明 \\
+\midrule
+\endhead
+遥控器优先 & YUNZHUO 遥控器的优先级永远高于 gRPC（SDK） \\
+超时释放 & 遥控器停止操作 3 秒后，gRPC 自动获得控制权 \\
+无抢占 & gRPC 不能强行抢占遥控器的控制权 \\
+超时可配 & 超时时间通过 \texttt{HAN\_DOG\_ARBITER\_TIMEOUT} 配置，默认 3 秒 \\
+\bottomrule
+\end{longtable}
+
+\subsection{对 SDK 开发者的影响}
+
+\begin{verbatim}
+SDK 发送 walk() 指令
+       |
+       v
+  Arbiter 检查控制权
+       |
+   gRPC 有控制权?
+     |
+   是/      \否 (遥控器占用)
+   v          v
+ 执行指令    指令被忽略或拒绝
+\end{verbatim}
+
+\begin{itemize}[nosep]
+  \item 当遥控器在线并活跃时，SDK 的运动指令将被忽略
+  \item 状态查询（\texttt{get\_state()}, \texttt{get\_voltage()} 等）不受 Arbiter 影响，始终可用
+  \item 遥控器释放后约 3 秒，SDK 自动恢复控制权，无需额外操作
+\end{itemize}
+
+\subsection{安全启示}
+
+\begin{itemize}[nosep]
+  \item \textbf{现场测试时务必携带遥控器}，作为最后的安全手段
+  \item 不要依赖 SDK 作为唯一的急停方式
+  \item 如果 SDK 指令无响应，先检查遥控器是否在线
+\end{itemize}
+
+\section{禁止操作}
+
+以下操作可能导致设备损坏或人员伤害，\textbf{严格禁止}：
+
+{\small
+\begin{longtable}{cll}
+\toprule
+序号 & 禁止操作 & 原因 \\
+\midrule
+\endhead
+1 & 在桌面、高台上运行机器人 & 摔落损坏，可能伤人 \\
+2 & 电机使能状态下翻转机器人 & 电机强力对抗将损坏齿轮箱 \\
+3 & 跳过 Grounded 状态直接启用电机运动 & 状态机保护被绕过 \\
+4 & 在电机使能状态下插拔 CAN 线缆 & 可能导致 CAN 总线短路 \\
+5 & 长时间运行而不监控温度 & 电机过热会永久损坏绕组 \\
+6 & 在关节卡死时反复发送运动指令 & 电流持续上升，烧毁电机 \\
+7 & 在充电状态下运行电机 & 部分充电器不支持边充边放 \\
+8 & 修改关节限位为极大值 & 失去关节保护 \\
+9 & 在湿滑/不平地面运行而无人看护 & 跌倒后持续运动可能损坏关节 \\
+10 & 多个 SDK 客户端同时发送运动指令 & 指令冲突导致运动抖动 \\
+\bottomrule
+\end{longtable}
+}
+
+\section{标准关机序列}
+
+每次使用结束后，必须执行以下关机序列：
+
+\begin{lstlisting}[style=python]
+import time
+
+# 步骤 1: 停止行走
+dog.walk(vx=0.0, vy=0.0, vyaw=0.0)
+
+# 步骤 2: 坐下
+dog.sit_down()
+
+# 步骤 3: 等待进入 Grounded 状态
+for state in dog.listen_state():
+    if state == "grounded":
+        break
+
+# 步骤 4: 禁用电机
+dog.disable()
+
+# 步骤 5: 关闭连接
+dog.close()
+
+print("安全关机完成。")
+\end{lstlisting}
+
+\noindent\textbf{简化版（带超时保护）：}
+
+\begin{lstlisting}[style=python]
+import time
+
+def safe_shutdown(dog, timeout=10.0):
+    """安全关机，带超时保护。"""
+    try:
+        dog.walk()
+        dog.sit_down()
+
+        # 轮询等待 Grounded，而非使用流式接口
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if dog.get_state() == "grounded":
+                break
+            time.sleep(0.2)
+
+        dog.disable()
+    except Exception as e:
+        print(f"关机异常: {e}")
+        # 最后手段：直接禁用
+        try:
+            dog.disable()
+        except Exception:
+            pass
+    finally:
+        dog.close()
+\end{lstlisting}
+
+\noindent\textbf{关键原则}：先坐稳再断电。直接调用 \texttt{disable()} 而不先 \texttt{sit\_down()} 会导致机器人从站立姿态自由跌落。
+
+\section{故障诊断树}
+
+遇到问题时，按以下诊断树逐步排查：
+
+\begin{verbatim}
+问题: 机器人异常
+       |
+       v
+  机器人是否有响应?
+       |
+    否/        \是
+    v            v
+  检查电源      机器人在运动吗?
+  检查网络        |
+  重启服务      是/        \否
+       |       v            v
+       |    运动是否正常?   能查询状态吗?
+       |      |              dog.get_state()
+       |    否/  \是           |
+       |    v      v        是/   \否
+       |  运动异常  正常     查电机状态  网络问题
+       |         get_motor_status()
+       v                     |
+  [电源/网络故障]         有故障码?
+  1. 电池是否有电           |
+  2. 电池开关是否打开    是/    \否
+  3. CAN 线是否连好      v        v
+  4. SSH 能否连通      清除故障  检查状态机
+  5. brainstem 服务    clear_motor_fault()
+     是否运行
+\end{verbatim}
+
+\noindent\textbf{运动异常诊断：}
+
+\begin{verbatim}
+运动异常
+    |
+    v
+  机器人摔倒了?
+    |
+  是/        \否
+  v            v
+ 检查电压    运动不流畅?
+ get_voltage()   |
+    |         是/     \否
+    v         v         v
+ < 42V?    检查温度    指令无效?
+    |      temperature    |
+  是/ \否     |          v
+  v     v    > 70C?   检查 Arbiter
+ 低压   检查   |      (遥控器是否在线)
+ 保护  关节限位
+\end{verbatim}
+
+\section*{附录：安全相关环境变量}
+
+\begin{longtable}{lll}
+\toprule
+环境变量 & 默认值 & 说明 \\
+\midrule
+\endhead
+\texttt{HAN\_DOG\_JOINT\_LIMIT\_RAD} & 3.14 & 关节绝对限位 (rad) \\
+\texttt{HAN\_DOG\_ARBITER\_TIMEOUT} & 3 & 遥控器释放后 gRPC 获取控制权等待时间 (s) \\
+\texttt{HAN\_DOG\_SHUTDOWN\_TIMEOUT} & 8 & 关机等待超时 (s) \\
+\texttt{HAN\_DOG\_STARTUP\_TIMEOUT} & 10 & FSM 启动等待 Grounded 超时 (s) \\
+\texttt{HAN\_DOG\_SENSOR\_LOW\_THRESHOLD} & 3 & 传感器低阈值（连续低读数计数） \\
+\bottomrule
+\end{longtable}
+
+\section*{附录：安全操作总结}
+
+\begin{verbatim}
++------------------------------------------------------+
+|              Thunder 安全操作五条铁律                   |
+|                                                      |
+|  1. 永远带遥控器 -- 遥控器是最终安全手段               |
+|  2. 先坐再断电   -- disable() 前必须 sit_down()       |
+|  3. 关注电压     -- 低于 44V 准备收工                  |
+|  4. 监控温度     -- 超过 70C 立即休息                  |
+|  5. 地面运行     -- 永远在地面操作，永远不上桌          |
++------------------------------------------------------+
+\end{verbatim}
+
+
+
+% ============================================================
+%  第 8 章：常见问题
+% ============================================================
+\chapter{常见问题}
+\label{ch:faq}
+
+本章汇总使用 Thunder Python SDK 过程中的常见问题及解决方案。
+
+\section{连接问题}
+
+\subsection{Q: 连接超时 (DEADLINE\_EXCEEDED)}
+
+\noindent\textbf{现象}：调用任何 SDK 方法时抛出 \texttt{grpc.RpcError}，状态码 \texttt{DEADLINE\_EXCEEDED}。
+
+\noindent\textbf{排查步骤}：
+
+\begin{lstlisting}[style=bash]
+# 1. 确认网络可达
+ping 192.168.66.190
+
+# 2. 确认 gRPC 端口开放
+# Linux/macOS:
+nc -zv 192.168.66.190 13145
+# Windows:
+Test-NetConnection -ComputerName 192.168.66.190 -Port 13145
+
+# 3. 确认 brainstem 服务正在运行
+ssh sunrise@192.168.66.190 "systemctl status brainstem"
+\end{lstlisting}
+
+\noindent\textbf{常见原因与解决}：
+
+\begin{longtable}{ll}
+\toprule
+原因 & 解决 \\
+\midrule
+\endhead
+机器人未开机 & 打开电池开关，等待系统启动（约 30 秒） \\
+开发机和机器人不在同一网段 & 确认两台设备在同一局域网 \\
+brainstem 服务未启动 & SSH 登录后运行 \texttt{systemctl start brainstem} \\
+防火墙拦截 & 确认开发机防火墙放行 13145 端口 \\
+超时时间太短 & 构造时增大 timeout：\texttt{ThunderClient(host, timeout=10.0)} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Q: 连接被拒绝 (UNAVAILABLE)}
+
+\noindent\textbf{现象}：\texttt{grpc.RpcError} 状态码 \texttt{UNAVAILABLE}，提示 \texttt{Connection refused}。
+
+\noindent\textbf{排查}：
+
+\begin{lstlisting}[style=python]
+import grpc
+
+try:
+    dog = ThunderClient("192.168.66.190")
+    dog.get_state()
+except grpc.RpcError as e:
+    print(f"状态码: {e.code()}")
+    print(f"详情: {e.details()}")
+\end{lstlisting}
+
+\noindent\textbf{常见原因}：
+\begin{itemize}[nosep]
+  \item brainstem 服务未启动或崩溃 -- 检查 \texttt{systemctl status brainstem}
+  \item 端口被其他服务占用 -- 检查 \texttt{ss -tlnp | grep 13145}
+  \item IP 地址错误 -- 确认机器人实际 IP
+\end{itemize}
+
+\subsection{Q: IP 地址不确定}
+
+如果不确定机器人 IP：
+
+\begin{lstlisting}[style=bash]
+# 方法 1: 通过路由器管理页面查看 DHCP 租约
+
+# 方法 2: 在已知网段扫描 gRPC 端口
+# Linux (需安装 nmap):
+nmap -p 13145 192.168.66.0/24
+
+# 方法 3: 如果有 USB 串口连接
+# 登录后查看 IP:
+ip addr show
+\end{lstlisting}
+
+默认 IP 为 \texttt{192.168.66.190}，如果网络配置未更改，直接使用即可。
+
+\section{电机不动}
+
+\subsection{Q: 调用了 enable() 但电机没反应}
+
+\noindent\textbf{排查清单}：
+
+\begin{lstlisting}[style=python]
+# 1. 确认状态
+state = dog.get_state()
+print(f"状态: {state}")
+# 应该是 "grounded" 或 "zero"
+
+# 2. 检查电机在线状态
+motors = dog.get_motor_status()
+offline = [m for m in motors if not m.online]
+if offline:
+    print(f"离线电机: {[m.id for m in offline]}")
+
+# 3. 检查故障
+faulted = [m for m in motors if m.errors]
+if faulted:
+    print(f"故障电机: {[(m.id, m.errors) for m in faulted]}")
+    # 尝试清除
+    dog.clear_motor_fault()
+
+# 4. 检查电压
+voltages = dog.get_voltage()
+print(f"电压范围: {min(voltages):.1f}V ~ {max(voltages):.1f}V")
+\end{lstlisting}
+
+\noindent\textbf{常见原因}：
+
+\begin{longtable}{ll}
+\toprule
+原因 & 解决 \\
+\midrule
+\endhead
+未调用 \texttt{enable()} & 先调用 \texttt{dog.enable()} \\
+电机有故障未清除 & \texttt{dog.clear\_motor\_fault()} \\
+CAN 线缆松动 & 检查并重新插紧 CAN 接头 \\
+电池电量不足 & 充电至 44V 以上 \\
+遥控器占用控制权 & 松开遥控器摇杆，等待 3 秒 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Q: 只有部分电机动，其他不动}
+
+\noindent\textbf{排查}：
+
+\begin{lstlisting}[style=python]
+motors = dog.get_motor_status()
+for m in motors:
+    status = "OK" if m.online and not m.errors else "FAIL"
+    print(f"Joint {m.id:2d}: {status}  online={m.online}  errors={m.errors}")
+\end{lstlisting}
+
+\noindent\textbf{常见原因}：
+\begin{itemize}[nosep]
+  \item 对应腿的 CAN 线缆断开 -- 检查该腿的 CAN 总线物理连接
+  \item 单个电机驱动板故障 -- 更换后重试
+  \item 电机过热保护 -- 查看温度值，等待冷却
+\end{itemize}
+
+\subsection{Q: enable() 后状态没变化}
+
+\texttt{enable()} 使能电机，但不会改变 FSM 状态。使能后需要手动切换状态：
+
+\begin{lstlisting}[style=python]
+dog.enable()
+# 此时状态仍为 "grounded"，电机通电但保持坐姿
+dog.stand_up()
+# 现在状态变为 "standing"
+\end{lstlisting}
+
+\section{机器人摔倒}
+
+\subsection{Q: 行走中突然坐下}
+
+\noindent\textbf{最可能原因}：低压保护触发。
+
+\begin{lstlisting}[style=python]
+# 检查电压历史
+voltages = dog.get_voltage()
+print(f"当前电压: {min(voltages):.1f}V")
+# 如果 < 42V，说明是低压保护
+\end{lstlisting}
+
+\noindent\textbf{其他可能原因}：
+
+\begin{longtable}{ll}
+\toprule
+原因 & 诊断方法 \\
+\midrule
+\endhead
+低电压 ($<$ 42V) & \texttt{get\_voltage()} 返回值低于 42 \\
+电机过热 & \texttt{get\_motor\_status()} 中 temperature $>$ 80\textdegree C \\
+关节超限 & \texttt{get\_motor\_status()} 中 position 绝对值过大 \\
+CAN 通信中断 & \texttt{get\_motor\_status()} 中部分电机 online=False \\
+传感器断开 & 查看 brainstem 日志中的 SEVERE 信息 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{查看系统日志}：
+
+\begin{lstlisting}[style=bash]
+# SSH 登录机器人查看日志
+ssh sunrise@192.168.66.190
+# 日志文件在 logs/ 目录下
+ls logs/
+cat logs/han_dog_$(date +%Y%m%d).log | tail -50
+\end{lstlisting}
+
+\subsection{Q: 站起来后立即摔倒}
+
+\noindent\textbf{排查}：
+\begin{enumerate}[nosep]
+  \item 地面是否太滑 -- 在有摩擦力的地面（橡胶垫、地毯）上测试
+  \item 零位是否正确 -- 如果关节零位偏移，站立姿态会畸形
+  \item 策略是否匹配 -- 确认加载的运动策略与当前机器人硬件配置一致
+\end{enumerate}
+
+\section{行走指令无效}
+
+\subsection{Q: walk() 调用成功但机器人不动}
+
+\noindent\textbf{排查顺序}：
+
+\begin{lstlisting}[style=python]
+# 1. 检查状态 -- 必须是 Standing 或 Walking
+state = dog.get_state()
+print(f"状态: {state}")  # 必须是 "standing" 或 "walking"
+
+# 2. 如果状态不对
+if state == "grounded":
+    print("需要先站起来: dog.stand_up()")
+elif state == "zero":
+    print("需要先使能: dog.enable() -> dog.stand_up()")
+elif state == "transitioning":
+    print("正在过渡，请等待...")
+\end{lstlisting}
+
+\noindent\textbf{常见原因}：
+
+\begin{longtable}{ll}
+\toprule
+原因 & 解决 \\
+\midrule
+\endhead
+不在 Standing 状态 & 先调用 \texttt{stand\_up()} \\
+遥控器占用控制权 & 松开遥控器摇杆，等待 3 秒超时 \\
+速度参数为 0 & 检查参数：\texttt{dog.walk(vx=0.3)} \\
+策略不支持该运动 & 检查当前策略是否支持横移或旋转 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Q: 遥控器在线时 SDK 指令被忽略}
+
+这是\textbf{正常行为}。ControlArbiter 保证遥控器始终具有最高优先级。
+
+\noindent\textbf{解决方案}：
+\begin{enumerate}[nosep]
+  \item 关闭遥控器
+  \item 或松开遥控器摇杆，等待 3 秒后 SDK 自动获得控制权
+\end{enumerate}
+
+\begin{lstlisting}[style=python]
+import time
+
+# 等待控制权释放
+print("等待遥控器释放控制权...")
+time.sleep(4)  # 等待超过 arbiter timeout (默认 3 秒)
+dog.walk(vx=0.3)  # 现在应该生效
+\end{lstlisting}
+
+\section{策略切换失败}
+
+\subsection{Q: switch\_profile() 报错}
+
+\noindent\textbf{前置条件}：策略切换只能在 \textbf{Grounded} 状态下执行。
+
+\begin{lstlisting}[style=python]
+state = dog.get_state()
+if state != "grounded":
+    print(f"当前状态 {state}，需要先坐下。")
+    dog.walk()       # 停步
+    dog.sit_down()   # 坐下
+    # 等待到 grounded
+    import time
+    for _ in range(50):
+        if dog.get_state() == "grounded":
+            break
+        time.sleep(0.2)
+
+# 现在可以切换
+profile = dog.switch_profile("thunder2v1")
+print(f"已切换到: {profile.current}")
+\end{lstlisting}
+
+\subsection{Q: 策略名称不存在}
+
+\begin{lstlisting}[style=python]
+# 先查看可用策略
+profile = dog.get_profile()
+print(f"可用策略: {profile.available}")
+print(f"策略说明: {profile.descriptions}")
+
+# 使用列表中的名称
+dog.switch_profile(profile.available[0])
+\end{lstlisting}
+
+\subsection{Q: 切换策略后行为异常}
+
+每个策略针对特定硬件配置和运动模式进行训练。切换策略后如果出现异常运动：
+\begin{enumerate}[nosep]
+  \item 确认策略与当前硬件配置匹配
+  \item 立即坐下：\texttt{dog.sit\_down()}
+  \item 切回之前正常工作的策略
+\end{enumerate}
+
+\section{IMU 数据异常}
+
+\subsection{Q: 四元数数值看起来不对}
+
+\noindent\textbf{Hamilton vs ROS 约定}：
+
+Thunder SDK 使用 Hamilton 约定：\texttt{(w, x, y, z)}
+
+\begin{lstlisting}[style=python]
+imu = next(iter(dog.listen_imu()))
+# SDK 返回: (w, x, y, z)
+print(f"w={imu.quaternion.w}, x={imu.quaternion.x}, "
+      f"y={imu.quaternion.y}, z={imu.quaternion.z}")
+\end{lstlisting}
+
+如果你的应用使用 ROS 约定 \texttt{(x, y, z, w)}，需要手动转换：
+
+\begin{lstlisting}[style=python]
+# SDK (Hamilton) -> ROS
+ros_quat = (imu.quaternion.x, imu.quaternion.y,
+            imu.quaternion.z, imu.quaternion.w)
+
+# 如果使用 scipy
+from scipy.spatial.transform import Rotation
+r = Rotation.from_quat([
+    imu.quaternion.x,
+    imu.quaternion.y,
+    imu.quaternion.z,
+    imu.quaternion.w,
+])  # scipy 使用 (x,y,z,w) 顺序
+euler = r.as_euler('xyz', degrees=True)
+\end{lstlisting}
+
+\subsection{Q: 机器人静止但角速度不为零}
+
+IMU 的陀螺仪存在零偏（bias），静止时读数不会严格为零。典型零偏范围：
+
+\begin{verbatim}
+|gyro.x| < 0.02 rad/s  -- 正常
+|gyro.x| > 0.05 rad/s  -- 可能需要标定
+\end{verbatim}
+
+如需高精度角速度，可在启动时采集 100 帧静止数据取均值作为零偏，后续数据减去此偏移。
+
+\subsection{Q: listen\_imu() 频率不是 50Hz}
+
+IMU 标称频率约 50Hz，实际可能在 48--52Hz 波动。这是正常的。如果频率显著偏低（$<$ 30Hz），检查：
+\begin{itemize}[nosep]
+  \item 串口连接是否正常
+  \item brainstem 服务是否负载过高
+  \item 网络延迟（gRPC 传输开销）
+\end{itemize}
+
+\section{性能与延迟}
+
+\subsection{Q: gRPC 调用延迟有多大？}
+
+\begin{longtable}{lll}
+\toprule
+调用类型 & 典型延迟 & 说明 \\
+\midrule
+\endhead
+单次查询 (\texttt{get\_state()} 等) & 1--5 ms & 局域网内 \\
+运动指令 (\texttt{walk()} 等) & 1--5 ms & 局域网内 \\
+首次连接 & 50--200 ms & 包含 HTTP/2 握手 \\
+流式数据 (\texttt{listen\_imu()} 等) & $<$ 1 ms/帧 & 建立后持续推送 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Q: 50Hz 控制频率够用吗？}
+
+Thunder 的运动控制循环固定为 50Hz（20ms 周期）。SDK 发送的指令在下一个控制周期生效。这意味着：
+\begin{itemize}[nosep]
+  \item 指令最大延迟：20ms（一个控制周期）
+  \item 不需要以超过 50Hz 的频率发送 walk() 指令
+  \item 建议的 walk() 指令发送频率：10--50Hz
+\end{itemize}
+
+\begin{lstlisting}[style=python]
+import time
+
+# 不需要这样做（浪费资源）:
+while True:
+    dog.walk(vx=0.3)
+    time.sleep(0.001)  # 1000Hz -- 过高，无意义
+
+# 推荐做法:
+while True:
+    dog.walk(vx=0.3)
+    time.sleep(0.05)  # 20Hz -- 足够
+\end{lstlisting}
+
+\subsection{Q: Python GIL 会影响实时性吗？}
+
+Python 的全局解释器锁（GIL）对 gRPC 调用影响很小，因为 gRPC 底层使用 C 扩展进行网络 I/O，不受 GIL 限制。但以下场景需要注意：
+
+\begin{itemize}[nosep]
+  \item \textbf{多线程同时调用}：gRPC 客户端本身是线程安全的，但应避免多线程同时发送运动指令（语义冲突）
+  \item \textbf{数据处理密集}：如果在 \texttt{listen\_imu()} 回调中做大量 numpy 计算，可能导致帧处理延迟。建议将数据处理放到独立线程
+\end{itemize}
+
+\begin{lstlisting}[style=python]
+import threading
+import queue
+
+# 推荐模式：生产者-消费者
+data_queue = queue.Queue(maxsize=100)
+
+def imu_reader(dog):
+    """生产者：读取 IMU 数据放入队列。"""
+    for imu in dog.listen_imu():
+        try:
+            data_queue.put_nowait(imu)
+        except queue.Full:
+            data_queue.get()  # 丢弃最旧的
+            data_queue.put_nowait(imu)
+
+def data_processor():
+    """消费者：处理 IMU 数据。"""
+    while True:
+        imu = data_queue.get()
+        # 在这里做复杂计算...
+        pass
+
+reader = threading.Thread(target=imu_reader, args=(dog,), daemon=True)
+processor = threading.Thread(target=data_processor, daemon=True)
+reader.start()
+processor.start()
+\end{lstlisting}
+
+\section{环境变量参考}
+
+以下环境变量在机器人端（brainstem 服务）生效，SDK 客户端不直接使用。了解这些变量有助于理解系统行为和排障。
+
+{\small
+\begin{longtable}{lllll}
+\toprule
+环境变量 & 类型 & 默认值 & 有效范围 & 说明 \\
+\midrule
+\endhead
+\texttt{HAN\_DOG\_PORT} & int & 13145 & 1--65535 & gRPC 服务监听端口 \\
+\texttt{HAN\_DOG\_IMU\_PORT} & str & /dev/ttyUSB1 & 设备路径 & IMU 串口设备 \\
+\texttt{HAN\_DOG\_YUNZHUO\_PORT} & str & /dev/yunzhuo & 设备路径 & YUNZHUO 遥控器串口 \\
+\texttt{HAN\_DOG\_XBOX\_DEVICE} & str & /dev/input/js0 & 设备路径 & Xbox 手柄设备 \\
+\texttt{HAN\_DOG\_XBOX\_CONFIG} & str & config/xbox.json & 文件路径 & Xbox 手柄按键映射 \\
+\texttt{HAN\_DOG\_DEFAULT\_PROFILE} & str & (无) & 策略名称 & 默认加载的运动策略 \\
+\texttt{HAN\_DOG\_PROFILE\_DIR} & str & profiles/ & 目录路径 & 策略文件目录 \\
+\texttt{HAN\_DOG\_ARBITER\_TIMEOUT} & int & 3 & 1--60 & 遥控器释放后控制权切换 (s) \\
+\texttt{HAN\_DOG\_SENSOR\_LOW\_THRESHOLD} & int & 3 & $\geq$ 1 & 传感器低读数计数阈值 \\
+\texttt{HAN\_DOG\_SHUTDOWN\_TIMEOUT} & int & 8 & 1--300 & 关机等待超时 (s) \\
+\texttt{HAN\_DOG\_STARTUP\_TIMEOUT} & int & 10 & 1--300 & 启动等待 Grounded 超时 (s) \\
+\texttt{HAN\_DOG\_JOINT\_LIMIT\_RAD} & float & 3.14 & $>$ 0 & 关节绝对限位 (rad) \\
+\texttt{HAN\_DOG\_LOG\_DIR} & str & logs & 目录路径 & 日志文件目录 \\
+\texttt{HAN\_DOG\_LOG} & str & INFO & Logger 级别 & 日志级别 \\
+\texttt{HAN\_DOG\_DEBUG\_TUI} & str & (无) & true/其他 & 启用调试 TUI \\
+\texttt{MEDULLA\_STANDALONE} & str & (无) & 1/其他 & 启用独立模式 \\
+\bottomrule
+\end{longtable}
+}
+
+\section{网络排障}
+
+\subsection{基本连通性检查}
+
+\begin{lstlisting}[style=bash]
+# 第 1 步: Ping 机器人
+ping 192.168.66.190
+# 预期: 响应时间 < 5ms (局域网)
+
+# 第 2 步: 检查 gRPC 端口
+# Linux/macOS:
+nc -zv 192.168.66.190 13145
+# 预期输出: Connection to 192.168.66.190 13145 port [tcp/*] succeeded!
+
+# Windows PowerShell:
+Test-NetConnection -ComputerName 192.168.66.190 -Port 13145
+# 预期: TcpTestSucceeded : True
+
+# 第 3 步: 检查服务状态 (SSH)
+ssh sunrise@192.168.66.190 "systemctl status brainstem"
+# 预期: Active: active (running)
+\end{lstlisting}
+
+\subsection{防火墙检查}
+
+\begin{lstlisting}[style=bash]
+# Linux 开发机
+sudo iptables -L -n | grep 13145
+
+# Windows 开发机
+netsh advfirewall firewall show rule name=all | findstr 13145
+
+# 临时放行 (Linux)
+sudo iptables -A OUTPUT -p tcp --dport 13145 -j ACCEPT
+
+# 临时放行 (Windows PowerShell, 管理员)
+New-NetFirewallRule -DisplayName "Thunder gRPC" -Direction Outbound -Protocol TCP -RemotePort 13145 -Action Allow
+\end{lstlisting}
+
+\subsection{网络拓扑要求}
+
+\begin{verbatim}
+开发机                    Thunder 机器人
+(192.168.66.x)           (192.168.66.190)
+     |                         |
+     +--- 同一局域网/交换机 ---+
+           (无 NAT、无代理)
+\end{verbatim}
+
+\begin{itemize}[nosep]
+  \item SDK 使用 gRPC over HTTP/2，需要直连（不经过 HTTP 代理）
+  \item 不支持跨 NAT 连接（如果开发机在不同子网，需要配置路由）
+  \item Wi-Fi 连接可能有延迟抖动，建议使用有线网络
+\end{itemize}
+
+\subsection{远程开发（通过 SSH 隧道）}
+
+如果开发机不在局域网内，可通过 SSH 隧道连接：
+
+\begin{lstlisting}[style=bash]
+# 在有局域网访问的跳板机上建立隧道
+ssh -L 13145:192.168.66.190:13145 sunrise@192.168.66.190
+
+# 然后 SDK 连接 localhost
+dog = ThunderClient("127.0.0.1", port=13145)
+\end{lstlisting}
+
+\section{提交 Bug 报告}
+
+遇到无法自行解决的问题时，请按以下格式提交 Bug 报告。
+
+\subsection{必要信息}
+
+\begin{lstlisting}[style=plain,numbers=none]
+1. SDK 版本:
+   python -c "import brainstem_sdk; print(brainstem_sdk.__version__)"
+
+2. Python 版本:
+   python --version
+
+3. 操作系统:
+   (例: Ubuntu 22.04 / Windows 11 / macOS 14)
+
+4. 机器人固件版本:
+   (SSH 登录后查看 brainstem 版本)
+
+5. 问题描述:
+   (清晰描述预期行为和实际行为)
+
+6. 复现步骤:
+   (从连接开始，逐步列出操作)
+
+7. 错误信息:
+   (完整的异常堆栈或错误输出)
+
+8. 机器人日志:
+   (SSH 登录，提供 logs/han_dog_YYYYMMDD.log 中相关片段)
+\end{lstlisting}
+
+\subsection{收集诊断信息的脚本}
+
+\begin{lstlisting}[style=python]
+"""诊断信息收集脚本。将输出复制到 Bug 报告中。"""
+
+import sys
+import platform
+import grpc
+
+try:
+    import brainstem_sdk
+    sdk_ver = brainstem_sdk.__version__
+except Exception as e:
+    sdk_ver = f"导入失败: {e}"
+
+print("=" * 50)
+print("Thunder SDK 诊断信息")
+print("=" * 50)
+print(f"SDK 版本:    {sdk_ver}")
+print(f"Python:      {sys.version}")
+print(f"平台:        {platform.platform()}")
+print(f"grpc 版本:   {grpc.__version__}")
+print()
+
+host = input("机器人 IP (默认 192.168.66.190): ").strip() or "192.168.66.190"
+
+try:
+    from brainstem_sdk import ThunderClient
+    dog = ThunderClient(host, timeout=5.0)
+
+    # 状态
+    state = dog.get_state()
+    print(f"连接:        成功")
+    print(f"机器人状态:  {state}")
+
+    # 电压
+    voltages = dog.get_voltage()
+    print(f"电压范围:    {min(voltages):.1f}V ~ {max(voltages):.1f}V")
+
+    # 电机
+    motors = dog.get_motor_status()
+    online_count = sum(1 for m in motors if m.online)
+    fault_count = sum(1 for m in motors if m.errors)
+    max_temp = max(m.temperature for m in motors)
+    print(f"电机在线:    {online_count}/16")
+    print(f"电机故障:    {fault_count}/16")
+    print(f"最高温度:    {max_temp:.0f}C")
+
+    # 故障详情
+    for m in motors:
+        if m.errors or not m.online:
+            print(f"  Joint {m.id}: online={m.online} errors={m.errors} "
+                  f"temp={m.temperature:.0f}C voltage={m.voltage:.1f}V")
+
+    # 策略
+    profile = dog.get_profile()
+    print(f"当前策略:    {profile.current}")
+    print(f"可用策略:    {profile.available}")
+
+    dog.close()
+
+except grpc.RpcError as e:
+    print(f"连接:        失败")
+    print(f"错误码:      {e.code()}")
+    print(f"详情:        {e.details()}")
+except Exception as e:
+    print(f"异常:        {type(e).__name__}: {e}")
+
+print()
+print("=" * 50)
+print("请将以上输出复制到 Bug 报告中。")
+\end{lstlisting}
+
+\subsection{日志收集}
+
+\begin{lstlisting}[style=bash]
+# SSH 登录机器人
+ssh sunrise@192.168.66.190
+
+# 查看今天的日志
+cat logs/han_dog_$(date +%Y%m%d).log
+
+# 只看错误和警告
+grep -E "WARNING|SEVERE" logs/han_dog_$(date +%Y%m%d).log
+
+# 查看最近 100 行
+tail -100 logs/han_dog_$(date +%Y%m%d).log
+
+# 导出日志到本地（在开发机上执行）
+scp sunrise@192.168.66.190:logs/han_dog_*.log ./thunder_logs/
+\end{lstlisting}
+
+\subsection{联系方式}
+
+\begin{itemize}[nosep]
+  \item GitHub Issues：在 brainstem 仓库提交 Issue
+  \item 附上诊断脚本输出和相关日志
+\end{itemize}
+
+\section*{附录：快速排障速查表}
+
+{\small
+\begin{longtable}{llll}
+\toprule
+症状 & 首先检查 & 可能原因 & 解决方案 \\
+\midrule
+\endhead
+连接超时 & \texttt{ping} 机器人 & 网络不通 & 检查网线/Wi-Fi/IP \\
+连接被拒 & brainstem 服务状态 & 服务未启动 & \texttt{systemctl start brainstem} \\
+enable() 无效 & \texttt{get\_motor\_status()} & 电机离线/有故障 & 检查 CAN 线，清除故障 \\
+walk() 无效 & \texttt{get\_state()} & 不在 Standing & 先 \texttt{stand\_up()} \\
+walk() 被忽略 & 遥控器状态 & Arbiter 被占用 & 松开遥控器，等 3 秒 \\
+突然坐下 & \texttt{get\_voltage()} & 低压保护 ($<$ 42V) & 充电 \\
+突然摔倒 & 电机温度 & 过热/关节超限 & 冷却 / 重新标零 \\
+策略切换失败 & \texttt{get\_state()} & 不在 Grounded & 先 \texttt{sit\_down()} \\
+IMU 数据异常 & 四元数约定 & Hamilton vs ROS & 调整字段顺序 \\
+数据流中断 & 网络连接 & gRPC 通道断开 & 重建 ThunderClient \\
+多客户端冲突 & 客户端数量 & 多 SDK 实例 & 保证单客户端 \\
+\bottomrule
+\end{longtable}
+}
+
+% ============================================================
+%  文档结束
+% ============================================================
+
+\end{document}
