@@ -64,3 +64,6 @@ sim/robot/meshes/
 sim/legacy/
 model/
 sim/model/
+
+# Python build artifacts
+*.egg-info/
