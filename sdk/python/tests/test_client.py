@@ -7,7 +7,8 @@ No real robot needed.
 import threading
 import time
 from concurrent import futures
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import grpc
 import pytest
@@ -254,3 +255,88 @@ class TestContextManager:
         with ThunderClient("localhost", port=port) as dog:
             state = dog.get_state()
             assert state in RobotState._MAP.values()
+
+
+class TestConnectionFailure:
+    def test_connect_bad_port(self):
+        """Connecting to a port with no server should fail on ping."""
+        client = ThunderClient("localhost", port=1, timeout=1.0)
+        try:
+            assert client.ping() is False
+        finally:
+            client.close()
+
+    def test_with_statement_bad_port(self):
+        """Using 'with' on a dead target should raise ConnectionError."""
+        from brainstem_sdk.client import ConnectionError as OrixConnectionError
+
+        with pytest.raises(OrixConnectionError):
+            with ThunderClient("localhost", port=1, timeout=1.0) as dog:
+                pass
+
+
+class TestSpeedMode:
+    """Test speed-mode RPCs via stub-level mocking.
+
+    SetSpeedMode / GetSpeedMode are not yet in the proto definition,
+    so we patch them directly on the stub.
+    """
+
+    def test_set_high_speed(self, dog):
+        mock_set = MagicMock(return_value=Empty())
+        with patch.object(dog._stub, "SetSpeedMode", mock_set, create=True):
+            dog.set_high_speed(True)
+        mock_set.assert_called_once()
+        req = mock_set.call_args[0][0]
+        assert req.mode == 1
+
+    def test_set_normal_speed(self, dog):
+        mock_set = MagicMock(return_value=Empty())
+        with patch.object(dog._stub, "SetSpeedMode", mock_set, create=True):
+            dog.set_high_speed(False)
+        req = mock_set.call_args[0][0]
+        assert req.mode == 0
+
+    def test_get_speed_mode_normal(self, dog):
+        mock_get = MagicMock(return_value=SimpleNamespace(mode=0))
+        with patch.object(dog._stub, "GetSpeedMode", mock_get, create=True):
+            assert dog.get_speed_mode() == "normal"
+
+    def test_get_speed_mode_high(self, dog):
+        mock_get = MagicMock(return_value=SimpleNamespace(mode=1))
+        with patch.object(dog._stub, "GetSpeedMode", mock_get, create=True):
+            assert dog.get_speed_mode() == "high_speed"
+
+
+class TestGestures:
+    """Test gesture RPCs via stub-level mocking.
+
+    ListGestures / PlayGesture are not yet in the proto definition,
+    so we patch them directly on the stub.
+    """
+
+    def test_list_gestures(self, dog):
+        fake_resp = SimpleNamespace(gestures=[
+            SimpleNamespace(name="bow", description="Bow", duration_ms=3000),
+            SimpleNamespace(name="dance", description="Dance", duration_ms=5000),
+        ])
+        mock_list = MagicMock(return_value=fake_resp)
+        with patch.object(dog._stub, "ListGestures", mock_list, create=True):
+            gestures = dog.list_gestures()
+        assert len(gestures) == 2
+        assert gestures[0].name == "bow"
+        assert gestures[1].name == "dance"
+        assert gestures[0].duration_ms == 3000
+
+    def test_play_gesture(self, dog):
+        mock_play = MagicMock(return_value=Empty())
+        with patch.object(dog._stub, "PlayGesture", mock_play, create=True):
+            dog.play_gesture("bow")
+        mock_play.assert_called_once()
+        req = mock_play.call_args[0][0]
+        assert req.name == "bow"
+
+
+class TestPing:
+    def test_ping_returns_true(self, dog):
+        assert dog.ping() is True

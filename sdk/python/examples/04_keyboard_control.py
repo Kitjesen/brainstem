@@ -1,3 +1,4 @@
+# NOTE: This example requires Linux/macOS (uses termios/tty)
 """键盘控制：WASD 操控机器人行走。
 
 W/S = 前进/后退

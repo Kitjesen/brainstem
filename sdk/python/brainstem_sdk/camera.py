@@ -21,10 +21,18 @@ import io
 import logging
 import threading
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from typing import Optional, Tuple, Union
 
 logger = logging.getLogger("brainstem_sdk.camera")
+
+
+# ── Exceptions ─────────────────────────────────────────────
+
+
+class CameraOpenError(Exception):
+    """Raised when the camera fails to open (device missing, busy, etc.)."""
+
 
 # ── OpenCV 延迟导入 ─────────────────────────────────────────
 
@@ -124,7 +132,11 @@ class OrixCamera:
         """打开摄像头。
 
         Returns:
-            是否成功打开。
+            True if already open or successfully opened.
+
+        Raises:
+            CameraOpenError: If the camera cannot be opened (device missing,
+                busy, or invalid source).
         """
         _ensure_cv2()
         if self._cap is not None and self._cap.isOpened():
@@ -135,7 +147,10 @@ class OrixCamera:
         if not self._cap.isOpened():
             logger.error("无法打开摄像头: source=%s", self._source)
             self._cap = None
-            return False
+            raise CameraOpenError(
+                f"Failed to open camera source={self._source}. "
+                "Check that the device exists and is not in use."
+            )
 
         # 仅对 USB 设备设置分辨率和帧率
         if isinstance(self._source, int):
@@ -338,7 +353,7 @@ class OrixCamera:
 
     # ── MJPEG 流服务器 ──────────────────────────────────────
 
-    def stream_mjpeg(self, port: int = 8080):
+    def stream_mjpeg(self, port: int = 8080, host: str = "0.0.0.0"):
         """启动 MJPEG HTTP 流服务器，供远程浏览器查看摄像头画面。
 
         在后台线程运行，不阻塞调用者。浏览器访问
@@ -346,28 +361,20 @@ class OrixCamera:
 
         Args:
             port: HTTP 服务端口 (默认 8080)。
+            host: 绑定地址 (默认 ``"0.0.0.0"``)。
 
         Raises:
             RuntimeError: 摄像头未打开或流服务器已在运行。
+            OSError: 端口被占用。
         """
         if not self.is_opened():
             raise RuntimeError("摄像头未打开，请先调用 open()")
         if self._stream_running:
             raise RuntimeError("MJPEG 流服务器已在运行")
 
-        self._stream_running = True
-
-        # 启动帧采集线程
-        capture_thread = threading.Thread(
-            target=self._stream_capture_loop,
-            daemon=True,
-            name="orix-camera-stream-capture",
-        )
-        capture_thread.start()
-
         # 创建 HTTP 服务器
         camera_ref = self
-        server_address = ("0.0.0.0", port)
+        server_address = (host, port)
 
         class MJPEGHandler(BaseHTTPRequestHandler):
             """处理 MJPEG 流请求的 HTTP handler。"""
@@ -437,7 +444,21 @@ class OrixCamera:
                 # 降低日志噪音
                 logger.debug("MJPEG HTTP: %s", format % args)
 
-        self._stream_server = HTTPServer(server_address, MJPEGHandler)
+        # Create the server FIRST — if the port is busy this raises OSError
+        # before we start any threads or set _stream_running.
+        self._stream_server = ThreadingHTTPServer(server_address, MJPEGHandler)
+
+        # Server created successfully; NOW mark running and start threads.
+        self._stream_running = True
+
+        # 启动帧采集线程
+        capture_thread = threading.Thread(
+            target=self._stream_capture_loop,
+            daemon=True,
+            name="orix-camera-stream-capture",
+        )
+        capture_thread.start()
+
         self._stream_thread = threading.Thread(
             target=self._stream_server.serve_forever,
             daemon=True,
@@ -446,9 +467,9 @@ class OrixCamera:
         self._stream_thread.start()
 
         logger.info(
-            "MJPEG 流服务器已启动: http://0.0.0.0:%d/ "
+            "MJPEG 流服务器已启动: http://%s:%d/ "
             "(浏览器访问 /stream 查看实时画面, /snapshot 查看快照)",
-            port,
+            host, port,
         )
 
     def _stream_capture_loop(self):

@@ -9,6 +9,12 @@ cd sdk/python
 pip install -e .
 ```
 
+摄像头功能需要额外安装 opencv-python:
+
+```bash
+pip install -e ".[camera]"
+```
+
 ## 快速开始
 
 ```python
@@ -40,6 +46,10 @@ dog = ThunderClient("10.0.0.1", port=13145, timeout=5.0)
 # 支持 with 语句
 with ThunderClient("192.168.66.190") as dog:
     dog.stand_up()
+
+# 检查连接
+if dog.ping():
+    print("机器人在线")
 ```
 
 ### 运动控制
@@ -57,6 +67,55 @@ with ThunderClient("192.168.66.190") as dog:
 - `vy > 0` = 向左, `vy < 0` = 向右
 - `vyaw > 0` = 逆时针, `vyaw < 0` = 顺时针
 - `dog.walk()` (无参数) = 原地停步
+
+### 速度模式
+
+```python
+# 开启高速模式 (最高 2.5m/s，仅在开阔平坦场地使用)
+dog.set_high_speed(True)
+
+# 查询当前速度模式
+mode = dog.get_speed_mode()  # "normal" 或 "high_speed"
+
+# 关闭高速模式
+dog.set_high_speed(False)
+```
+
+### 动作系统 (Gesture)
+
+```python
+# 列出所有预设动作
+gestures = dog.list_gestures()
+for g in gestures:
+    print(f"{g.name}: {g.description} ({g.duration_ms}ms)")
+
+# 播放动作 (机器人必须在 Standing 状态)
+dog.play_gesture("bow")    # 鞠躬
+dog.play_gesture("dance")  # 跳舞
+```
+
+### 摄像头 (OrixCamera)
+
+需要安装 `pip install brainstem-sdk[camera]`。
+
+```python
+from brainstem_sdk import OrixCamera
+
+# 上下文管理器 (推荐)
+with OrixCamera() as cam:
+    frame = cam.read()           # 读取一帧 (numpy BGR)
+    cam.save_photo("photo.jpg")  # 拍照
+
+# 远程 RTSP 流
+cam = OrixCamera(source="rtsp://192.168.66.190:8554/cam")
+
+# 启动 MJPEG 流服务器 (浏览器访问 http://<ip>:8080/)
+cam.open()
+cam.stream_mjpeg(port=8080)
+
+# 录像
+cam.start_recording("output.mp4", duration=10)
+```
 
 ### 状态查询
 
@@ -155,7 +214,12 @@ for state in dog.listen_state():
 | `examples/01_hello_walk.py` | 最简走路示例 |
 | `examples/02_read_imu.py` | 读取 IMU 数据流 |
 | `examples/03_motor_diagnostics.py` | 电机诊断 |
-| `examples/04_keyboard_control.py` | WASD 键盘控制 |
+| `examples/04_keyboard_control.py` | WASD 键盘控制 (Linux/macOS) |
+| `examples/05_gestures.py` | 预设动作演示 |
+| `examples/06_motor_control.py` | 电机操作全流程 |
+| `examples/07_camera_basic.py` | 摄像头基础用法 |
+| `examples/08_camera_record.py` | 摄像头录像 |
+| `examples/09_camera_stream.py` | MJPEG 流服务器 |
 
 ## 网络要求
 

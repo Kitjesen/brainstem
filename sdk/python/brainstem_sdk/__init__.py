@@ -19,31 +19,51 @@ Quick start::
 
 from brainstem_sdk.client import (
     ThunderClient,
+    OrixClient,
     ImuData,
     JointData,
     MotorInfo,
     ProfileInfo,
+    GestureInfo,
     RobotState,
     Vec3,
     Quat,
+    OrixError,
+    ConnectionError as OrixConnectionError,
+    InvalidStateError,
+    TimeoutError as OrixTimeoutError,
 )
 
 # 摄像头模块延迟导入 — opencv-python 是可选依赖
 try:
-    from brainstem_sdk.camera import OrixCamera
+    from brainstem_sdk.camera import OrixCamera, CameraOpenError
 except ImportError:
-    OrixCamera = None  # type: ignore[assignment,misc]
+    class OrixCamera:  # type: ignore[no-redef]
+        """Stub: opencv-python not installed."""
+        def __init__(self, *args, **kwargs):
+            raise ImportError(
+                "OrixCamera requires opencv-python. "
+                "Install with: pip install brainstem-sdk[camera]"
+            )
+    CameraOpenError = None  # type: ignore[assignment,misc]
 
 __version__ = "1.0.0"
 
 __all__ = [
     "ThunderClient",
+    "OrixClient",
     "ImuData",
     "JointData",
     "MotorInfo",
     "ProfileInfo",
+    "GestureInfo",
     "RobotState",
     "Vec3",
     "Quat",
+    "OrixError",
+    "OrixConnectionError",
+    "InvalidStateError",
+    "OrixTimeoutError",
     "OrixCamera",
+    "CameraOpenError",
 ]

@@ -15,7 +15,35 @@ from typing import Iterator
 import grpc
 from google.protobuf.empty_pb2 import Empty
 
+from types import SimpleNamespace
+
 from brainstem_sdk._proto import cms_pb2, cms_pb2_grpc, common_pb2
+
+
+def _proto_or_ns(module, cls_name, **kwargs):
+    """Use proto message if available, else SimpleNamespace (for new RPCs pending protoc)."""
+    cls = getattr(module, cls_name, None)
+    if cls is not None:
+        return cls(**kwargs)
+    return SimpleNamespace(**kwargs)
+
+
+# ── SDK exceptions ─────────────────────────────────────────
+
+class OrixError(Exception):
+    """Base exception for ORIX SDK."""
+
+
+class ConnectionError(OrixError):
+    """Failed to connect to the robot."""
+
+
+class InvalidStateError(OrixError):
+    """Robot is in wrong state for the requested operation."""
+
+
+class TimeoutError(OrixError):
+    """Operation timed out."""
 
 
 # ── Data types ──────────────────────────────────────────────
@@ -64,6 +92,12 @@ class ProfileInfo:
     available: list[str] = field(default_factory=list)
     descriptions: list[str] = field(default_factory=list)
 
+@dataclass
+class GestureInfo:
+    name: str = ""
+    description: str = ""
+    duration_ms: int = 0
+
 
 # ── State enum ──────────────────────────────────────────────
 
@@ -107,6 +141,10 @@ class ThunderClient:
         dog.disable()
     """
 
+    # Speed-mode proto enum values (SpeedMode in cms.proto)
+    SPEED_MODE_NORMAL = 0
+    SPEED_MODE_HIGH = 1
+
     def __init__(
         self,
         host: str = "192.168.66.190",
@@ -123,20 +161,56 @@ class ThunderClient:
         self._channel.close()
 
     def __enter__(self):
+        if not self.ping():
+            raise ConnectionError(f"Cannot connect to robot at {self._target}")
         return self
 
     def __exit__(self, *args):
         self.close()
 
+    # ── gRPC call wrapper ───────────────────────────────────
+
+    def _call(self, method, request, timeout=None):
+        """Call a gRPC method with friendly error mapping."""
+        try:
+            return method(request, timeout=timeout or self._timeout)
+        except grpc.RpcError as e:
+            code = e.code()
+            details = e.details() or str(e)
+            if code == grpc.StatusCode.UNAVAILABLE:
+                raise ConnectionError(
+                    f"Cannot connect to robot at {self._target}: {details}"
+                ) from e
+            elif code == grpc.StatusCode.DEADLINE_EXCEEDED:
+                raise TimeoutError(
+                    f"Operation timed out: {details}"
+                ) from e
+            elif code == grpc.StatusCode.FAILED_PRECONDITION:
+                raise InvalidStateError(
+                    f"Robot in wrong state: {details}"
+                ) from e
+            else:
+                raise OrixError(f"gRPC error [{code}]: {details}") from e
+
+    # ── Connection check ────────────────────────────────────
+
+    def ping(self) -> bool:
+        """Check if the robot is reachable. Returns True if connected."""
+        try:
+            self._call(self._stub.GetCmsState, Empty(), timeout=2.0)
+            return True
+        except OrixError:
+            return False
+
     # ── Motor control ───────────────────────────────────────
 
     def enable(self):
         """Enable all motors."""
-        self._stub.Enable(Empty(), timeout=self._timeout)
+        self._call(self._stub.Enable, Empty())
 
     def disable(self):
         """Disable all motors (safe stop)."""
-        self._stub.Disable(Empty(), timeout=self._timeout)
+        self._call(self._stub.Disable, Empty())
 
     # ── Motion commands ─────────────────────────────────────
 
@@ -148,16 +222,19 @@ class ThunderClient:
             vy: Left/right speed [-1, 1]. Positive = left.
             vyaw: Rotation speed [-1, 1]. Positive = counter-clockwise.
         """
+        vx = max(-1.0, min(1.0, vx))
+        vy = max(-1.0, min(1.0, vy))
+        vyaw = max(-1.0, min(1.0, vyaw))
         cmd = common_pb2.Vector3(x=vx, y=vy, z=vyaw)
-        self._stub.Walk(cmd, timeout=self._timeout)
+        self._call(self._stub.Walk, cmd)
 
     def stand_up(self):
         """Transition from sitting to standing."""
-        self._stub.StandUp(Empty(), timeout=self._timeout)
+        self._call(self._stub.StandUp, Empty())
 
     def sit_down(self):
         """Transition from standing to sitting."""
-        self._stub.SitDown(Empty(), timeout=self._timeout)
+        self._call(self._stub.SitDown, Empty())
 
     # ── State query ─────────────────────────────────────────
 
@@ -167,17 +244,17 @@ class ThunderClient:
         Returns:
             One of: "zero", "grounded", "standing", "walking", "transitioning".
         """
-        resp = self._stub.GetCmsState(Empty(), timeout=self._timeout)
+        resp = self._call(self._stub.GetCmsState, Empty())
         return RobotState.from_proto(resp.kind)
 
     def get_voltage(self) -> list[float]:
         """Read bus voltage of all 16 motors (V)."""
-        resp = self._stub.GetVoltage(Empty(), timeout=self._timeout)
+        resp = self._call(self._stub.GetVoltage, Empty())
         return list(resp.values)
 
     def get_motor_status(self) -> list[MotorInfo]:
         """Get health status of all 16 motors."""
-        resp = self._stub.GetMotorStatus(Empty(), timeout=self._timeout)
+        resp = self._call(self._stub.GetMotorStatus, Empty())
         return [
             MotorInfo(
                 id=m.id,
@@ -196,7 +273,7 @@ class ThunderClient:
 
     def get_profile(self) -> ProfileInfo:
         """Get current profile info and available profiles."""
-        resp = self._stub.GetProfile(Empty(), timeout=self._timeout)
+        resp = self._call(self._stub.GetProfile, Empty())
         return ProfileInfo(
             current=resp.current,
             available=list(resp.available),
@@ -210,7 +287,7 @@ class ThunderClient:
             name: Profile name (see get_profile().available).
         """
         req = cms_pb2.ProfileRequest(name=name)
-        resp = self._stub.SwitchProfile(req, timeout=self._timeout)
+        resp = self._call(self._stub.SwitchProfile, req)
         return ProfileInfo(
             current=resp.current,
             available=list(resp.available),
@@ -235,9 +312,9 @@ class ThunderClient:
             dog.walk(vx=1.0)           # full speed forward
             dog.set_high_speed(False)  # back to normal
         """
-        mode = 1 if enabled else 0  # SPEED_MODE_HIGH=1, SPEED_MODE_NORMAL=0
-        req = cms_pb2.SpeedModeRequest(mode=mode)
-        self._stub.SetSpeedMode(req, timeout=self._timeout)
+        mode = self.SPEED_MODE_HIGH if enabled else self.SPEED_MODE_NORMAL
+        req = _proto_or_ns(cms_pb2, 'SpeedModeRequest', mode=mode)
+        self._call(self._stub.SetSpeedMode, req)
 
     def get_speed_mode(self) -> str:
         """Get current speed mode.
@@ -245,34 +322,34 @@ class ThunderClient:
         Returns:
             "normal" or "high_speed".
         """
-        resp = self._stub.GetSpeedMode(Empty(), timeout=self._timeout)
-        return "high_speed" if resp.mode == 1 else "normal"
+        resp = self._call(self._stub.GetSpeedMode, Empty())
+        return "high_speed" if resp.mode == self.SPEED_MODE_HIGH else "normal"
 
     # ── Gesture (动作系统) ───────────────────────────────
 
-    def list_gestures(self) -> list[dict]:
+    def list_gestures(self) -> list[GestureInfo]:
         """List all available preset gestures.
 
         Returns:
-            List of dicts with keys: name, description, duration_ms.
+            List of GestureInfo with name, description, duration_ms.
 
         Example::
 
             gestures = dog.list_gestures()
             for g in gestures:
-                print(f"{g['name']}: {g['description']} ({g['duration_ms']}ms)")
+                print(f"{g.name}: {g.description} ({g.duration_ms}ms)")
         """
-        resp = self._stub.ListGestures(Empty(), timeout=self._timeout)
+        resp = self._call(self._stub.ListGestures, Empty())
         return [
-            {
-                "name": g.name,
-                "description": g.description,
-                "duration_ms": g.duration_ms,
-            }
+            GestureInfo(
+                name=g.name,
+                description=g.description,
+                duration_ms=g.duration_ms,
+            )
             for g in resp.gestures
         ]
 
-    def play_gesture(self, name: str):
+    def play_gesture(self, name: str, timeout: float = 30.0):
         """Play a preset gesture. Robot must be standing.
 
         Available gestures: bow (鞠躬), nod (点头), wiggle (扭动),
@@ -280,6 +357,7 @@ class ThunderClient:
 
         Args:
             name: Gesture name (see list_gestures()).
+            timeout: Maximum wait time in seconds (default 30.0).
 
         Example::
 
@@ -287,8 +365,8 @@ class ThunderClient:
             dog.play_gesture("bow")    # 鞠躬
             dog.play_gesture("dance")  # 跳舞
         """
-        req = cms_pb2.GestureRequest(name=name)
-        self._stub.PlayGesture(req, timeout=30.0)  # gestures can take long
+        req = _proto_or_ns(cms_pb2, 'GestureRequest', name=name)
+        self._call(self._stub.PlayGesture, req, timeout=timeout)
 
     # ── Diagnostics ─────────────────────────────────────────
 
@@ -299,11 +377,11 @@ class ThunderClient:
             joint_ids: Joint indices (0-15) to clear. None = clear all.
         """
         req = cms_pb2.ClearFaultRequest(joint_ids=joint_ids or [])
-        self._stub.ClearMotorFault(req, timeout=self._timeout)
+        self._call(self._stub.ClearMotorFault, req)
 
     def set_zero(self):
         """Calibrate current position as zero. Robot must be grounded."""
-        self._stub.SetZero(Empty(), timeout=self._timeout)
+        self._call(self._stub.SetZero, Empty())
 
     # ── Streaming (real-time data) ──────────────────────────
 
