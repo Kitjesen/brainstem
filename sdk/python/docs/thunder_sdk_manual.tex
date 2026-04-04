@@ -274,41 +274,17 @@ v1.0.0 & 2026-04 & 大算机器人 & 正式发布 \\
 % ============================================================
 \chapter*{前言}
 \addcontentsline{toc}{chapter}{前言}
+\thispagestyle{fancy}
 
-\section*{教育机器人的时代背景}
+近年来，国家高度重视人工智能与机器人教育。《新一代人工智能发展规划》明确要求在各级院校开设人工智能课程，教育部《人工智能教育基地建设指南》进一步推动了 AI+机器人实验室的普及。四足机器人作为融合机械工程、电子控制、传感器技术、强化学习和嵌入式系统的综合平台，正在成为 STEM 教育和高校科研的理想载体。
 
-近年来，国家高度重视人工智能与机器人教育的发展。《新一代人工智能发展规划》明确提出在中小学和高等院校开设人工智能相关课程，《教育部关于加强和改进中小学实验教学的意见》强调动手实践和工程思维的培养。2024 年教育部印发的《人工智能教育基地建设指南》进一步推动了 AI+机器人实验室在全国高校和中学的普及。
+ORIX 教育版四足机器狗是大算机器人面向教育场景推出的专业级开发平台。设计理念：\textbf{学以致用}（可编程、调参、训练策略的真实机器人）、\textbf{降低门槛}（3 行 Python 代码控制行走）、\textbf{不设天花板}（覆盖本科到研究生的完整学习路径）、\textbf{工业级可靠}（与工业机器人相同的控制架构和安全机制）。
 
-在这一背景下，四足机器人作为融合了机械工程、电子控制、传感器技术、强化学习和嵌入式系统的综合平台，正在成为 STEM 教育和高校科研的理想载体。它不仅能让学生直观理解运动学和动力学原理，还能作为强化学习、计算机视觉和自主导航等前沿技术的实验平台。
-
-\section*{ORIX 教育版的定位}
-
-ORIX 教育版四足机器狗是大算机器人面向教育场景推出的专业级机器人开发平台。它的设计理念是：
-
-\begin{itemize}
-  \item \textbf{学以致用} --- 不是观摩演示的展品，而是可以编程、调参、训练策略的真实机器人
-  \item \textbf{降低门槛} --- 3 行 Python 代码即可控制机器人行走，无需了解底层通信协议和控制理论
-  \item \textbf{不设天花板} --- 从入门行走到自定义 RL 策略训练、多传感器融合、自主导航，一个平台覆盖从本科到研究生的完整学习路径
-  \item \textbf{工业级可靠} --- 采用与工业机器人相同的控制架构和安全机制，学生接触的是真实的工程实践，而非简化的教学模型
-\end{itemize}
-
-\section*{本手册的目标}
-
-本手册为 ORIX Python SDK 的完整开发指南，面向以下读者：
-
-\begin{itemize}
-  \item \textbf{高校教师}：了解平台能力，设计课程实验方案
-  \item \textbf{学生开发者}：从零开始学习机器人编程，完成课程项目
-  \item \textbf{科研人员}：利用 SDK 的传感器接口和控制 API 进行算法验证
-  \item \textbf{竞赛团队}：快速搭建机器人应用原型，参加 RoboCup、全国机器人大赛等赛事
-\end{itemize}
-
-手册覆盖从安装配置到高级开发的完整流程。建议首次使用时按顺序阅读前三章（概述、快速开始、硬件概览），后续章节可按需查阅。
+本手册面向高校教师（课程实验设计）、学生开发者（从零上手）、科研人员（算法验证）和竞赛团队（快速原型）。建议首次使用按顺序阅读前三章，后续章节按需查阅。
 
 \vspace{1em}
 \begin{flushright}
-\textit{大算机器人技术团队}\\
-\textit{2026 年 4 月}
+\textit{大算机器人技术团队\quad 2026 年 4 月}
 \end{flushright}
 
 \newpage
@@ -811,7 +787,314 @@ grpc._channel._InactiveRpcError: ... transition in progress
 
 状态机正在过渡中（如站起/坐下动画），请等待过渡完成后再发送新指令。
 % ============================================================
-%  第 3 章：坐标系与关节
+%  第 3 章：理论基础
+% ============================================================
+\chapter{理论基础}
+\label{ch:theory}
+
+\chapterguide
+{本章介绍 ORIX 机器狗控制系统涉及的核心理论，包括 PD 控制、强化学习策略、姿态表示和状态机形式化定义。理解这些理论有助于更好地使用 SDK 进行二次开发和算法研究。}
+{如果您只需要快速上手控制机器狗，可以跳过本章，直接阅读 API 参考章节。}
+
+% ------------------------------------------------------------
+\section{PD 位置控制}
+\label{sec:pd-control}
+
+四足机器人的每个关节电机均采用 PD（比例--微分）位置控制器。PD 控制器根据
+目标位置与当前位置的偏差，以及目标速度与当前速度的偏差，计算驱动关节所需的力矩。
+
+其基本控制律为：
+
+\begin{equation}
+\label{eq:pd-control}
+\tau = K_p \left( q_{\mathrm{target}} - q_{\mathrm{current}} \right)
+     + K_d \left( \dot{q}_{\mathrm{target}} - \dot{q}_{\mathrm{current}} \right)
+\end{equation}
+
+其中：
+\begin{itemize}[nosep]
+  \item $\tau$ —— 关节输出力矩（N$\cdot$m）
+  \item $K_p$ —— 比例增益（位置刚度），单位 N$\cdot$m/rad
+  \item $K_d$ —— 微分增益（速度阻尼），单位 N$\cdot$m$\cdot$s/rad
+  \item $q_{\mathrm{target}}$, $q_{\mathrm{current}}$ —— 目标与当前关节角度（rad）
+  \item $\dot{q}_{\mathrm{target}}$, $\dot{q}_{\mathrm{current}}$ —— 目标与当前关节角速度（rad/s）
+\end{itemize}
+
+\subsection{物理意义}
+
+$K_p$ 决定了关节的\textbf{刚度}：$K_p$ 越大，关节对位置偏差的响应越强，
+如同弹簧越硬。$K_d$ 决定了关节的\textbf{阻尼}：$K_d$ 越大，关节运动越平滑，
+振荡越少，如同液压阻尼器。
+
+\subsection{稳定性条件}
+
+PD 控制器稳定的必要条件为：
+
+\begin{equation}
+K_p > 0, \quad K_d > 0
+\end{equation}
+
+\subsection{阻尼比分析}
+
+将单关节建模为二阶系统 $I\ddot{q} + K_d\dot{q} + K_p q = 0$（$I$ 为关节转动惯量），
+可定义阻尼比 $\zeta$ 和固有频率 $\omega_n$：
+
+\begin{align}
+\omega_n &= \sqrt{\frac{K_p}{I}} \\
+\zeta    &= \frac{K_d}{2\sqrt{I \cdot K_p}}
+\end{align}
+
+不同阻尼比对应不同的动态行为：
+
+\begin{itemize}[nosep]
+  \item $\zeta < 1$（\textbf{欠阻尼}）：关节到达目标位置时会出现振荡，适用于需要快速响应的场景，但可能引起机械抖动。
+  \item $\zeta = 1$（\textbf{临界阻尼}）：关节以最快速度到达目标位置且不超调。这是理论上最优的阻尼比。
+  \item $\zeta > 1$（\textbf{过阻尼}）：关节缓慢趋近目标位置，无超调但响应速度慢。
+\end{itemize}
+
+在实际机器人中，通常选取略欠阻尼（$\zeta \approx 0.7 \sim 0.9$）的参数，
+以兼顾响应速度和稳定性。
+
+% ------------------------------------------------------------
+\section{强化学习运动控制}
+\label{sec:rl-locomotion}
+
+ORIX 采用基于强化学习（Reinforcement Learning, RL）的方法训练四足步态策略。
+策略网络在高保真物理仿真器（Isaac Lab）中通过数百万次交互学习，然后直接部署到
+真实机器人上（Sim-to-Real）。
+
+\subsection{策略网络}
+
+策略网络 $\pi$ 是一个将观测映射到动作的神经网络：
+
+\begin{equation}
+\mathbf{a}_t = \pi(\mathbf{o}_t)
+\end{equation}
+
+其中 $\mathbf{o}_t$ 为 $t$ 时刻的观测向量，$\mathbf{a}_t$ 为输出动作。
+
+\subsection{观测空间}
+
+单帧观测向量维度为 57，概念上由以下部分组成：
+
+\begin{equation}
+\mathbf{o} = \begin{bmatrix}
+  \boldsymbol{\omega} \\ \mathbf{g}_{\mathrm{proj}} \\ \mathbf{c}_{\mathrm{cmd}} \\
+  \mathbf{q}_{\mathrm{pos}} \\ \dot{\mathbf{q}} \\ \mathbf{a}_{\mathrm{prev}} \\
+  \mathbf{b}_{\mathrm{contact}}
+\end{bmatrix}
+\in \mathbb{R}^{57}
+\end{equation}
+
+各分量含义如下：
+
+\begin{longtable}{llp{7.5cm}}
+\toprule
+分量 & 维度 & 说明 \\
+\midrule
+$\boldsymbol{\omega}$ & 3 & 陀螺仪角速度（机体坐标系） \\
+$\mathbf{g}_{\mathrm{proj}}$ & 3 & 投影重力向量（见~\ref{sec:attitude}~节） \\
+$\mathbf{c}_{\mathrm{cmd}}$ & 3 & 速度指令 $(v_x, v_y, \omega_z)$ \\
+$\mathbf{q}_{\mathrm{pos}}$ & 12 & 关节位置（12 腿关节，rad） \\
+$\dot{\mathbf{q}}$ & 12 & 关节速度（rad/s） \\
+$\mathbf{a}_{\mathrm{prev}}$ & 12 & 上一时刻动作输出 \\
+$\mathbf{b}_{\mathrm{contact}}$ & 12 & 足端接触布尔量 \\
+\bottomrule
+\end{longtable}
+
+\textbf{注意：}以上为概念性分解，实际观测向量的精确组成可能因策略版本不同而略有差异。
+
+\subsection{历史帧堆叠}
+
+为了让策略感知时序动态信息，通常将连续 $H$ 帧观测堆叠为一个输入：
+
+\begin{equation}
+\mathbf{O}_t = \begin{bmatrix}
+  \mathbf{o}_t & \mathbf{o}_{t-1} & \cdots & \mathbf{o}_{t-H+1}
+\end{bmatrix}
+\in \mathbb{R}^{57 \times H}
+\end{equation}
+
+典型值 $H = 5$，因此策略网络的实际输入维度为 $57 \times 5 = 285$。
+
+\subsection{动作空间与缩放}
+
+策略网络输出 12 个腿关节的位置增量（另有 4 个脚轮关节由独立逻辑控制）。
+原始网络输出 $\mathbf{a} \in [-1, 1]^{12}$ 经缩放后变为目标关节角度：
+
+\begin{equation}
+\label{eq:action-scale}
+q_{\mathrm{target},i} = a_i \times \mathrm{actionScale}_i + q_{\mathrm{stand},i}
+\end{equation}
+
+其中 $\mathrm{actionScale}$ 为每个关节的缩放系数，$q_{\mathrm{stand}}$ 为默认站立姿态角度。
+
+\subsection{Sim-to-Real}
+
+策略在 Isaac Lab 仿真环境中训练，使用域随机化（Domain Randomization）缩小仿真与现实的差距。
+训练完成后，策略网络导出为 ONNX 格式，部署到真实机器人的嵌入式处理器上进行实时推理。
+
+% ------------------------------------------------------------
+\section{姿态表示与坐标变换}
+\label{sec:attitude}
+
+机器人的姿态（朝向）在三维空间中通常用四元数表示，它避免了欧拉角的万向锁问题。
+
+\subsection{四元数基础}
+
+单位四元数 $\mathbf{q}$ 定义为：
+
+\begin{equation}
+\mathbf{q} = (w, x, y, z), \quad \|\mathbf{q}\| = \sqrt{w^2 + x^2 + y^2 + z^2} = 1
+\end{equation}
+
+\subsection{四元数到旋转矩阵}
+
+四元数 $\mathbf{q} = (w, x, y, z)$ 对应的旋转矩阵 $R$ 为：
+
+\begin{equation}
+R = \begin{pmatrix}
+1 - 2(y^2 + z^2) & 2(xy - wz) & 2(xz + wy) \\
+2(xy + wz) & 1 - 2(x^2 + z^2) & 2(yz - wx) \\
+2(xz - wy) & 2(yz + wx) & 1 - 2(x^2 + y^2)
+\end{pmatrix}
+\end{equation}
+
+\subsection{投影重力计算}
+
+投影重力（Projected Gravity）是将世界坐标系的重力方向变换到机体坐标系，
+用于让策略感知机器人当前的倾斜状态。其计算公式为：
+
+\begin{equation}
+\label{eq:projected-gravity}
+\mathbf{g}_{\mathrm{body}} = R^\top \begin{pmatrix} 0 \\ 0 \\ -1 \end{pmatrix}
+\end{equation}
+
+其中 $R$ 为由 IMU 四元数计算得到的旋转矩阵。当机器人水平放置时，
+$\mathbf{g}_{\mathrm{body}} = (0, 0, -1)^\top$；当机器人倾斜时，重力在
+机体 $x$、$y$ 轴上会产生分量。
+
+\subsection{Hamilton 约定与 ROS 约定}
+
+两种常见的四元数排列约定：
+
+\begin{itemize}[nosep]
+  \item \textbf{Hamilton 约定}（ORIX / Protobuf）：$(w, x, y, z)$ —— 实部 $w$ 在前
+  \item \textbf{ROS 约定}（ROS2 / tf2）：$(x, y, z, w)$ —— 实部 $w$ 在后
+\end{itemize}
+
+在 ORIX 系统内部统一使用 Hamilton 约定。当与 ROS 系统交互时（如导航模块），
+\texttt{han\_dog\_bridge} 会自动完成两种约定之间的转换。
+
+% ------------------------------------------------------------
+\section{有限状态机}
+\label{sec:fsm-theory}
+
+ORIX 的运动控制流程由一个有限状态机（Finite State Machine, FSM）管理。
+FSM 确保机器人在任何时刻都处于明确定义的状态，且所有状态转换都经过安全校验。
+
+\subsection{形式化定义}
+
+FSM 形式化定义为五元组：
+
+\begin{equation}
+\mathrm{FSM} = (S,\; \Sigma,\; \delta,\; s_0,\; F)
+\end{equation}
+
+其中各元素定义如下：
+
+\begin{align}
+S      &= \{\texttt{Zero},\; \texttt{Grounded},\; \texttt{Standing},\; \texttt{Walking},\; \texttt{Transitioning}\} \\
+\Sigma &= \{\texttt{init},\; \texttt{standUp},\; \texttt{sitDown},\; \texttt{walk},\; \texttt{stop},\; \texttt{fault}\} \\
+s_0    &= \texttt{Zero}
+\end{align}
+
+$\delta: S \times \Sigma \to S$ 为状态转移函数，$F$ 为终态集合（在持续运行系统中通常为空集）。
+
+\subsection{状态转移表}
+
+\begin{longtable}{lll}
+\toprule
+当前状态 & 输入事件 & 下一状态 \\
+\midrule
+\texttt{Zero} & \texttt{init} & \texttt{Grounded} \\
+\texttt{Grounded} & \texttt{standUp} & \texttt{Transitioning} $\to$ \texttt{Standing} \\
+\texttt{Standing} & \texttt{walk} & \texttt{Walking} \\
+\texttt{Standing} & \texttt{sitDown} & \texttt{Transitioning} $\to$ \texttt{Grounded} \\
+\texttt{Walking} & \texttt{stop} & \texttt{Standing} \\
+\texttt{Walking} & \texttt{sitDown} & \texttt{Transitioning} $\to$ \texttt{Grounded} \\
+任意状态 & \texttt{fault} & \texttt{Grounded}（经由安全坐下） \\
+\bottomrule
+\end{longtable}
+
+\subsection{安全不变量}
+
+FSM 设计中最重要的安全不变量：
+
+\begin{quote}
+\textbf{从任意状态出发，收到 \texttt{fault} 信号后，系统必须经由安全坐下动画回到 \texttt{Grounded} 状态。}
+\end{quote}
+
+这意味着即使在行走过程中发生低电压告警、通信丢失或软件异常，
+机器人也会优雅地坐下而非直接断电跌倒。
+这一设计在代码中由 \texttt{Brain} 的 FSM 实现保证（见 \texttt{han\_dog\_brain/cms/}）。
+
+% ------------------------------------------------------------
+\section{控制频率与实时性}
+\label{sec:control-freq}
+
+ORIX 的主控制循环以 50\,Hz 固定频率运行，即每个控制周期为：
+
+\begin{equation}
+T = \frac{1}{50\,\mathrm{Hz}} = 20\,\mathrm{ms}
+\end{equation}
+
+\subsection{单周期流水线}
+
+每个 20\,ms 周期内，系统依次执行以下步骤：
+
+\begin{enumerate}[nosep]
+  \item \textbf{传感器读取}：从 IMU 和关节编码器获取最新数据
+  \item \textbf{观测构建}：将传感器数据组装为策略网络所需的观测向量
+  \item \textbf{神经网络推理}：策略网络前向传播，输出关节动作
+  \item \textbf{动作后处理}：应用 actionScale 缩放和安全限幅
+  \item \textbf{电机指令下发}：通过 CAN 总线发送 PD 位置指令
+\end{enumerate}
+
+\subsection{时间预算}
+
+典型的时间分配如下：
+
+\begin{longtable}{lr}
+\toprule
+阶段 & 耗时 \\
+\midrule
+神经网络推理（ONNX Runtime） & $< 1$\,ms \\
+传感器读取 + 观测构建 + 动作后处理 & $< 1$\,ms \\
+总流水线 & $< 2$\,ms \\
+事件循环空闲时间 & $\sim 18$\,ms \\
+\bottomrule
+\end{longtable}
+
+\subsection{为什么单线程事件循环足够}
+
+ORIX 主控程序采用 Dart 单线程异步事件循环模型。50\,Hz 控制循环的关键路径
+仅占用约 2\,ms，远小于 20\,ms 的周期。剩余 18\,ms 可用于处理 gRPC 请求、
+日志写入和状态广播等异步任务。
+
+单线程模型的优势在于：
+\begin{itemize}[nosep]
+  \item 无线程同步开销（无锁、无竞态条件）
+  \item 确定性的执行顺序，便于调试和分析
+  \item 更低的延迟抖动（jitter），提高控制精度
+\end{itemize}
+
+只要控制路径上的操作全部是非阻塞的（ORIX 通过异步 I/O 和 CAN 总线
+非阻塞写入保证这一点），单线程模型完全能够满足 50\,Hz 的实时性要求。
+
+
+% ============================================================
+%  第 4 章：坐标系与关节
 % ============================================================
 \chapter{坐标系与关节}
 \label{ch:coordinates}
@@ -1092,7 +1375,7 @@ dog.clear_motor_fault(joint_ids=[0, 1, 2, 3])
 
 
 % ============================================================
-%  第 4 章：状态机与运动控制
+%  第 5 章：状态机与运动控制
 % ============================================================
 \chapter{状态机与运动控制}
 \label{ch:fsm}
@@ -1636,7 +1919,7 @@ RPC 超时 & 5 秒 & SDK 默认 RPC 超时 \\
 
 
 % ============================================================
-%  第 5 章：传感器数据
+%  第 6 章：传感器数据
 % ============================================================
 \chapter{传感器数据}
 \label{ch:sensors}
@@ -2131,7 +2414,7 @@ FSM 状态变化 & \texttt{listen\_state()} & str & -- & 事件驱动 & 状态�
 
 
 % ============================================================
-%  第 6 章：API 参考
+%  第 7 章：API 参考
 % ============================================================
 \chapter{API 参考}
 \label{ch:api}
@@ -2808,7 +3091,7 @@ finally:
 
 
 % ============================================================
-%  第 7 章：安全指南
+%  第 8 章：安全指南
 % ============================================================
 \chapter{安全指南}
 \label{ch:safety}
@@ -3252,7 +3535,7 @@ def safe_shutdown(dog, timeout=10.0):
 
 
 % ============================================================
-%  第 8 章：常见问题
+%  第 9 章：常见问题
 % ============================================================
 \chapter{常见问题}
 \label{ch:faq}
