@@ -6,7 +6,7 @@
 
 ## 目录
 
-1. [ThunderClient 构造与连接](#1-thunderclient-构造与连接)
+1. [OrixClient 构造与连接](#1-thunderclient-构造与连接)
 2. [电机控制](#2-电机控制)
 3. [运动指令](#3-运动指令)
 4. [状态查询](#4-状态查询)
@@ -18,12 +18,12 @@
 
 ---
 
-## 1. ThunderClient 构造与连接
+## 1. OrixClient 构造与连接
 
 ### 构造函数
 
 ```python
-ThunderClient(host="192.168.66.190", port=13145, timeout=5.0)
+OrixClient(host="192.168.66.190", port=13145, timeout=5.0)
 ```
 
 | 参数 | 类型 | 默认值 | 说明 |
@@ -35,13 +35,13 @@ ThunderClient(host="192.168.66.190", port=13145, timeout=5.0)
 **说明**：构造函数创建一个 gRPC 不安全通道（insecure channel），连接到 `host:port`。通道创建即连接，无需额外调用。
 
 ```python
-from brainstem_sdk import ThunderClient
+from brainstem_sdk import OrixClient
 
 # 默认连接
-dog = ThunderClient("192.168.66.190")
+dog = OrixClient("192.168.66.190")
 
 # 自定义参数
-dog = ThunderClient("10.0.0.100", port=13145, timeout=10.0)
+dog = OrixClient("10.0.0.100", port=13145, timeout=10.0)
 ```
 
 ### close()
@@ -54,10 +54,10 @@ dog.close() -> None
 
 ### 上下文管理器
 
-`ThunderClient` 支持 `with` 语句，退出时自动调用 `close()`：
+`OrixClient` 支持 `with` 语句，退出时自动调用 `close()`：
 
 ```python
-with ThunderClient("192.168.66.190") as dog:
+with OrixClient("192.168.66.190") as dog:
     dog.enable()
     dog.stand_up()
     dog.walk(vx=0.3)
@@ -544,7 +544,7 @@ if state == RobotState.STANDING:
 import grpc
 
 try:
-    dog = ThunderClient("192.168.66.190", timeout=3.0)
+    dog = OrixClient("192.168.66.190", timeout=3.0)
     dog.get_state()
 except grpc.RpcError as e:
     if e.code() == grpc.StatusCode.UNAVAILABLE:
@@ -620,7 +620,7 @@ finally:
 
 | 分类 | 方法 | 返回值 | 说明 |
 |------|------|--------|------|
-| **连接** | `ThunderClient(host, port, timeout)` | - | 构造并连接 |
+| **连接** | `OrixClient(host, port, timeout)` | - | 构造并连接 |
 | | `close()` | None | 关闭连接 |
 | **电机** | `enable()` | None | 使能全部电机 |
 | | `disable()` | None | 禁用全部电机 |

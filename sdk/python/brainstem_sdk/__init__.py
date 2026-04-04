@@ -2,9 +2,9 @@
 
 Quick start::
 
-    from brainstem_sdk import ThunderClient
+    from brainstem_sdk import OrixClient
 
-    dog = ThunderClient("192.168.66.190")
+    dog = OrixClient("192.168.66.190")
     dog.stand_up()
     dog.walk(vx=0.3)
     dog.sit_down()
@@ -18,7 +18,7 @@ Quick start::
 """
 
 from brainstem_sdk.client import (
-    ThunderClient,
+    OrixClient,
     OrixClient,
     ImuData,
     JointData,
@@ -50,7 +50,7 @@ except ImportError:
 __version__ = "1.0.0"
 
 __all__ = [
-    "ThunderClient",
+    "OrixClient",
     "OrixClient",
     "ImuData",
     "JointData",

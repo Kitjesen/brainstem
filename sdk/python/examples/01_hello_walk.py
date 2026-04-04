@@ -1,8 +1,8 @@
 """最简示例：3 行代码让机器人走路。"""
 
-from brainstem_sdk import ThunderClient
+from brainstem_sdk import OrixClient
 
-dog = ThunderClient("192.168.66.190")
+dog = OrixClient("192.168.66.190")
 try:
     # 使能电机
     dog.enable()

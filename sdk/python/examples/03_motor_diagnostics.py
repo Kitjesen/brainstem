@@ -1,8 +1,8 @@
 """电机诊断：读取电压、温度、状态。"""
 
-from brainstem_sdk import ThunderClient
+from brainstem_sdk import OrixClient
 
-dog = ThunderClient("192.168.66.190")
+dog = OrixClient("192.168.66.190")
 
 # 读取电压
 voltages = dog.get_voltage()

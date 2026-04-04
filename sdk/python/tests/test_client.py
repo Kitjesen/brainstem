@@ -1,6 +1,6 @@
 """brainstem_sdk unit tests.
 
-Tests the ThunderClient against a mock gRPC server.
+Tests the OrixClient against a mock gRPC server.
 No real robot needed.
 """
 
@@ -15,7 +15,7 @@ import pytest
 from google.protobuf.empty_pb2 import Empty
 from google.protobuf.duration_pb2 import Duration
 
-from brainstem_sdk import ThunderClient, RobotState
+from brainstem_sdk import OrixClient, RobotState
 from brainstem_sdk._proto import cms_pb2, cms_pb2_grpc, common_pb2
 
 
@@ -130,9 +130,9 @@ def mock_server():
 
 @pytest.fixture
 def dog(mock_server):
-    """Create a ThunderClient connected to the mock server."""
+    """Create a OrixClient connected to the mock server."""
     port, _ = mock_server
-    client = ThunderClient("localhost", port=port, timeout=5.0)
+    client = OrixClient("localhost", port=port, timeout=5.0)
     yield client
     client.close()
 
@@ -252,7 +252,7 @@ class TestStreaming:
 class TestContextManager:
     def test_with_statement(self, mock_server):
         port, _ = mock_server
-        with ThunderClient("localhost", port=port) as dog:
+        with OrixClient("localhost", port=port) as dog:
             state = dog.get_state()
             assert state in RobotState._MAP.values()
 
@@ -260,7 +260,7 @@ class TestContextManager:
 class TestConnectionFailure:
     def test_connect_bad_port(self):
         """Connecting to a port with no server should fail on ping."""
-        client = ThunderClient("localhost", port=1, timeout=1.0)
+        client = OrixClient("localhost", port=1, timeout=1.0)
         try:
             assert client.ping() is False
         finally:
@@ -271,7 +271,7 @@ class TestConnectionFailure:
         from brainstem_sdk.client import ConnectionError as OrixConnectionError
 
         with pytest.raises(OrixConnectionError):
-            with ThunderClient("localhost", port=1, timeout=1.0) as dog:
+            with OrixClient("localhost", port=1, timeout=1.0) as dog:
                 pass
 
 

@@ -18,10 +18,10 @@ pip install -e ".[camera]"
 ## 快速开始
 
 ```python
-from brainstem_sdk import ThunderClient
+from brainstem_sdk import OrixClient
 
 # 连接机器人 (默认 192.168.66.190:13145)
-dog = ThunderClient("192.168.66.190")
+dog = OrixClient("192.168.66.190")
 
 # 使能电机 → 站起 → 走路 → 坐下 → 禁用
 dog.enable()
@@ -38,13 +38,13 @@ dog.disable()
 
 ```python
 # 默认连接
-dog = ThunderClient("192.168.66.190")
+dog = OrixClient("192.168.66.190")
 
 # 自定义端口和超时
-dog = ThunderClient("10.0.0.1", port=13145, timeout=5.0)
+dog = OrixClient("10.0.0.1", port=13145, timeout=5.0)
 
 # 支持 with 语句
-with ThunderClient("192.168.66.190") as dog:
+with OrixClient("192.168.66.190") as dog:
     dog.stand_up()
 
 # 检查连接

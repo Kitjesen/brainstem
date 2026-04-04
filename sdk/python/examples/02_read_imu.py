@@ -1,8 +1,8 @@
 """读取 IMU 实时数据流。"""
 
-from brainstem_sdk import ThunderClient
+from brainstem_sdk import OrixClient
 
-dog = ThunderClient("192.168.66.190")
+dog = OrixClient("192.168.66.190")
 
 print("订阅 IMU 数据 (Ctrl+C 退出)...")
 try:

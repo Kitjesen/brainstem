@@ -13,7 +13,7 @@ Enter = 退出
 import sys
 import termios
 import tty
-from brainstem_sdk import ThunderClient
+from brainstem_sdk import OrixClient
 
 
 def getch():
@@ -28,7 +28,7 @@ def getch():
 
 
 def main():
-    dog = ThunderClient("192.168.66.190")
+    dog = OrixClient("192.168.66.190")
     dog.enable()
 
     speed = 0.4

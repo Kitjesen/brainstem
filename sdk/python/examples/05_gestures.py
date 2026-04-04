@@ -1,9 +1,9 @@
 """动作演示：让机器狗鞠躬、点头、跳舞。"""
 
 import time
-from brainstem_sdk import ThunderClient
+from brainstem_sdk import OrixClient
 
-dog = ThunderClient("192.168.66.190")
+dog = OrixClient("192.168.66.190")
 try:
     # 查看所有可用动作
     gestures = dog.list_gestures()

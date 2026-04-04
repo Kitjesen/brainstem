@@ -1,9 +1,9 @@
-"""Thunder quadruped robot Python SDK.
+"""ORIX 教育版四足机器狗 Python SDK.
 
 3 lines to walk:
 
-    from brainstem_sdk import ThunderClient
-    dog = ThunderClient("192.168.66.190")
+    from brainstem_sdk import OrixClient
+    dog = OrixClient("192.168.66.190")
     dog.walk(vx=0.3)
 """
 
@@ -123,8 +123,8 @@ class RobotState:
 
 # ── Client ──────────────────────────────────────────────────
 
-class ThunderClient:
-    """High-level Python client for Thunder quadruped robot.
+class OrixClient:
+    """High-level Python client for ORIX quadruped robot.
 
     Args:
         host: Robot IP address (default "192.168.66.190").
@@ -133,7 +133,7 @@ class ThunderClient:
 
     Example::
 
-        dog = ThunderClient("192.168.66.190")
+        dog = OrixClient("192.168.66.190")
         dog.enable()
         dog.stand_up()
         dog.walk(vx=0.5)
@@ -433,7 +433,3 @@ class ThunderClient:
         """
         for msg in self._stub.ListenCmsState(Empty()):
             yield RobotState.from_proto(msg.kind)
-
-
-# Preferred public alias used by the current ORIX-facing documentation.
-OrixClient = ThunderClient

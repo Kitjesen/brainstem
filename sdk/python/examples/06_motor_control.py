@@ -1,7 +1,7 @@
 """电机操作全流程：诊断、清错、标零、增益监控。"""
 
 import time
-from brainstem_sdk import ThunderClient
+from brainstem_sdk import OrixClient
 
 JOINT_NAMES = [
     "FR Hip", "FR Thigh", "FR Calf", "FR Foot",
@@ -10,7 +10,7 @@ JOINT_NAMES = [
     "RL Hip", "RL Thigh", "RL Calf", "RL Foot",
 ]
 
-dog = ThunderClient("192.168.66.190")
+dog = OrixClient("192.168.66.190")
 try:
     # ──── 1. 电机诊断 ────────────────────────────────────
 
