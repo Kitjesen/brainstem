@@ -1947,7 +1947,7 @@ for i, v in enumerate(voltages):
 阈值 & 行为 \\
 \midrule
 \endhead
-$<$ 42.0 V & 系统自动执行坐下动作，等待 Grounded 状态确认后禁用电机 \\
+$<$ 22.4 V & 系统自动执行坐下动作，等待 Grounded 状态确认后禁用电机 \\
 \bottomrule
 \end{longtable}
 
@@ -1966,7 +1966,7 @@ $<$ 42.0 V & 系统自动执行坐下动作，等待 Grounded 状态确认后禁
 \begin{lstlisting}[style=python]
 import time
 
-def monitor_voltage(dog, interval=5.0, warn_threshold=44.0):
+def monitor_voltage(dog, interval=5.0, warn_threshold=24.0):
     """周期性检查电压，提前预警。"""
     while True:
         voltages = dog.get_voltage()
@@ -2829,7 +2829,7 @@ ORIX 教育版四足机器狗是一台具有高扭矩电机的自主运动设备
 序号 & 检查项 & 确认方法 & 通过标准 \\
 \midrule
 \endhead
-1 & 电池电量充足 & \texttt{dog.get\_voltage()} & 所有电机电压 >= 44V \\
+1 & 电池电量充足 & \texttt{dog.get\_voltage()} & 所有电机电压 >= 24V \\
 2 & 操作区域净空 & 目视检查 & 周围 1.5 米内无人员/易碎物品 \\
 3 & 机器人放置在地面 & 目视检查 & 四脚均接触平坦地面 \\
 4 & 急停装置就绪 & 确认遥控器在手 & 遥控器已开机，电量充足 \\
@@ -2853,7 +2853,7 @@ dog = OrixClient("192.168.66.190")
 # 1. 检查电压
 voltages = dog.get_voltage()
 min_v = min(voltages)
-print(f"电压: {min_v:.1f}V", "-- 通过" if min_v >= 44.0 else "-- 不通过! 请充电")
+print(f"电压: {min_v:.1f}V", "-- 通过" if min_v >= 24.0 else "-- 不通过! 请充电")
 
 # 2. 检查电机状态
 motors = dog.get_motor_status()
@@ -2917,9 +2917,10 @@ dog.close()
 电压范围 & 状态 & 建议 \\
 \midrule
 \endhead
-$\geq$ 48V & 满电 & 正常使用 \\
-44V -- 48V & 正常 & 正常使用，关注电量 \\
-22.4V -- 44V & 低电量 & 尽快结束任务，准备充电 \\
+$\geq$ 29V & 满电 & 正常使用 \\
+26V -- 29.4V & 正常 & 正常使用 \\
+24V -- 26V & 偏低 & 关注电量，准备充电 \\
+22.4V -- 24V & 低电量 & 尽快结束任务 \\
 $<$ 22.4V & 危险 & 自动触发保护，必须立即充电 \\
 \bottomrule
 \end{longtable}
@@ -2929,8 +2930,8 @@ $<$ 22.4V & 危险 & 自动触发保护，必须立即充电 \\
 \begin{itemize}[nosep]
   \item 低压保护\textbf{不可通过 SDK 绕过}
   \item 大电流运动（快速行走、爬坡）会导致瞬时压降，可能在电池未耗尽时触发保护
-  \item 建议在电压低于 44V 时即结束运动任务
-  \item 触发低压保护后，必须充电至 44V 以上才可重新启动
+  \item 建议在电压低于 24V 时即结束运动任务
+  \item 触发低压保护后，必须充电至 24V 以上才可重新启动
 \end{itemize}
 
 \section{关节限位保护}
@@ -3244,7 +3245,7 @@ def safe_shutdown(dog, timeout=10.0):
 \begin{enumerate}[nosep]
   \item \textbf{永远带遥控器} --- 遥控器是最终安全手段
   \item \textbf{先坐再断电} --- \texttt{disable()} 前必须 \texttt{sit\_down()}
-  \item \textbf{关注电压} --- 低于 44V 准备收工
+  \item \textbf{关注电压} --- 低于 24V 准备收工
   \item \textbf{监控温度} --- 超过 70\textdegree C 立即休息
   \item \textbf{地面运行} --- 永远在地面操作，永远不上桌
 \end{enumerate}}
@@ -3384,7 +3385,7 @@ print(f"电压范围: {min(voltages):.1f}V ~ {max(voltages):.1f}V")
 未调用 \texttt{enable()} & 先调用 \texttt{dog.enable()} \\
 电机有故障未清除 & \texttt{dog.clear\_motor\_fault()} \\
 CAN 线缆松动 & 检查并重新插紧 CAN 接头 \\
-电池电量不足 & 充电至 44V 以上 \\
+电池电量不足 & 充电至 24V 以上 \\
 遥控器占用控制权 & 松开遥控器摇杆，等待 3 秒 \\
 \bottomrule
 \end{longtable}
