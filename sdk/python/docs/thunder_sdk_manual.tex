@@ -1001,33 +1001,31 @@ Z & 上方 (Up) & 垂直向上 \\
 
 \section{关节编号总表}
 
-以下是 ORIX 全部 16 个关节的完整参数表，包括编号、URDF 名称、运动范围和最大力矩。编写底层控制或进行运动学分析时需要频繁参考此表。ORIX 共 16 个自由度，按腿分组编号：
+以下是 ORIX 全部 16 个关节的编号和 URDF 名称。编写底层控制或进行运动学分析时需要频繁参考此表。具体的运动范围请参考 URDF 文件或通过 SDK 接口查询。
 
-{\small
-\begin{longtable}{clllllll}
+\begin{longtable}{cllll}
 \toprule
-索引 & 名称 & 腿 & 关节类型 & URDF 名称 & 范围 (rad) & 正方向 & 最大力矩 \\
+索引 & 名称 & 腿 & 关节类型 & URDF 名称 \\
 \midrule
 \endhead
-0 & FR Hip & 前右 & 髋 (横滚) & \texttt{fr\_hip\_joint} & -0.41 \textasciitilde{} +0.41 & 外展 & 50 Nm \\
-1 & FR Thigh & 前右 & 大腿 (俯仰) & \texttt{fr\_thigh\_joint} & -3.14 \textasciitilde{} 0 & 后摆 & 50 Nm \\
-2 & FR Calf & 前右 & 小腿 (俯仰) & \texttt{fr\_calf\_joint} & 0 \textasciitilde{} +3.14 & 伸展 & 50 Nm \\
-3 & FR Foot & 前右 & 脚轮 (连续) & \texttt{fr\_foot\_joint} & 连续旋转 & -- & 30 Nm \\
-4 & FL Hip & 前左 & 髋 (横滚) & \texttt{fl\_hip\_joint} & -0.41 \textasciitilde{} +0.41 & 外展 & 50 Nm \\
-5 & FL Thigh & 前左 & 大腿 (俯仰) & \texttt{fl\_thigh\_joint} & 0 \textasciitilde{} +3.14 & 前摆 & 50 Nm \\
-6 & FL Calf & 前左 & 小腿 (俯仰) & \texttt{fl\_calf\_joint} & -3.14 \textasciitilde{} 0 & 收缩 & 50 Nm \\
-7 & FL Foot & 前左 & 脚轮 (连续) & \texttt{fl\_foot\_joint} & 连续旋转 & -- & 30 Nm \\
-8 & RR Hip & 后右 & 髋 (横滚) & \texttt{rr\_hip\_joint} & -0.41 \textasciitilde{} +0.41 & 外展 & 50 Nm \\
-9 & RR Thigh & 后右 & 大腿 (俯仰) & \texttt{rr\_thigh\_joint} & 0 \textasciitilde{} +3.14 & 前摆 & 50 Nm \\
-10 & RR Calf & 后右 & 小腿 (俯仰) & \texttt{rr\_calf\_joint} & -6.28 \textasciitilde{} 0 & 收缩 & 50 Nm \\
-11 & RR Foot & 后右 & 脚轮 (连续) & \texttt{rr\_foot\_joint} & 连续旋转 & -- & 30 Nm \\
-12 & RL Hip & 后左 & 髋 (横滚) & \texttt{rl\_hip\_joint} & -0.41 \textasciitilde{} +0.41 & 外展 & 50 Nm \\
-13 & RL Thigh & 后左 & 大腿 (俯仰) & \texttt{rl\_thigh\_joint} & -3.14 \textasciitilde{} 0 & 后摆 & 50 Nm \\
-14 & RL Calf & 后左 & 小腿 (俯仰) & \texttt{rl\_calf\_joint} & 0 \textasciitilde{} +6.28 & 伸展 & 50 Nm \\
-15 & RL Foot & 后左 & 脚轮 (连续) & \texttt{rl\_foot\_joint} & 连续旋转 & -- & 30 Nm \\
+0 & FR Hip & 前右 & 髋 (横滚) & \texttt{fr\_hip\_joint} \\
+1 & FR Thigh & 前右 & 大腿 (俯仰) & \texttt{fr\_thigh\_joint} \\
+2 & FR Calf & 前右 & 小腿 (俯仰) & \texttt{fr\_calf\_joint} \\
+3 & FR Foot & 前右 & 脚轮 (连续) & \texttt{fr\_foot\_joint} \\
+4 & FL Hip & 前左 & 髋 (横滚) & \texttt{fl\_hip\_joint} \\
+5 & FL Thigh & 前左 & 大腿 (俯仰) & \texttt{fl\_thigh\_joint} \\
+6 & FL Calf & 前左 & 小腿 (俯仰) & \texttt{fl\_calf\_joint} \\
+7 & FL Foot & 前左 & 脚轮 (连续) & \texttt{fl\_foot\_joint} \\
+8 & RR Hip & 后右 & 髋 (横滚) & \texttt{rr\_hip\_joint} \\
+9 & RR Thigh & 后右 & 大腿 (俯仰) & \texttt{rr\_thigh\_joint} \\
+10 & RR Calf & 后右 & 小腿 (俯仰) & \texttt{rr\_calf\_joint} \\
+11 & RR Foot & 后右 & 脚轮 (连续) & \texttt{rr\_foot\_joint} \\
+12 & RL Hip & 后左 & 髋 (横滚) & \texttt{rl\_hip\_joint} \\
+13 & RL Thigh & 后左 & 大腿 (俯仰) & \texttt{rl\_thigh\_joint} \\
+14 & RL Calf & 后左 & 小腿 (俯仰) & \texttt{rl\_calf\_joint} \\
+15 & RL Foot & 后左 & 脚轮 (连续) & \texttt{rl\_foot\_joint} \\
 \bottomrule
 \end{longtable}
-}
 
 \section{关节分组}
 
