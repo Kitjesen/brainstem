@@ -1,4 +1,4 @@
-"""Brainstem SDK — Python client for Thunder quadruped robot.
+"""ORIX SDK — Python client for ORIX educational quadruped robot.
 
 Quick start::
 

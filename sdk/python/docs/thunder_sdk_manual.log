@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999997 (MiKTeX 25.12) (preloaded format=xelatex 2026.3.13)  4 APR 2026 22:37
+This is XeTeX, Version 3.141592653-2.6-0.999997 (MiKTeX 25.12) (preloaded format=xelatex 2026.3.13)  4 APR 2026 23:37
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1115,22 +1115,14 @@ File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 [1
 
 
-] [2] (thunder_sdk_manual.toc
-Underfull \vbox (badness 1596) has occurred while \output is active []
-
- [3]
-[4] [5] [6] [7] [8])
+] [2] (thunder_sdk_manual.toc [3] [4] [5] [6] [7] [8])
 \tf@toc=\write4
 \openout4 = `thunder_sdk_manual.toc'.
 
- [9]
+ [9] [10] [11
+
+]
 第一章
-(C:\Users\99563\AppData\Local\Programs\MiKTeX\tex/latex/listings\lstlang1.sty
-File: lstlang1.sty 2025/11/14 1.11b listings language file
-)
-(C:\Users\99563\AppData\Local\Programs\MiKTeX\tex/latex/listings\lstlang1.sty
-File: lstlang1.sty 2025/11/14 1.11b listings language file
-)
 
 Package fontspec Info: 
 (fontspec)             Could not resolve font "FangSong/BI" (it probably
@@ -1157,217 +1149,247 @@ Package fontspec Info:
 (fontspec)             - 'normal' (m/n) with NFSS spec.:
 (fontspec)             <->"FangSong/OT:script=hani;language=dflt;"
 
-LaTeX Font Info:    Font shape `TU/lmtt/bx/n' in size <10> not available
-(Font)              Font shape `TU/lmtt/b/n' tried instead on input line 290.
+[12
 
+] [13]
+第二章
+(C:\Users\99563\AppData\Local\Programs\MiKTeX\tex/latex/listings\lstlang1.sty
+File: lstlang1.sty 2025/11/14 1.11b listings language file
+)
+(C:\Users\99563\AppData\Local\Programs\MiKTeX\tex/latex/listings\lstlang1.sty
+File: lstlang1.sty 2025/11/14 1.11b listings language file
+)
+LaTeX Font Info:    Font shape `TU/lmtt/bx/n' in size <10> not available
+(Font)              Font shape `TU/lmtt/b/n' tried instead on input line 400.
+
+[14
+
+]
 (C:\Users\99563\AppData\Local\Programs\MiKTeX\tex/latex/listings\lstlang1.sty
 File: lstlang1.sty 2025/11/14 1.11b listings language file
 )
 
 LaTeX Font Warning: Font shape `TU/FangSong(0)/m/it' undefined
-(Font)              using `TU/FangSong(0)/m/n' instead on input line 301.
+(Font)              using `TU/FangSong(0)/m/n' instead on input line 428.
 
-[10
-
-] [11] [12]
-ignored error: Infinite glue shrinkage found in box being split [13] [14]
-第二章
-[15
-
-] [16]
-Overfull \hbox (6.23102pt too wide) in paragraph at lines 604--605
+[15]
+Overfull \hbox (6.23102pt too wide) in paragraph at lines 477--478
 \TU/SimSun(0)/m/n/10.95 速 判 断 问 题 属 于 网 络、|  服 务、|  控 制 权 还 是 硬 件 在 线 状 态。|  将 
 以 下 脚 本 保 存 为 \TU/lmtt/m/n/10.95 verify_connection.py
  []
 
-[17] [18]
+[16] [17]
 Underfull \vbox (badness 2134) has occurred while \output is active []
 
- [19]
-Overfull \hbox (3.05074pt too wide) in paragraph at lines 738--739
+ [18]
+Overfull \hbox (3.05074pt too wide) in paragraph at lines 611--612
 []\TU/lmr/m/n/10.95 SSH \TU/SimSun(0)/m/n/10.95 登 录 确 认 服 务 运 行：| \TU/lmtt/m/n/
 10.95 ssh sunrise@192.168.66.190 'systemctl status brainstem' 
  []
 
 
-Overfull \hbox (24.15448pt too wide) in paragraph at lines 744--745
+Overfull \hbox (24.15448pt too wide) in paragraph at lines 617--618
 []\TU/SimSun(0)/m/n/10.95 行 走 指 令 未 生 效 是 新 手 最 常 遇 到 的 问 题 之 一。|  必 须 按 照 状 态 
 机 顺 序 操 作：| \TU/lmtt/m/n/10.95 enable() $\OMS/cmsy/m/n/10.95 !$ \TU/lmtt/m/n/10
 .95 stand_up()
  []
 
-[20] [21]
+[19] [20]
 第三章
-[22
+[21
 
-]
-ignored error: Infinite glue shrinkage found in box being split [23] [24]
-ignored error: Infinite glue shrinkage found in box being split [25] [26]
-[27]
-第四章
-
-Overfull \hbox (0.7044pt too wide) in alignment at lines 1082--1086
- [] [] [] 
+] [22] [23]
+Overfull \hbox (30.47823pt too wide) in paragraph at lines 840--842
+[]\TU/SimSun(0)/m/n/10.95 在 \TU/lmr/m/n/10.95 ORIX \TU/SimSun(0)/m/n/10.95 系 统 
+内 部 统 一 使 用 \TU/lmr/m/n/10.95 Hamilton \TU/SimSun(0)/m/n/10.95 约 定。|  当 与 \TU/l
+mr/m/n/10.95 ROS \TU/SimSun(0)/m/n/10.95 系 统 交 互 时  |（如 导 航 模 块） ，| \TU/lmtt/m/
+n/10.95 han_dog_bridge
  []
 
-
-Overfull \hbox (0.7044pt too wide) in alignment at lines 1086--1093
- [] [] [] 
- []
-
-[28
-
-]
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1097.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `\to' on input line 1097.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1097.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1114.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `\to' on input line 1114.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1114.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1135.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `\to' on input line 1135.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1135.
-
-[29]
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1165.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `\to' on input line 1165.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1165.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1180.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `\to' on input line 1180.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1180.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1196.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `\to' on input line 1196.
-
-
-Package hyperref Warning: Token not allowed in a PDF string (Unicode):
-(hyperref)                removing `math shift' on input line 1196.
-
-[30] [31] [32]
+[24]
 LaTeX Font Info:    Font shape `TU/lmtt/bx/n' in size <10.95> not available
-(Font)              Font shape `TU/lmtt/b/n' tried instead on input line 1302.
- [33] [34] [35]
-Underfull \vbox (badness 10000) has occurred while \output is active []
+(Font)              Font shape `TU/lmtt/b/n' tried instead on input line 889.
+ [25] [26]
+第四章
+[27
 
- [36]
-[37]
-ignored error: Infinite glue shrinkage found in box being split [38] [39]
+]
+ignored error: Infinite glue shrinkage found in box being split [28] [29]
+ignored error: Infinite glue shrinkage found in box being split [30] [31]
+[32]
 第五章
 
-Overfull \hbox (50.636pt too wide) in alignment at lines 1602--1606
- [] [] [] [] [] [] 
+Overfull \hbox (0.7044pt too wide) in alignment at lines 1270--1274
+ [] [] [] 
  []
 
 
-Overfull \hbox (50.636pt too wide) in alignment at lines 1606--1613
- [] [] [] [] [] [] 
+Overfull \hbox (0.7044pt too wide) in alignment at lines 1274--1281
+ [] [] [] 
  []
 
-ignored error: Infinite glue shrinkage found in box being split [40
+[33
 
-] [41]
-[42] [43] [44] [45] [46]
+]
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1285.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\to' on input line 1285.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1285.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1302.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\to' on input line 1302.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1302.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1323.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\to' on input line 1323.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1323.
+
+[34]
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1353.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\to' on input line 1353.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1353.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1368.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\to' on input line 1368.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1368.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1384.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `\to' on input line 1384.
+
+
+Package hyperref Warning: Token not allowed in a PDF string (Unicode):
+(hyperref)                removing `math shift' on input line 1384.
+
+[35] [36] [37] [38] [39] [40]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [47]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [48]
-Overfull \hbox (48.52597pt too wide) in alignment at lines 2059--2063
- [] [] [] [] [] [] 
- []
-
-
-Overfull \hbox (48.52597pt too wide) in alignment at lines 2063--2077
- [] [] [] [] [] [] 
- []
-
-ignored error: Infinite glue shrinkage found in box being split [49] [50]
+ [41]
+[42]
+ignored error: Infinite glue shrinkage found in box being split [43] [44]
 第六章
-[51
+[45
 
-] [52] [53]
-ignored error: Infinite glue shrinkage found in box being split [54] [55]
-[56] [57]
-ignored error: Infinite glue shrinkage found in box being split [58] [59]
-[60]
-ignored error: Infinite glue shrinkage found in box being split [61] [62]
-[63]
+] [46] [47] [48] [49] [50] [51]
 第七章
-[64
+
+Overfull \hbox (50.636pt too wide) in alignment at lines 2047--2051
+ [] [] [] [] [] [] 
+ []
+
+
+Overfull \hbox (50.636pt too wide) in alignment at lines 2051--2058
+ [] [] [] [] [] [] 
+ []
+
+ignored error: Infinite glue shrinkage found in box being split [52
+
+] [53]
+[54] [55] [56] [57] [58]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [59]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [60]
+Overfull \hbox (48.52597pt too wide) in alignment at lines 2504--2508
+ [] [] [] [] [] [] 
+ []
+
+
+Overfull \hbox (48.52597pt too wide) in alignment at lines 2508--2522
+ [] [] [] [] [] [] 
+ []
+
+ignored error: Infinite glue shrinkage found in box being split [61] [62]
+第八章
+[63
+
+] [64] [65]
+ignored error: Infinite glue shrinkage found in box being split [66] [67]
+[68] [69]
+ignored error: Infinite glue shrinkage found in box being split [70] [71]
+[72] [73] [74]
+Overfull \hbox (32.73892pt too wide) in alignment at lines 3171--3175
+ [] [] [] [] 
+ []
+
+
+Overfull \hbox (32.73892pt too wide) in alignment at lines 3175--3199
+ [] [] [] [] 
+ []
+
+[75] [76]
+第九章
+[77
 
 ]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [65]
-[66] [67] [68] [69] [70] [71] [72]
-第八章
-[73
+ [78]
+[79] [80] [81] [82] [83] [84] [85]
+第十章
+[86
 
-] [74] [75] [76] [77] [78] [79] [80]
-Overfull \hbox (13.05597pt too wide) in alignment at lines 3647--3651
+] [87] [88] [89] [90] [91] [92] [93]
+Overfull \hbox (13.05597pt too wide) in alignment at lines 4124--4128
  [] [] [] [] [] 
  []
 
 
-Overfull \hbox (13.05597pt too wide) in alignment at lines 3651--3667
+Overfull \hbox (13.05597pt too wide) in alignment at lines 4128--4144
  [] [] [] [] [] 
  []
 
-[81] [82] [83] [84]
+[94] [95] [96] [97]
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [85]
-ignored error: Infinite glue shrinkage found in box being split [86] [87]
-
+ [98]
+ignored error: Infinite glue shrinkage found in box being split [99] [100]
+[101] 
 enddocument/afterlastpage (AED): lastpage setting LastPage.
 (thunder_sdk_manual.aux)
  ***********
@@ -1379,15 +1401,15 @@ L3 programming layer <2022/08/05>
 LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
 Package rerunfilecheck Info: File `thunder_sdk_manual.out' has not changed.
-(rerunfilecheck)             Checksum: 5CB68185D5C7533CDA5E13F44044C9E7;31895.
+(rerunfilecheck)             Checksum: F0541AECE0703132930783BBF9A06E49;37568.
  ) 
 Here is how much of TeX's memory you used:
- 20518 strings out of 402987
- 429270 string characters out of 5448524
- 1319918 words of memory out of 5000000
- 48930 multiletter control sequences out of 15000+600000
- 639279 words of font info for 131 fonts, out of 8000000 for 9000
+ 20725 strings out of 402987
+ 436169 string characters out of 5448524
+ 1325505 words of memory out of 5000000
+ 49123 multiletter control sequences out of 15000+600000
+ 642084 words of font info for 145 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
  93i,13n,111p,1206b,1940s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
-Output written on thunder_sdk_manual.pdf (87 pages).
+Output written on thunder_sdk_manual.pdf (101 pages).

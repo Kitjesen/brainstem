@@ -276,11 +276,13 @@ v1.0.0 & 2026-04 & 大算机器人 & 正式发布 \\
 \addcontentsline{toc}{chapter}{前言}
 \thispagestyle{fancy}
 
-近年来，国家高度重视人工智能与机器人教育。《新一代人工智能发展规划》明确要求在各级院校开设人工智能课程，教育部《人工智能教育基地建设指南》进一步推动了 AI+机器人实验室的普及。四足机器人作为融合机械工程、电子控制、传感器技术、强化学习和嵌入式系统的综合平台，正在成为 STEM 教育和高校科研的理想载体。
+近年来，国家高度重视人工智能与机器人教育的发展。《新一代人工智能发展规划》明确要求在中小学和高等院校开设人工智能相关课程，《教育部关于加强和改进中小学实验教学的意见》强调动手实践和工程思维的培养，教育部《人工智能教育基地建设指南》进一步推动了 AI+机器人实验室在全国高校和中学的普及。在这一大背景下，实物机器人作为连接理论与实践的桥梁，正在成为教育体系的重要组成部分。
 
-ORIX 教育版四足机器狗是大算机器人面向教育场景推出的专业级开发平台。设计理念：\textbf{学以致用}（可编程、调参、训练策略的真实机器人）、\textbf{降低门槛}（3 行 Python 代码控制行走）、\textbf{不设天花板}（覆盖本科到研究生的完整学习路径）、\textbf{工业级可靠}（与工业机器人相同的控制架构和安全机制）。
+四足机器人是一类典型的高集成度教学平台。它融合了机械工程（腿部机构设计、运动学建模）、电子控制（伺服驱动、传感器融合）、嵌入式系统（实时控制、CAN 总线通信）、计算机视觉（姿态估计、环境感知）和人工智能（强化学习策略训练、sim-to-real 迁移）等多个学科的核心内容。相较于传统的机械臂或移动底盘，四足机器人的动力学更加丰富，控制问题更具挑战性，能够让学生直观感受到理论与工程之间的差距，也能作为强化学习、仿生运动控制、自主导航等前沿技术的实验载体。
 
-本手册面向高校教师（课程实验设计）、学生开发者（从零上手）、科研人员（算法验证）和竞赛团队（快速原型）。建议首次使用按顺序阅读前三章，后续章节按需查阅。
+ORIX 教育版四足机器狗是大算机器人面向教育场景推出的专业级开发平台。我们的设计遵循四个核心理念：\textbf{学以致用}——它不是展会上的观摩样品，而是一台可以编程、调参、训练自定义策略的真实机器人；\textbf{降低门槛}——3 行 Python 代码即可完成从连接到行走的全流程，学生不需要先掌握通信协议和控制理论；\textbf{不设天花板}——从入门的遥控行走到高级的 RL 策略训练、多传感器融合、SLAM 建图和自主导航，一个平台覆盖从本科到研究生的完整学习路径；\textbf{工业级可靠}——采用与工业机器人相同的 FSM 状态机、控制权仲裁和 E-Stop 安全机制，学生接触的是真实的工程实践。
+
+本手册是 ORIX Python SDK 的完整开发指南，面向四类读者：高校教师（了解平台能力、设计课程实验方案）、学生开发者（从零开始学习机器人编程、完成课程项目和毕业设计）、科研人员（利用 SDK 传感器接口和控制 API 进行算法验证）以及竞赛团队（快速搭建原型参加 RoboCup、全国大学生机器人大赛等赛事）。手册覆盖从环境安装到高级开发的完整流程，建议首次使用时按顺序阅读前三章（前言、概述、快速开始），完成首次连通后再根据兴趣阅读理论基础和 API 参考。
 
 \vspace{1em}
 \begin{flushright}
@@ -295,214 +297,66 @@ ORIX 教育版四足机器狗是大算机器人面向教育场景推出的专业
 \chapter{概述}
 \label{ch:overview}
 
-ORIX 教育版四足机器狗 Python 开发套件，3 行代码控制机器人。
-
 \chapterguide
-{本章用于先建立整体认识：SDK 能控制什么、典型开发流程是什么、后续章节分别解决哪一类问题。它不是一步一步的上手教程，而是帮助您快速形成全局视图。}
-{如果您当前的目标是尽快跑通机器人控制，请先读第~\ref{ch:quickstart}~章；完成首次连通与动作验证后，再回到本章查看能力总览。}
+{本章建立对 ORIX 平台的整体认识：它解决什么问题、能做什么、适合什么场景、后续章节如何组织。阅读后您将对整个 SDK 有全局认识，便于根据自己的目标决定详读哪些章节。}
+{如果您想尽快跑通机器人控制，可跳到第~\ref{ch:quickstart}~章；如果您关心控制理论，可直接读第~\ref{ch:theory}~章。}
 
-\section{安装}
+\section{产品定位}
 
-ORIX SDK 通过 Python 标准包管理工具 pip 进行安装。安装完成后，您可以在任何 Python 3.8+ 环境中导入使用。以下是推荐的安装方式：
+ORIX 教育版四足机器狗是一个集成了运动控制、传感器融合、强化学习策略推理和安全机制的完整机器人平台。它由机器狗本体（16 DOF 四足机器人）、Python SDK（\texttt{brainstem-sdk}）和开发文档三部分组成。机器狗内置完整的控制系统，开发者通过 SDK 在开发电脑上编写 Python 代码远程控制机器人，无需接触底层 C++ 或嵌入式代码。
 
-\begin{lstlisting}[style=bash]
-cd sdk/python
-pip install -e .
-\end{lstlisting}
+\section{SDK 能做什么}
 
-\section{快速开始}
+\texttt{brainstem-sdk} 提供了对机器狗的全方位控制能力，主要包括以下五类接口：
 
-以下示例展示了使用 ORIX SDK 控制机器狗的最简流程。只需几行 Python 代码，即可完成连接、站立、行走和坐下等基本操作。
-
-\begin{lstlisting}[style=python]
-from brainstem_sdk import OrixClient
-
-# 连接机器人 (默认 192.168.66.190:13145)
-dog = OrixClient("192.168.66.190")
-
-# 使能电机 -> 站起 -> 走路 -> 坐下 -> 禁用
-dog.enable()
-dog.stand_up()
-dog.walk(vx=0.3)       # 30% 速度前进
-dog.walk(vx=0, vyaw=0.2)  # 原地左转
-dog.sit_down()
-dog.disable()
-\end{lstlisting}
-
-\section{API 参考}
-
-本节提供 ORIX SDK 核心接口的快速概览。完整的 API 文档请参阅第~\ref{ch:api}~章。
-
-\subsection{连接}
-
-在使用 SDK 控制机器狗之前，需要先建立与机器狗主控板的网络连接。确保您的开发电脑与机器狗处于同一局域网内。
-
-\begin{lstlisting}[style=python]
-# 默认连接
-dog = OrixClient("192.168.66.190")
-
-# 自定义端口和超时
-dog = OrixClient("10.0.0.1", port=13145, timeout=5.0)
-
-# 支持 with 语句
-with OrixClient("192.168.66.190") as dog:
-    dog.stand_up()
-\end{lstlisting}
-
-\subsection{运动控制}
-
-ORIX 机器狗支持多种运动模式，包括站立、坐下、行走和预设动作。所有运动指令通过 SDK 客户端对象发送，机器狗内置的状态机会自动管理运动状态转换。实际编程时，建议先确认当前状态，再发出动作指令，以免因为状态不匹配导致“调用成功但动作未生效”的误判。
-
-\begin{longtable}{lll}
-\toprule
-方法 & 说明 & 参数 \\
-\midrule
-\endhead
-\texttt{dog.enable()} & 使能全部电机 & -- \\
-\texttt{dog.disable()} & 禁用全部电机 & -- \\
-\texttt{dog.stand\_up()} & 坐姿 $\to$ 站立 & -- \\
-\texttt{dog.sit\_down()} & 站立 $\to$ 坐姿 & -- \\
-\texttt{dog.walk(vx, vy, vyaw)} & 行走 & \parbox[t]{5cm}{vx: 前后 [-1,1]\\vy: 左右 [-1,1]\\vyaw: 旋转 [-1,1]} \\
-\bottomrule
-\end{longtable}
-
-\noindent\textbf{walk() 参数约定：}
-\begin{itemize}[nosep]
-  \item \texttt{vx > 0} = 前进，\texttt{vx < 0} = 后退
-  \item \texttt{vy > 0} = 向左，\texttt{vy < 0} = 向右
-  \item \texttt{vyaw > 0} = 逆时针，\texttt{vyaw < 0} = 顺时针
-  \item \texttt{dog.walk()} (无参数) = 原地停步
+\begin{itemize}
+  \item \textbf{运动控制} --- 使能/禁用电机、站立、坐下、行走、切换速度模式、播放预设动作
+  \item \textbf{传感器读取} --- IMU 姿态数据流（50Hz）、关节编码器数据流、电机状态、母线电压
+  \item \textbf{状态管理} --- 查询 FSM 状态、订阅状态变化事件、切换运动策略
+  \item \textbf{诊断与维护} --- 读取电机故障码、清除故障、电机标零、健康检查
+  \item \textbf{摄像头接口} --- USB 摄像头拍照、录像、MJPEG 流媒体服务（可选模块）
 \end{itemize}
 
-\subsection{状态查询}
+整个 SDK 遵循简洁设计原则：客户代码完全不需要了解 gRPC、protobuf、状态机实现细节，所有复杂性隐藏在 \texttt{OrixClient} 类后面。
 
-通过状态查询接口，您可以随时了解机器狗当前所处的运动状态、加载的运动策略等信息。这对于编写可靠的控制逻辑至关重要。
+\section{典型开发流程}
 
-\begin{lstlisting}[style=python]
-# 获取当前状态
-state = dog.get_state()
-# 返回: "zero" | "grounded" | "standing" | "walking" | "transitioning"
+一个典型的 ORIX 开发流程包含以下步骤：
 
-# 获取当前策略
-profile = dog.get_profile()
-print(profile.current)     # "default"
-print(profile.available)   # ["default", "mini"]
+\begin{enumerate}
+  \item \textbf{环境准备} --- 开发电脑装 Python 3.8+，机器狗开机并连接局域网（详见第~\ref{ch:quickstart}~章）
+  \item \textbf{安装 SDK} --- \texttt{pip install brainstem-sdk}
+  \item \textbf{验证连接} --- 运行验证脚本，确认与机器狗通信正常
+  \item \textbf{编写控制代码} --- 使用 \texttt{OrixClient} 发送运动指令和读取传感器数据
+  \item \textbf{调试与迭代} --- 根据需要切换策略、调整参数、查看日志
+  \item \textbf{高级开发} --- 集成计算机视觉、训练自定义 RL 策略、与 ROS2 对接
+\end{enumerate}
 
-# 切换策略 (机器人必须在 grounded 状态)
-dog.switch_profile("mini")
-\end{lstlisting}
+\section{手册结构}
 
-\subsection{诊断}
+本手册共 9 章，按"入门 $\to$ 理论 $\to$ 参考 $\to$ 运维"的顺序组织：
 
-诊断接口用于检查电机健康状态、读取母线电压和清除故障码。在每次启动运动前进行诊断检查是良好的工程实践。
-
-\begin{lstlisting}[style=python]
-# 电压
-voltages = dog.get_voltage()  # [25.6, 25.5, ...] 16个电机
-
-# 电机状态
-motors = dog.get_motor_status()
-for m in motors:
-    print(f"Joint {m.id}: online={m.online} temp={m.temperature}C")
-
-# 清除电机故障
-dog.clear_motor_fault()          # 清除全部
-dog.clear_motor_fault([0, 1, 2]) # 只清前右腿
-
-# 标零 (grounded 状态下)
-dog.set_zero()
-\end{lstlisting}
-
-\subsection{实时数据流}
-
-SDK 提供三种实时数据流：IMU 姿态数据、关节编码器数据和状态机变化事件。这些数据流基于 gRPC 服务端流实现，以约 50Hz 的频率持续推送。
-
-\begin{lstlisting}[style=python]
-# IMU 数据 (~50Hz)
-for imu in dog.listen_imu():
-    print(f"gyro: {imu.gyroscope.x:.3f}, {imu.gyroscope.y:.3f}, {imu.gyroscope.z:.3f}")
-    print(f"quat: w={imu.quaternion.w:.3f}")
-
-# 关节数据
-for joint in dog.listen_joint():
-    print(f"Joint {joint.id}: pos={joint.position:.3f} rad")
-
-# 状态变化
-for state in dog.listen_state():
-    print(f"State changed: {state}")
-\end{lstlisting}
-
-\section{关节编号}
-
-ORIX 机器人共有 16 个关节，按四条腿分组编号如下：
-
-\begin{longtable}{clcl}
+\begin{longtable}{llp{7cm}}
 \toprule
-\textbf{前右 (FR)} & & \textbf{前左 (FL)} & \\
-\midrule
-0 & Hip & 4 & Hip \\
-1 & Thigh & 5 & Thigh \\
-2 & Calf & 6 & Calf \\
-3 & Foot & 7 & Foot \\
-\midrule
-\textbf{后右 (RR)} & & \textbf{后左 (RL)} & \\
-\midrule
-8 & Hip & 12 & Hip \\
-9 & Thigh & 13 & Thigh \\
-10 & Calf & 14 & Calf \\
-11 & Foot & 15 & Foot \\
-\bottomrule
-\end{longtable}
-
-\section{状态机}
-
-ORIX 的状态机包含三个主要运行状态。系统初始化后自动进入 Grounded 状态，用户通过 SDK 指令在各状态之间切换。状态转换遵循严格的顺序约束，不允许跳跃式切换。
-
-\begin{longtable}{lll}
-\toprule
-起始状态 & 触发动作 & 目标状态 \\
+\textbf{章} & \textbf{主题} & \textbf{适合谁} \\
 \midrule
 \endhead
-Init & 自动初始化 & Grounded \\
-Grounded & \texttt{stand\_up()} & Standing \\
-Standing & \texttt{walk(vx, vy, vyaw)} & Walking \\
-Walking & \texttt{walk(0,0,0)} 或停步 & Standing \\
-Standing & \texttt{sit\_down()} & Grounded \\
-Walking & \texttt{sit\_down()} & Grounded（经由 Standing） \\
+1 & 概述（本章） & 所有读者 \\
+2 & 快速开始 & 第一次使用的开发者 \\
+3 & 理论基础 & 希望理解控制原理的学生/研究人员 \\
+4 & 硬件概览 & 需要了解硬件参数的工程师 \\
+5 & 坐标系与关节 & 进行运动规划的开发者 \\
+6 & 状态机与运动控制 & 编写控制逻辑的开发者 \\
+7 & 传感器数据 & 进行数据采集和算法研究的开发者 \\
+8 & API 参考 & 查阅接口细节时的所有开发者 \\
+9 & 安全指南 & 上手前必读 \\
+10 & 常见问题 & 遇到问题时查阅 \\
 \bottomrule
 \end{longtable}
 
-\begin{itemize}[nosep]
-  \item \textbf{Grounded}：坐姿，安全状态。上电后自动进入。
-  \item \textbf{Standing}：站立，可以接收 walk 指令。
-  \item \textbf{Walking}：行走中。发送 \texttt{walk(0,0,0)} 回到 Standing。
-\end{itemize}
+\vspace{0.5em}
 
-\section{示例}
-
-SDK 附带多个示例脚本，涵盖从基础行走到传感器读取、电机诊断和键盘遥控等典型场景。这些示例是学习 SDK 用法的最佳起点。
-
-\begin{longtable}{ll}
-\toprule
-示例 & 说明 \\
-\midrule
-\endhead
-\texttt{examples/01\_hello\_walk.py} & 最简走路示例 \\
-\texttt{examples/02\_read\_imu.py} & 读取 IMU 数据流 \\
-\texttt{examples/03\_motor\_diagnostics.py} & 电机诊断 \\
-\texttt{examples/04\_keyboard\_control.py} & WASD 键盘控制 \\
-\bottomrule
-\end{longtable}
-
-\section{网络要求}
-
-ORIX SDK 使用 gRPC over HTTP/2 协议与机器狗通信，对网络环境有以下基本要求：
-
-\begin{itemize}[nosep]
-  \item 开发机和机器人在同一局域网
-  \item 默认 gRPC 端口：\textbf{13145}
-  \item 无需安装额外中间件（纯 gRPC over HTTP/2）
-\end{itemize}
+首次使用建议按顺序阅读第 1--2 章（概述 + 快速开始），完成首次连通和基本控制验证。之后可根据需要跳读：如果关心控制理论，读第 3 章；如果要做运动规划，读第 5--6 章；如果要开发传感器融合或 RL 策略，读第 7 章；遇到具体接口问题查第 8 章。安全指南（第 9 章）在真机操作前必读。
 
 
 
@@ -902,7 +756,7 @@ $\mathbf{b}_{\mathrm{contact}}$ & 12 & 足端接触布尔量 \\
 \bottomrule
 \end{longtable}
 
-\textbf{注意：}以上为概念性分解，实际观测向量的精确组成可能因策略版本不同而略有差异。
+\textbf{注：}本章描述的是概念模型，实际部署版本的观测向量和动作维度可能因 Profile 配置和 ONNX 模型而异。具体维度请通过 \texttt{model\_info} 接口查询或参考您训练时使用的 env config。
 
 \subsection{历史帧堆叠}
 
@@ -1458,7 +1312,7 @@ Walking & \texttt{sit\_down()} & 先 StandUp 再 SitDown & Grounded \\
 中间状态 & Transitioning (StandUp) \\
 耗时 & 150 ticks $\times$ 20ms = \textbf{3 秒} \\
 过程 & 从当前姿态线性插值到 standingPose \\
-PD 参数 & Kp=200, Kd=8（高刚度，确保平稳） \\
+PD 参数 & 由 Profile 配置决定（过渡阶段使用较高刚度，确保平稳） \\
 \bottomrule
 \end{longtable}
 
@@ -1544,7 +1398,7 @@ PD 参数 & Kp=200, Kd=8（高刚度，确保平稳） \\
 
 \section{非法操作处理}
 
-ORIX 的状态机设计优先保证安全性。在错误的状态下发送指令不会导致错误，但指令会被静默忽略：
+ORIX 的状态机设计优先保证安全性。高层 SDK API 会抛出 \texttt{InvalidStateError} 异常（从 \texttt{grpc.FAILED\_PRECONDITION} 映射而来）。如果您直接使用底层 stub 绕过 SDK，服务端可能静默忽略不合法的状态转换。推荐始终使用 \texttt{OrixClient} 并处理 \texttt{InvalidStateError}：
 
 \begin{longtable}{lll}
 \toprule
@@ -1702,7 +1556,7 @@ SDK 控制中，遥控器关机 & SDK 保持控制权，不受影响 \\
 \begin{enumerate}[nosep]
   \item \textbf{首次调试时关闭遥控器}，避免控制权冲突
   \item \textbf{保留遥控器作为安全手段}，紧急情况下随时接管
-  \item \textbf{不要轮询状态来检测控制权}，SDK 指令被拒绝时不会报错，只是静默忽略
+  \item \textbf{不要轮询状态来检测控制权}。当 SDK 指令与当前状态不匹配时，\texttt{OrixClient} 会抛出 \texttt{InvalidStateError} 异常。遥控器持有控制权时的 SDK 指令在仲裁层被拒绝，这种情况 SDK 不会报错（非状态机错误）。
 \end{enumerate}
 
 \section{故障处理}
@@ -1916,6 +1770,263 @@ RPC 超时 & 5 秒 & SDK 默认 RPC 超时 \\
 \bottomrule
 \end{longtable}
 
+
+
+% ============================================================
+%  实用开发指南
+% ============================================================
+\chapter{实用开发指南}
+\label{ch:practical}
+
+\chapterguide{本章汇集了在实际开发中经常遇到的场景和最佳实践。包括电池管理、数据记录、远程部署、集成 OpenCV 视觉、自定义 Profile 和多机器人管理等实用模式。每个场景都给出可直接使用的代码模板。}{本章不涉及新的 API，而是展示如何组合已有 API 解决真实问题。初次阅读可以略读，实际开发时作为速查参考。}
+
+\section{电池管理}
+
+机器狗采用 7 串锂电池，正常工作电压约 24V，低压保护阈值 18V。在长时间运行的应用中，建议实现主动电池监控而不是依赖低压保护被动触发。
+
+\subsection{电池电量估算}
+
+通过电压近似估算电池电量（线性估算，实际锂电放电曲线非线性，仅作参考）：
+
+\begin{lstlisting}[style=python]
+def estimate_battery_level(dog):
+    """估算电池电量百分比 (近似值)"""
+    voltages = dog.get_voltage()
+    valid = [v for v in voltages if v > 0]
+    if not valid:
+        return None
+    avg_v = sum(valid) / len(valid)
+    # 线性插值: 29.4V=100%, 18V=0%
+    pct = max(0, min(100, (avg_v - 18) / (29.4 - 18) * 100))
+    return pct, avg_v
+\end{lstlisting}
+
+\subsection{周期性电池监控}
+
+在长时间运行的任务中，建议每 30 秒检查一次电池，电量低于 30\% 时主动坐下并提醒用户：
+
+\begin{lstlisting}[style=python]
+import time
+from brainstem_sdk import OrixClient
+
+def monitor_battery_loop(dog, interval=30):
+    while True:
+        pct, v = estimate_battery_level(dog)
+        if v is None:
+            time.sleep(interval)
+            continue
+        print(f"电量: {pct:.0f}% ({v:.1f}V)")
+        if pct < 30:
+            print("低电量，主动收工...")
+            dog.sit_down()
+            dog.disable()
+            break
+        time.sleep(interval)
+\end{lstlisting}
+
+\section{数据记录与采集}
+
+机器狗的 IMU 和关节数据是进行算法研究和系统调试的重要数据源。SDK 的流式接口可以方便地记录这些数据到文件。
+
+\subsection{记录 IMU 数据到 CSV}
+
+\begin{lstlisting}[style=python]
+import csv
+from brainstem_sdk import OrixClient
+
+def record_imu_to_csv(duration_sec, filename):
+    dog = OrixClient("192.168.66.190")
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["time_ms", "gx", "gy", "gz",
+                         "qw", "qx", "qy", "qz"])
+        count = 0
+        target = duration_sec * 50  # 50 Hz
+        for imu in dog.listen_imu():
+            writer.writerow([
+                imu.timestamp_ms,
+                imu.gyroscope.x, imu.gyroscope.y, imu.gyroscope.z,
+                imu.quaternion.w, imu.quaternion.x,
+                imu.quaternion.y, imu.quaternion.z,
+            ])
+            count += 1
+            if count >= target:
+                break
+    dog.close()
+
+# 记录 10 秒 IMU 数据
+record_imu_to_csv(10, "imu_log.csv")
+\end{lstlisting}
+
+\subsection{同时记录 IMU 和关节数据}
+
+使用多线程同时订阅多个数据流，主线程负责写文件协调：
+
+\begin{lstlisting}[style=python]
+import threading
+from queue import Queue
+
+def record_all_sensors(dog, duration_sec, prefix="log"):
+    imu_q = Queue()
+    joint_q = Queue()
+    stop_event = threading.Event()
+
+    def imu_worker():
+        for imu in dog.listen_imu():
+            if stop_event.is_set():
+                break
+            imu_q.put(imu)
+
+    def joint_worker():
+        for j in dog.listen_joint():
+            if stop_event.is_set():
+                break
+            joint_q.put(j)
+
+    t1 = threading.Thread(target=imu_worker, daemon=True)
+    t2 = threading.Thread(target=joint_worker, daemon=True)
+    t1.start()
+    t2.start()
+
+    time.sleep(duration_sec)
+    stop_event.set()
+
+    # 保存队列内容到文件
+    # ... (写 CSV 逻辑)
+\end{lstlisting}
+
+\section{远程部署}
+
+大多数情况下您在开发电脑上运行 Python 代码通过 gRPC 远程控制机器狗。但有时需要将代码部署到机器狗本体上运行（例如减少网络延迟、脱离开发机运行）。
+
+\subsection{SSH 部署工作流}
+
+将本地脚本上传到机器狗并运行：
+
+\begin{lstlisting}[style=bash]
+# 上传脚本到机器狗
+scp my_script.py sunrise@192.168.66.190:~/scripts/
+
+# SSH 远程执行
+ssh sunrise@192.168.66.190 "cd scripts && python3 my_script.py"
+
+# 长期后台运行
+ssh sunrise@192.168.66.190 "nohup python3 scripts/my_script.py > log.txt 2>&1 &"
+\end{lstlisting}
+
+在机器狗本地运行时，SDK 的连接地址使用 \texttt{localhost}：
+
+\begin{lstlisting}[style=python]
+# 本地运行（在机器狗上）
+dog = OrixClient("localhost")
+
+# 远程运行（在开发机上）
+dog = OrixClient("192.168.66.190")
+\end{lstlisting}
+
+\section{集成计算机视觉}
+
+结合 OpenCV 可以实现基于视觉的控制，例如目标跟踪、障碍物检测等。以下是一个最简的颜色追踪示例：
+
+\begin{lstlisting}[style=python]
+import cv2
+import numpy as np
+from brainstem_sdk import OrixClient, OrixCamera
+
+def follow_red_ball():
+    dog = OrixClient("192.168.66.190")
+    cam = OrixCamera()
+    cam.open()
+
+    dog.enable()
+    dog.stand_up()
+
+    try:
+        while True:
+            frame = cam.read()
+            if frame is None:
+                continue
+
+            # 检测红色区域
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            mask = cv2.inRange(hsv, (0, 100, 100), (10, 255, 255))
+            moments = cv2.moments(mask)
+
+            if moments["m00"] > 500:
+                # 红色物体中心 x 坐标
+                cx = int(moments["m10"] / moments["m00"])
+                frame_center = frame.shape[1] // 2
+                # 根据偏差控制转向
+                turn = -(cx - frame_center) / frame_center * 0.3
+                dog.walk(vx=0.2, vyaw=turn)
+            else:
+                dog.walk()  # 停止
+
+            if cv2.waitKey(1) == ord('q'):
+                break
+    finally:
+        dog.walk()
+        dog.sit_down()
+        dog.disable()
+        cam.close()
+        dog.close()
+\end{lstlisting}
+
+\section{自定义 Profile}
+
+Profile 是机器狗的运动参数集合，用户可以通过自定义 Profile 调整 PD 增益、站立姿态和 ONNX 模型路径。自定义 Profile 的典型用途包括：训练自己的 RL 策略、调参使机器狗更稳定、适配不同地形。
+
+\subsection{Profile 文件结构}
+
+Profile 是 JSON 文件，存放在机器狗的 \texttt{profiles/} 目录下。以下是一个完整示例的骨架：
+
+\begin{lstlisting}[style=plain]
+{
+  "name": "my_custom",
+  "description": "自定义策略",
+  "modelPath": "model/my_policy.onnx",
+  "standingPose": [0.0, -0.65, 1.5, 0.0, ...],
+  "sittingPose": [0.0, 0.0, 0.0, 0.0, ...],
+  "inferKp": [...], "inferKd": [...],
+  "standUpKp": [...], "standUpKd": [...],
+  "sitDownKp": [...], "sitDownKd": [...],
+  "standUpCounts": 150,
+  "sitDownCounts": 150,
+  "imuGyroscopeScale": 0.25,
+  "jointVelocityScale": [0.05, 0.05, 0.05, 0.05],
+  "actionScale": [0.125, 0.25, 0.25, 5.0]
+}
+\end{lstlisting}
+
+完整字段说明参见 SDK 安装目录下的 \texttt{profile\_schema.json}。
+
+\subsection{部署自定义 Profile}
+
+\begin{lstlisting}[style=bash]
+# 上传到机器狗
+scp my_custom.json sunrise@192.168.66.190:~/profiles/
+
+# 控制系统每 30 秒自动扫描 profiles/ 目录，无需重启
+# 上传后在 SDK 中即可切换
+\end{lstlisting}
+
+\begin{lstlisting}[style=python]
+# 切换到自定义策略
+dog.switch_profile("my_custom")
+print(f"当前策略: {dog.get_profile().current}")
+\end{lstlisting}
+
+\section{开发建议与最佳实践}
+
+\begin{itemize}
+  \item \textbf{始终使用 try/finally} --- 确保异常时机器狗能安全收工（坐下 + 禁用电机）
+  \item \textbf{先查状态再发指令} --- 状态不匹配的指令会被静默忽略，先 \texttt{get\_state()} 可以避免误判
+  \item \textbf{流式接口用迭代器} --- \texttt{listen\_imu()} 等返回迭代器，用 \texttt{for} 循环消费，不要一次性 \texttt{list()}
+  \item \textbf{网络延迟补偿} --- 通过 Wi-Fi 连接时有 5-20ms 延迟，对需要高实时性的控制任务建议部署到机器狗本地
+  \item \textbf{日志分级} --- 开发时用 \texttt{INFO} 查看状态，调试时用 \texttt{DEBUG}，生产时用 \texttt{WARNING}
+  \item \textbf{测试先仿真后真机} --- 大算机器人提供 MuJoCo 仿真环境，建议先在仿真中验证逻辑再部署到真机
+  \item \textbf{电池健康} --- 经常使用到低压的电池寿命会下降，建议保持在 20\%--80\% 之间充放电
+\end{itemize}
 
 
 % ============================================================
@@ -2974,26 +3085,21 @@ if state == RobotState.STANDING:
 
 \section{错误处理}
 
-所有 RPC 调用可能抛出 \texttt{grpc.RpcError}。以下是常见错误场景及处理方式：
+\texttt{OrixClient} 的所有方法在遇到错误时会抛出 SDK 异常类：\texttt{OrixConnectionError}（网络不通）、\texttt{OrixTimeoutError}（超时）、\texttt{InvalidStateError}（状态错误）、\texttt{OrixError}（其他错误）。高级用户直接使用底层 stub 时才会遇到 \texttt{grpc.RpcError}。
 
 \subsection{连接超时}
 
 \begin{lstlisting}[style=python]
-import grpc
+from brainstem_sdk import OrixClient, OrixConnectionError, InvalidStateError
 
 try:
-    dog = OrixClient("192.168.66.190", timeout=3.0)
-    dog.get_state()
-except grpc.RpcError as e:
-    if e.code() == grpc.StatusCode.UNAVAILABLE:
-        print("无法连接到机器人。请检查：")
-        print("  1. 机器人是否已开机")
-        print("  2. IP 地址是否正确")
-        print("  3. brainstem 服务是否正在运行")
-    elif e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
-        print("请求超时。网络可能不稳定。")
-    else:
-        print(f"gRPC 错误: {e.code()} - {e.details()}")
+    dog = OrixClient("192.168.66.190")
+    dog.stand_up()
+    dog.walk(vx=0.5)
+except OrixConnectionError:
+    print("无法连接机器人")
+except InvalidStateError as e:
+    print(f"状态错误: {e}")
 \end{lstlisting}
 
 \subsection{常见错误码}
@@ -3081,12 +3187,47 @@ finally:
  & \texttt{switch\_profile(name)} & ProfileInfo & 切换运动策略 \\
 \textbf{诊断} & \texttt{clear\_motor\_fault(joint\_ids)} & None & 清除电机故障 \\
  & \texttt{set\_zero()} & None & 标定零位 \\
+ & \texttt{ping()} & bool & 检查连接状态 \\
+\textbf{速度模式} & \texttt{set\_high\_speed(enabled)} & None & 开启/关闭高速模式（最大 2.5\,m/s） \\
+ & \texttt{get\_speed\_mode()} & str & 返回 "normal" 或 "high\_speed" \\
+\textbf{手势} & \texttt{list\_gestures()} & list[GestureInfo] & 列出所有预设动作 \\
+ & \texttt{play\_gesture(name, timeout)} & None & 播放预设动作（默认超时 30\,s） \\
 \textbf{数据流} & \texttt{listen\_imu()} & Iterator[ImuData] & IMU 实时流 \\
  & \texttt{listen\_joint()} & Iterator[JointData] & 关节实时流 \\
  & \texttt{listen\_state()} & Iterator[str] & 状态变化流 \\
 \bottomrule
 \end{longtable}
 }
+
+\section*{附录：OrixCamera 速查表}
+
+\texttt{OrixCamera} 是可选的摄像头辅助模块（依赖 \texttt{opencv-python}），提供拍照、录像和 MJPEG 流功能。
+
+{\small
+\begin{longtable}{lll}
+\toprule
+方法 & 返回值 & 说明 \\
+\midrule
+\endhead
+\texttt{open()} & None & 打开摄像头设备 \\
+\texttt{close()} & None & 关闭摄像头设备 \\
+\texttt{read()} & ndarray & 读取单帧图像 \\
+\texttt{save\_photo(path)} & None & 拍照并保存到指定路径 \\
+\texttt{start\_recording(path)} & None & 开始录像 \\
+\texttt{stop\_recording()} & None & 停止录像 \\
+\texttt{stream\_mjpeg(host, port)} & None & 启动 MJPEG HTTP 流服务 \\
+\bottomrule
+\end{longtable}
+}
+
+\noindent 使用示例：
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import OrixCamera
+
+with OrixCamera() as cam:
+    cam.save_photo("photo.jpg")
+\end{lstlisting}
 
 
 
@@ -3249,8 +3390,10 @@ $<$ 18V & 危险 & 自动触发保护，必须立即充电 \\
 \end{itemize}
 
 \begin{lstlisting}[style=bash]
-export ORIX_JOINT_LIMIT_RAD=2.5  # 约 143 度
+export HAN_DOG_JOINT_LIMIT_RAD=2.5  # 约 143 度
 \end{lstlisting}
+
+\noindent 注：控制系统内部环境变量名仍沿用历史名称 \texttt{HAN\_DOG\_*}，这是为了向后兼容既有部署脚本。
 
 \section{电机故障处理}
 
@@ -3721,7 +3864,7 @@ print(f"当前电压: {min(voltages):.1f}V")
 原因 & 诊断方法 \\
 \midrule
 \endhead
-低电压 ($<$ 18V) & \texttt{get\_voltage()} 返回值低于 42 \\
+低电压 ($<$ 18V) & \texttt{get\_voltage()} 返回值低于 18 \\
 电机过热 & \texttt{get\_motor\_status()} 中 temperature $>$ 80\textdegree C \\
 关节超限 & \texttt{get\_motor\_status()} 中 position 绝对值过大 \\
 CAN 通信中断 & \texttt{get\_motor\_status()} 中部分电机 online=False \\
@@ -4091,7 +4234,7 @@ dog = OrixClient("127.0.0.1", port=13145)
    (完整的异常堆栈或错误输出)
 
 8. 机器人日志:
-   (SSH 登录，提供 logs/orix_YYYYMMDD.log 中相关片段)
+   (SSH 登录，提供 logs/han_dog_YYYYMMDD.log 中相关片段)
 \end{lstlisting}
 
 \subsection{收集诊断信息的脚本}
@@ -4174,16 +4317,16 @@ print("请将以上输出复制到 Bug 报告中。")
 ssh sunrise@192.168.66.190
 
 # 查看今天的日志
-cat logs/orix_$(date +%Y%m%d).log
+cat logs/han_dog_$(date +%Y%m%d).log
 
 # 只看错误和警告
-grep -E "WARNING|SEVERE" logs/orix_$(date +%Y%m%d).log
+grep -E "WARNING|SEVERE" logs/han_dog_$(date +%Y%m%d).log
 
 # 查看最近 100 行
-tail -100 logs/orix_$(date +%Y%m%d).log
+tail -100 logs/han_dog_$(date +%Y%m%d).log
 
 # 导出日志到本地（在开发机上执行）
-scp sunrise@192.168.66.190:logs/orix_*.log ./orix_logs/
+scp sunrise@192.168.66.190:logs/han_dog_*.log ./han_dog_logs/
 \end{lstlisting}
 
 \subsection{联系方式}
@@ -4192,6 +4335,68 @@ scp sunrise@192.168.66.190:logs/orix_*.log ./orix_logs/
   \item GitHub Issues：在 brainstem 仓库提交 Issue
   \item 附上诊断脚本输出和相关日志
 \end{itemize}
+
+\section{SSH 访问与系统服务}
+\label{sec:ssh-access}
+
+大多数排障操作都需要 SSH 登录机器人查看日志或重启服务。出厂镜像默认已启用 SSH，无需额外配置。
+
+\subsection{默认账户}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 默认值 \\
+\midrule
+\endhead
+用户名 & \texttt{sunrise} \\
+密码 & \texttt{sunrise} \\
+IP 地址 & \texttt{192.168.66.190} \\
+SSH 端口 & \texttt{22} \\
+\bottomrule
+\end{longtable}
+
+\noindent 出厂镜像默认开启 SSH 服务，无需手动启用。登录命令：
+
+\begin{lstlisting}[style=bash]
+ssh sunrise@192.168.66.190
+# 提示输入密码: sunrise
+\end{lstlisting}
+
+\subsection{brainstem 服务管理}
+
+ORIX 的控制栈（\texttt{brainstem}）以 \texttt{systemd} 服务形式运行，开机自启。以下命令在 SSH 登录后执行：
+
+\begin{lstlisting}[style=bash]
+# 查看服务状态
+systemctl status brainstem
+
+# 查看最近 100 行日志
+journalctl -u brainstem -n 100
+
+# 实时跟踪日志
+journalctl -u brainstem -f
+
+# 重启服务（通常在切换策略或修改配置后）
+sudo systemctl restart brainstem
+
+# 停止服务（调试时临时关闭控制栈）
+sudo systemctl stop brainstem
+
+# 启动服务
+sudo systemctl start brainstem
+\end{lstlisting}
+
+\subsection{无网络环境下的备选连接方式}
+
+如果 SSH 被校园网或企业防火墙拦截，或机器人未能获取 DHCP 地址，可以使用 RJ45 网线直连：
+
+\begin{enumerate}[nosep]
+  \item 用网线将开发机直接连接到机器人的 RJ45 口
+  \item 将开发机的以太网接口配置为静态 IP，例如 \texttt{192.168.66.100/24}
+  \item 使用默认地址连接：\texttt{ssh sunrise@192.168.66.190}
+\end{enumerate}
+
+\noindent 这种方式不依赖任何路由器或交换机，是调试现场最可靠的连接手段。
 
 \section*{附录：快速排障速查表}
 

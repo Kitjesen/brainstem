@@ -1,6 +1,6 @@
 # 06 -- API 参考
 
-本章提供 Thunder Python SDK (`brainstem_sdk`) 全部公开接口的完整参考。
+本章提供 ORIX Python SDK (`brainstem_sdk`) 全部公开接口的完整参考。
 
 ---
 
@@ -217,7 +217,7 @@ dog.get_voltage() -> list[float]
 |------|------|
 | 返回值 | 长度为 16 的浮点数列表，单位 V |
 | 索引 | 对应关节编号 0-15 |
-| 低压阈值 | 42.0V，低于此值系统自动触发保护 |
+| 低压阈值 | 18V，低于此值系统自动触发保护 |
 
 ```python
 voltages = dog.get_voltage()
