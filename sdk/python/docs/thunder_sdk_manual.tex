@@ -218,7 +218,6 @@
 \begin{tabular}{rl}
 \textbf{版本} & v1.0.0 \\
 \textbf{日期} & 2026年4月 \\
-\textbf{密级} & 内部文档 \\
 \end{tabular}
 
 \vfill
@@ -256,7 +255,7 @@
 \toprule
 版本 & 日期 & 作者 & 说明 \\
 \midrule
-v1.0.0 & 2026-04 & 大算机器人 & 初始版本 \\
+v1.0.0 & 2026-04 & 大算机器人 & 正式发布 \\
 \bottomrule
 \end{tabular}
 
@@ -268,6 +267,50 @@ v1.0.0 & 2026-04 & 大算机器人 & 初始版本 \\
 %  目录
 % ============================================================
 \tableofcontents
+\newpage
+
+% ============================================================
+%  前言
+% ============================================================
+\chapter*{前言}
+\addcontentsline{toc}{chapter}{前言}
+
+\section*{教育机器人的时代背景}
+
+近年来，国家高度重视人工智能与机器人教育的发展。《新一代人工智能发展规划》明确提出在中小学和高等院校开设人工智能相关课程，《教育部关于加强和改进中小学实验教学的意见》强调动手实践和工程思维的培养。2024 年教育部印发的《人工智能教育基地建设指南》进一步推动了 AI+机器人实验室在全国高校和中学的普及。
+
+在这一背景下，四足机器人作为融合了机械工程、电子控制、传感器技术、强化学习和嵌入式系统的综合平台，正在成为 STEM 教育和高校科研的理想载体。它不仅能让学生直观理解运动学和动力学原理，还能作为强化学习、计算机视觉和自主导航等前沿技术的实验平台。
+
+\section*{ORIX 教育版的定位}
+
+ORIX 教育版四足机器狗是大算机器人面向教育场景推出的专业级机器人开发平台。它的设计理念是：
+
+\begin{itemize}
+  \item \textbf{学以致用} --- 不是观摩演示的展品，而是可以编程、调参、训练策略的真实机器人
+  \item \textbf{降低门槛} --- 3 行 Python 代码即可控制机器人行走，无需了解底层通信协议和控制理论
+  \item \textbf{不设天花板} --- 从入门行走到自定义 RL 策略训练、多传感器融合、自主导航，一个平台覆盖从本科到研究生的完整学习路径
+  \item \textbf{工业级可靠} --- 采用与工业机器人相同的控制架构和安全机制，学生接触的是真实的工程实践，而非简化的教学模型
+\end{itemize}
+
+\section*{本手册的目标}
+
+本手册为 ORIX Python SDK 的完整开发指南，面向以下读者：
+
+\begin{itemize}
+  \item \textbf{高校教师}：了解平台能力，设计课程实验方案
+  \item \textbf{学生开发者}：从零开始学习机器人编程，完成课程项目
+  \item \textbf{科研人员}：利用 SDK 的传感器接口和控制 API 进行算法验证
+  \item \textbf{竞赛团队}：快速搭建机器人应用原型，参加 RoboCup、全国机器人大赛等赛事
+\end{itemize}
+
+手册覆盖从安装配置到高级开发的完整流程。建议首次使用时按顺序阅读前三章（概述、快速开始、硬件概览），后续章节可按需查阅。
+
+\vspace{1em}
+\begin{flushright}
+\textit{大算机器人技术团队}\\
+\textit{2026 年 4 月}
+\end{flushright}
+
 \newpage
 
 % ============================================================
@@ -974,33 +1017,41 @@ sitting_pose = [0, 0, 0, 0,   # FR
 q_{\text{target}} = \text{action\_output} \times \text{actionScale} + \text{standingPose}
 \]
 
-\subsection{过渡阶段（站起/坐下）}
+\subsection{站立姿态}
 
-站起和坐下使用统一的高刚度参数，确保平稳过渡：
+站立姿态（Standing Pose）是机器狗正常直立时所有关节的目标角度。站起过程会从坐姿线性插值到站立姿态，约 3 秒完成。站立姿态和 PD 增益参数均通过 Profile JSON 文件配置，用户可以根据自己的需要调整。
 
-\begin{longtable}{lll}
+\subsection{PD 控制接口}
+
+机器狗的关节控制基于 PD（比例-微分）位置控制。每个关节独立接受 Kp（比例增益）和 Kd（微分增益）参数，不同的增益组合会产生不同的运动效果：Kp 越大关节越"硬"，响应越快但可能震荡；Kd 越大阻尼越强，运动越平滑但响应变慢。
+
+PD 参数通过 Profile JSON 文件配置，SDK 提供以下接口查看和切换策略：
+
+\begin{lstlisting}[style=python]
+# 查看当前策略（含 PD 增益配置）
+profile = dog.get_profile()
+print(profile.current)      # 当前策略名称
+print(profile.available)    # 所有可用策略
+
+# 切换到不同的 PD 参数组合（机器人须在着地状态）
+dog.switch_profile("my_custom_profile")
+\end{lstlisting}
+
+Profile JSON 文件中的 PD 相关字段：
+
+\begin{longtable}{lp{10cm}}
 \toprule
-参数 & 值 & 说明 \\
+字段 & 说明 \\
 \midrule
 \endhead
-Kp & 200 & 全部 16 个关节 \\
-Kd & 8 & 全部 16 个关节 \\
+\texttt{inferKp} / \texttt{inferKd} & 行走推理时的 PD 增益（16 个值，每关节独立） \\
+\texttt{standUpKp} / \texttt{standUpKd} & 站起过渡时的 PD 增益 \\
+\texttt{sitDownKp} / \texttt{sitDownKd} & 坐下过渡时的 PD 增益 \\
+\texttt{actionScale} & 动作缩放系数（4 个值，按关节类型） \\
 \bottomrule
 \end{longtable}
 
-\section{关节速度缩放}
-
-为了使 RL 策略的观测向量中各维度的数值范围保持一致，IMU 陀螺仪和关节速度在输入神经网络前会进行缩放处理。
-
-\begin{longtable}{lll}
-\toprule
-参数 & 缩放系数 & 说明 \\
-\midrule
-\endhead
-\texttt{imuGyroscopeScale} & 0.25 & IMU 陀螺仪数据缩放 \\
-\texttt{jointVelocityScale} & {[}0.05, 0.05, 0.05, 0.05{]} & 各类型关节速度缩放 \\
-\bottomrule
-\end{longtable}
+详细的 JSON 格式规范请参考 \texttt{profile\_schema.json}。
 
 \section{编程中的关节操作}
 
@@ -2915,7 +2966,7 @@ $<$ 22.4V & 危险 & 自动触发保护，必须立即充电 \\
 \end{itemize}
 
 \begin{lstlisting}[style=bash]
-export HAN_DOG_JOINT_LIMIT_RAD=2.5  # 约 143 度
+export ORIX_JOINT_LIMIT_RAD=2.5  # 约 143 度
 \end{lstlisting}
 
 \section{电机故障处理}
@@ -3402,7 +3453,7 @@ CAN 通信中断 & \texttt{get\_motor\_status()} 中部分电机 online=False \\
 ssh sunrise@192.168.66.190
 # 日志文件在 logs/ 目录下
 ls logs/
-cat logs/han_dog_$(date +%Y%m%d).log | tail -50
+cat logs/orix_$(date +%Y%m%d).log | tail -50
 \end{lstlisting}
 
 \subsection{Q: 站起来后立即摔倒}
@@ -3757,7 +3808,7 @@ dog = OrixClient("127.0.0.1", port=13145)
    (完整的异常堆栈或错误输出)
 
 8. 机器人日志:
-   (SSH 登录，提供 logs/han_dog_YYYYMMDD.log 中相关片段)
+   (SSH 登录，提供 logs/orix_YYYYMMDD.log 中相关片段)
 \end{lstlisting}
 
 \subsection{收集诊断信息的脚本}
@@ -3840,16 +3891,16 @@ print("请将以上输出复制到 Bug 报告中。")
 ssh sunrise@192.168.66.190
 
 # 查看今天的日志
-cat logs/han_dog_$(date +%Y%m%d).log
+cat logs/orix_$(date +%Y%m%d).log
 
 # 只看错误和警告
-grep -E "WARNING|SEVERE" logs/han_dog_$(date +%Y%m%d).log
+grep -E "WARNING|SEVERE" logs/orix_$(date +%Y%m%d).log
 
 # 查看最近 100 行
-tail -100 logs/han_dog_$(date +%Y%m%d).log
+tail -100 logs/orix_$(date +%Y%m%d).log
 
 # 导出日志到本地（在开发机上执行）
-scp sunrise@192.168.66.190:logs/han_dog_*.log ./orix_logs/
+scp sunrise@192.168.66.190:logs/orix_*.log ./orix_logs/
 \end{lstlisting}
 
 \subsection{联系方式}
