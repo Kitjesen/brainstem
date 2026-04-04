@@ -217,6 +217,37 @@ class ThunderClient:
             descriptions=list(resp.descriptions),
         )
 
+    # ── Speed mode (速度模式) ─────────────────────────────
+
+    def set_high_speed(self, enabled: bool = True):
+        """Enable or disable high-speed mode (max 2.5m/s).
+
+        High-speed mode increases the maximum walking speed. Use only
+        in open, flat areas. The robot must be in Standing state.
+
+        Args:
+            enabled: True for high-speed (2.5m/s), False for normal.
+
+        Example::
+
+            dog.stand_up()
+            dog.set_high_speed(True)   # enable 2.5m/s
+            dog.walk(vx=1.0)           # full speed forward
+            dog.set_high_speed(False)  # back to normal
+        """
+        mode = 1 if enabled else 0  # SPEED_MODE_HIGH=1, SPEED_MODE_NORMAL=0
+        req = cms_pb2.SpeedModeRequest(mode=mode)
+        self._stub.SetSpeedMode(req, timeout=self._timeout)
+
+    def get_speed_mode(self) -> str:
+        """Get current speed mode.
+
+        Returns:
+            "normal" or "high_speed".
+        """
+        resp = self._stub.GetSpeedMode(Empty(), timeout=self._timeout)
+        return "high_speed" if resp.mode == 1 else "normal"
+
     # ── Gesture (动作系统) ───────────────────────────────
 
     def list_gestures(self) -> list[dict]:
@@ -324,3 +355,7 @@ class ThunderClient:
         """
         for msg in self._stub.ListenCmsState(Empty()):
             yield RobotState.from_proto(msg.kind)
+
+
+# Preferred public alias used by the current ORIX-facing documentation.
+OrixClient = ThunderClient
