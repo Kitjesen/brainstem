@@ -105,12 +105,14 @@
 % ============================================================
 %  页眉页脚
 % ============================================================
+\usepackage{lastpage}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[LE]{\small\leftmark}
-\fancyhead[RO]{\small\rightmark}
-\fancyfoot[C]{\small\thepage}
-\fancyfoot[LE,RO]{\small ORIX SDK v1.0.0}
+\fancyhead[L]{\small\color{brandslate} 大算机器人 | ORIX SDK v1.0.0}
+\fancyhead[R]{\small\color{brandslate}\leftmark}
+\fancyfoot[L]{\small\color{brandslate} 大算机器人}
+\fancyfoot[C]{\small 第 \thepage\ 页 / 共 \pageref{LastPage} 页}
+\fancyfoot[R]{\small\color{brandslate} ORIX 教育版四足机器狗}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\footrulewidth}{0.2pt}
 
@@ -1334,7 +1336,7 @@ dog.disable()
 
 ORIX 支持多个控制源同时存在，通过 ControlArbiter 仲裁控制权：
 
-控制权优先级从高到低依次为：YUNZHUO 遥控器（最高优先级）、Xbox 手柄、SDK gRPC（最低优先级）。高优先级控制源活跃时，低优先级的指令将被忽略。
+控制权优先级从高到低依次为：遥控器（最高优先级）、SDK gRPC（较低优先级）。遥控器活跃时，SDK 的指令将被忽略。遥控器无操作超过 3 秒后，控制权自动释放给 SDK。
 
 \subsection{仲裁规则}
 
@@ -3031,7 +3033,7 @@ ORIX 的 ControlArbiter（控制仲裁器）实施以下安全规则：
 规则 & 说明 \\
 \midrule
 \endhead
-遥控器优先 & YUNZHUO 遥控器的优先级永远高于 gRPC（SDK） \\
+遥控器优先 & 遥控器的优先级永远高于 SDK 指令，3 秒无操作自动释放 \\
 超时释放 & 遥控器停止操作 3 秒后，gRPC 自动获得控制权 \\
 无抢占 & gRPC 不能强行抢占遥控器的控制权 \\
 超时可配 & 超时时间通过 \texttt{HAN\_DOG\_ARBITER\_TIMEOUT} 配置，默认 3 秒 \\
@@ -3649,9 +3651,7 @@ processor.start()
 \endhead
 \texttt{HAN\_DOG\_PORT} & int & 13145 & 1--65535 & gRPC 服务监听端口 \\
 \texttt{HAN\_DOG\_IMU\_PORT} & str & /dev/ttyUSB1 & 设备路径 & IMU 串口设备 \\
-\texttt{HAN\_DOG\_YUNZHUO\_PORT} & str & /dev/yunzhuo & 设备路径 & YUNZHUO 遥控器串口 \\
-\texttt{HAN\_DOG\_XBOX\_DEVICE} & str & /dev/input/js0 & 设备路径 & Xbox 手柄设备 \\
-\texttt{HAN\_DOG\_XBOX\_CONFIG} & str & config/xbox.json & 文件路径 & Xbox 手柄按键映射 \\
+\texttt{HAN\_DOG\_CONTROLLER} & str & auto & 设备路径 & 遥控器设备（自动检测） \\
 \texttt{HAN\_DOG\_DEFAULT\_PROFILE} & str & (无) & 策略名称 & 默认加载的运动策略 \\
 \texttt{HAN\_DOG\_PROFILE\_DIR} & str & profiles/ & 目录路径 & 策略文件目录 \\
 \texttt{HAN\_DOG\_ARBITER\_TIMEOUT} & int & 3 & 1--60 & 遥控器释放后控制权切换 (s) \\
