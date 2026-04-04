@@ -612,7 +612,7 @@ dog.walk(vx=0.3)  # 30% 速度前进
 在第一次连接机器人之前，请逐项确认：
 
 \begin{itemize}[nosep]
-  \item[$\square$] 机器人已上电，电池电压正常（7 串锂电满电 29.4V，低压保护 22.4V）
+  \item[$\square$] 机器人已上电，电池电压正常（正常工作电压约 24V，低压保护 18V）
   \item[$\square$] 机器人主控板（S100P）已启动完成（约 30 秒）
   \item[$\square$] brainstem 服务已运行（\texttt{systemctl status brainstem}）
   \item[$\square$] 开发机与机器人在同一局域网（可以 \texttt{ping 192.168.66.190}）
@@ -1352,7 +1352,7 @@ dog.walk()
   \item \textbf{上电后电机默认禁用}。必须调用 \texttt{enable()} 才能运动。
   \item \textbf{\texttt{disable()} 随时可调用}。会立即释放所有电机力矩（机器人会瘫软）。
   \item \textbf{先坐下再禁用}。建议流程：\texttt{sit\_down()} $\to$ 等待 Grounded $\to$ \texttt{disable()}。
-  \item \textbf{低压自动禁用}。电压低于 22.4V 时，系统会先坐下再禁用，不会直接断电。
+  \item \textbf{低压自动禁用}。电压低于 18V 时，系统会先坐下再禁用，不会直接断电。
 \end{enumerate}
 
 \subsection{安全的关机流程}
@@ -1459,9 +1459,9 @@ dog.clear_motor_fault(joint_ids=[0, 1, 2])
 
 \subsection{低压保护}
 
-当任一电机总线电压低于 22.4V 时触发：
+当任一电机总线电压低于 18V 时触发：
 
-低压保护触发后，系统依次执行以下步骤：（1）检测到低压（低于 22.4V）$\to$（2）自动发送坐下指令 $\to$（3）等待机器人进入 Grounded 状态 $\to$（4）禁用全部电机。
+低压保护触发后，系统依次执行以下步骤：（1）检测到低压（低于 18V）$\to$（2）自动发送坐下指令 $\to$（3）等待机器人进入 Grounded 状态 $\to$（4）禁用全部电机。
 
 低压保护是\textbf{不可逆的}（单次触发后标记 \texttt{lowVoltageTriggered}），需要重新上电才能恢复。
 
@@ -1506,7 +1506,7 @@ print(f"初始状态: {state}")          # 应为 "grounded"
 
 voltages = dog.get_voltage()
 avg_v = sum(voltages) / len(voltages) if voltages else 0
-print(f"电池电压: {avg_v:.1f}V")     # 应 > 22.4V
+print(f"电池电压: {avg_v:.1f}V")     # 应 > 18V
 
 motors = dog.get_motor_status()
 offline = [m.id for m in motors if not m.online]
@@ -1626,7 +1626,7 @@ gRPC 端口 & 13145 & SDK 连接端口 \\
 站起耗时 & 3 秒 (150 ticks) & Grounded $\to$ Standing \\
 坐下耗时 & 3 秒 (150 ticks) & Standing $\to$ Grounded \\
 仲裁超时 & 3 秒 & 遥控器释放控制权的等待时间 \\
-低压阈值 & 22.4V & 低于此值触发保护坐下 \\
+低压阈值 & 18V & 低于此值触发保护坐下 \\
 启动超时 & 10 秒 & FSM 等待 Grounded 的超时 \\
 关机超时 & 8 秒 & 安全关机等待超时 \\
 RPC 超时 & 5 秒 & SDK 默认 RPC 超时 \\
@@ -1936,7 +1936,7 @@ voltages = dog.get_voltage()
 print(f"电压范围: {min(voltages):.1f}V ~ {max(voltages):.1f}V")
 
 for i, v in enumerate(voltages):
-    warning = " [低压!]" if v < 22.4 else ""
+    warning = " [低压!]" if v < 18.0 else ""
     print(f"  Joint {i:2d}: {v:.1f}V{warning}")
 \end{lstlisting}
 
@@ -1947,11 +1947,11 @@ for i, v in enumerate(voltages):
 阈值 & 行为 \\
 \midrule
 \endhead
-$<$ 22.4 V & 系统自动执行坐下动作，等待 Grounded 状态确认后禁用电机 \\
+$<$ 18.0 V & 系统自动执行坐下动作，等待 Grounded 状态确认后禁用电机 \\
 \bottomrule
 \end{longtable}
 
-低压保护是\textbf{不可绕过}的安全机制。当任一电机报告的母线电压低于 22.4V，控制系统将：
+低压保护是\textbf{不可绕过}的安全机制。当任一电机报告的母线电压低于 18V，控制系统将：
 
 \begin{enumerate}[nosep]
   \item 立即发送 \texttt{SitDown} 指令
@@ -1959,21 +1959,21 @@ $<$ 22.4 V & 系统自动执行坐下动作，等待 Grounded 状态确认后禁
   \item 禁用所有电机
 \end{enumerate}
 
-此过程通过日志输出 \texttt{LOW VOLTAGE: xx.xV < 22.4V -- graceful sitDown}。
+此过程通过日志输出 \texttt{LOW VOLTAGE: xx.xV < 18V -- graceful sitDown}。
 
 \subsection{电压监控最佳实践}
 
 \begin{lstlisting}[style=python]
 import time
 
-def monitor_voltage(dog, interval=5.0, warn_threshold=24.0):
+def monitor_voltage(dog, interval=5.0, warn_threshold=20.0):
     """周期性检查电压，提前预警。"""
     while True:
         voltages = dog.get_voltage()
         min_v = min(voltages)
         if min_v < warn_threshold:
             print(f"[警告] 电压偏低: {min_v:.1f}V (阈值 {warn_threshold}V)")
-            if min_v < 22.4:
+            if min_v < 18.0:
                 print("[严重] 已触发低压保护，请立即充电！")
                 break
         else:
@@ -2122,7 +2122,7 @@ IMU 时间戳 & \texttt{listen\_imu()} & \texttt{ImuData.timestamp\_ms} & ms & \
 电机温度 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.temperature} & C & 按需 & 内部温度 \\
 电机电压 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.voltage} & V & 按需 & 母线电压 \\
 电机故障码 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.errors} & list[int] & 按需 & 空=无故障 \\
-母线电压(16路) & \texttt{get\_voltage()} & list[float] & V & 按需 & 低压阈值 22.4V \\
+母线电压(16路) & \texttt{get\_voltage()} & list[float] & V & 按需 & 低压阈值 18V \\
 FSM 状态变化 & \texttt{listen\_state()} & str & -- & 事件驱动 & 状态切换时触发 \\
 \bottomrule
 \end{longtable}
@@ -2376,7 +2376,7 @@ dog.get_voltage() -> list[float]
 \endhead
 返回值 & 长度为 16 的浮点数列表，单位 V \\
 索引 & 对应关节编号 0--15 \\
-低压阈值 & 22.4V，低于此值系统自动触发保护 \\
+低压阈值 & 18V，低于此值系统自动触发保护 \\
 \bottomrule
 \end{longtable}
 
@@ -2896,16 +2896,16 @@ dog.close()
 
 \subsection{保护机制}
 
-当任一电机报告的母线电压低于 \textbf{22.4V} 时，系统自动触发低压保护：
+当任一电机报告的母线电压低于 \textbf{18V} 时，系统自动触发低压保护：
 
 低压保护的完整流程如下：
 
 \begin{enumerate}[nosep]
-  \item 检测到任一电机母线电压低于 22.4V
+  \item 检测到任一电机母线电压低于 18V
   \item 自动发送 SitDown 指令
   \item 等待机器人进入 Grounded 状态（安全着地）
   \item 禁用全部电机（Disable）
-  \item 日志输出：\texttt{LOW VOLTAGE: xx.xV < 22.4V -- graceful sitDown}
+  \item 日志输出：\texttt{LOW VOLTAGE: xx.xV < 18V -- graceful sitDown}
 \end{enumerate}
 
 此保护是\textbf{优雅坐下}流程，不是直接断电。系统会等待机器人安全着地后才禁用电机，避免从站立姿态跌落。
@@ -2917,11 +2917,10 @@ dog.close()
 电压范围 & 状态 & 建议 \\
 \midrule
 \endhead
-$\geq$ 29V & 满电 & 正常使用 \\
-26V -- 29.4V & 正常 & 正常使用 \\
-24V -- 26V & 偏低 & 关注电量，准备充电 \\
-22.4V -- 24V & 低电量 & 尽快结束任务 \\
-$<$ 22.4V & 危险 & 自动触发保护，必须立即充电 \\
+$\geq$ 24V & 正常 & 正常使用 \\
+20V -- 24V & 偏低 & 关注电量，准备充电 \\
+18V -- 20V & 低电量 & 尽快结束任务 \\
+$<$ 18V & 危险 & 自动触发保护，必须立即充电 \\
 \bottomrule
 \end{longtable}
 
@@ -3219,7 +3218,7 @@ def safe_shutdown(dog, timeout=10.0):
 运动异常诊断步骤：
 
 \begin{enumerate}[nosep]
-  \item \textbf{机器人摔倒}：首先用 \texttt{get\_voltage()} 检查电压。低于 22.4V 说明是低压保护触发；电压正常则检查关节限位是否超限。
+  \item \textbf{机器人摔倒}：首先用 \texttt{get\_voltage()} 检查电压。低于 18V 说明是低压保护触发；电压正常则检查关节限位是否超限。
   \item \textbf{运动不流畅}：用 \texttt{get\_motor\_status()} 检查电机温度。温度超过 70\textdegree C 说明过热，需暂停运动等待冷却。
   \item \textbf{指令无效}：检查 Arbiter 状态，确认遥控器是否在线占用控制权。
 \end{enumerate}
@@ -3429,7 +3428,7 @@ dog.stand_up()
 # 检查电压历史
 voltages = dog.get_voltage()
 print(f"当前电压: {min(voltages):.1f}V")
-# 如果 < 22.4V，说明是低压保护
+# 如果 < 18V，说明是低压保护
 \end{lstlisting}
 
 \noindent\textbf{其他可能原因}：
@@ -3439,7 +3438,7 @@ print(f"当前电压: {min(voltages):.1f}V")
 原因 & 诊断方法 \\
 \midrule
 \endhead
-低电压 ($<$ 22.4V) & \texttt{get\_voltage()} 返回值低于 42 \\
+低电压 ($<$ 18V) & \texttt{get\_voltage()} 返回值低于 42 \\
 电机过热 & \texttt{get\_motor\_status()} 中 temperature $>$ 80\textdegree C \\
 关节超限 & \texttt{get\_motor\_status()} 中 position 绝对值过大 \\
 CAN 通信中断 & \texttt{get\_motor\_status()} 中部分电机 online=False \\
@@ -3924,7 +3923,7 @@ scp sunrise@192.168.66.190:logs/orix_*.log ./orix_logs/
 enable() 无效 & \texttt{get\_motor\_status()} & 电机离线/有故障 & 检查 CAN 线，清除故障 \\
 walk() 无效 & \texttt{get\_state()} & 不在 Standing & 先 \texttt{stand\_up()} \\
 walk() 被忽略 & 遥控器状态 & Arbiter 被占用 & 松开遥控器，等 3 秒 \\
-突然坐下 & \texttt{get\_voltage()} & 低压保护 ($<$ 22.4V) & 充电 \\
+突然坐下 & \texttt{get\_voltage()} & 低压保护 ($<$ 18V) & 充电 \\
 突然摔倒 & 电机温度 & 过热/关节超限 & 冷却 / 重新标零 \\
 策略切换失败 & \texttt{get\_state()} & 不在 Grounded & 先 \texttt{sit\_down()} \\
 IMU 数据异常 & 四元数约定 & Hamilton vs ROS & 调整字段顺序 \\
