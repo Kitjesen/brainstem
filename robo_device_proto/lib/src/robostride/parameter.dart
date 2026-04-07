@@ -75,6 +75,10 @@ sealed class RSGetter with _$RSGetter {
   factory RSGetter.cantimeout(int value) = RSGetterCantimeout;
   factory RSGetter.zeroSta(bool value) = RSGetterZeroSta;
 
+  static RSGetter? tryFromByteData(ByteData data) {
+    try { return RSGetter.fromByteData(data); } catch (_) { return null; }
+  }
+
   factory RSGetter.fromByteData(ByteData data) =>
       switch (RSKey.fromByteData(data)) {
         .runMode => .runMode(RSRunMode.fromValue(data.getUint8(4))),
