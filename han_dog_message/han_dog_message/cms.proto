@@ -2,6 +2,15 @@
 //
 // CMS (Command & Monitoring Service) — 四足机器人的主控 gRPC 服务。
 // 提供运动控制指令和实时传感器数据流。
+//
+// API Version: 1.0.0 (2026-04-04)
+//
+// 兼容性承诺:
+//   - 现有 RPC 的签名和语义不会改变
+//   - 现有 message 的字段编号不会改变
+//   - 新增 RPC 和字段使用新编号，不影响已有客户端
+//   - 废弃功能至少保留 2 个大版本后才移除
+//   - 破坏性变更只在大版本号升级时发生 (v2.0.0)
 
 syntax = "proto3";
 
@@ -38,6 +47,10 @@ service Cms {
   rpc StandUp(google.protobuf.Empty) returns (google.protobuf.Empty);
   // 从站立过渡到坐姿。
   rpc SitDown(google.protobuf.Empty) returns (google.protobuf.Empty);
+  // 设置速度模式。NORMAL=默认, HIGH_SPEED=高速模式(最大 2.5m/s)。
+  rpc SetSpeedMode(SpeedModeRequest) returns (google.protobuf.Empty);
+  // 获取当前速度模式。
+  rpc GetSpeedMode(google.protobuf.Empty) returns (SpeedModeRequest);
 
   // ──── 仿真专用 ────
 
@@ -69,6 +82,13 @@ service Cms {
   rpc SwitchProfile(ProfileRequest) returns (ProfileInfo);
   // 获取当前策略信息。
   rpc GetProfile(google.protobuf.Empty) returns (ProfileInfo);
+
+  // ──── 动作系统 ────
+
+  // 播放预设动作（鞠躬/点头/扭动/伸展/跳舞等）。机器人必须在 Standing 状态。
+  rpc PlayGesture(GestureRequest) returns (google.protobuf.Empty);
+  // 获取所有可用的预设动作列表。
+  rpc ListGestures(google.protobuf.Empty) returns (GestureList);
 
   // ──── 诊断 ────
 
@@ -254,4 +274,41 @@ message Command {
     // 行走：(x=前后, y=左右, z=旋转)，范围 [-1, 1]。
     Vector3 walk = 4;
   }
+}
+
+// ──── 动作系统消息 ────
+
+// 播放动作请求。
+message GestureRequest {
+  // 动作名称（见 ListGestures 返回的列表）。
+  string name = 1;
+}
+
+// 可用动作列表。
+message GestureList {
+  repeated GestureInfo gestures = 1;
+}
+
+// 单个动作的信息。
+message GestureInfo {
+  // 动作名称（用于 PlayGesture 的 name 字段）。
+  string name = 1;
+  // 动作描述。
+  string description = 2;
+  // 预计执行时长（毫秒）。
+  int32 duration_ms = 3;
+}
+
+// ──── 速度模式 ────
+
+enum SpeedMode {
+  // 标准模式（默认）。
+  SPEED_MODE_NORMAL = 0;
+  // 高速模式，最大速度 2.5m/s。需要开阔平坦场地。
+  SPEED_MODE_HIGH = 1;
+}
+
+// 速度模式设置请求。
+message SpeedModeRequest {
+  SpeedMode mode = 1;
 }

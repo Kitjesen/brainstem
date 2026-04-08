@@ -19,14 +19,54 @@ dart run build_runner build --delete-conflicting-outputs  # 重新生成 Freezed
 
 **build_runner 注意：** 必须在包目录下运行（如 `cd han_dog_brain && dart run build_runner build --delete-conflicting-outputs`）。
 
-## 架构速查
+## 架构速查（4-Tier, 12 packages, 404 tracked files）
 
-| 层 | 包 | 说明 |
-|----|----|----|
-| 硬件 + gRPC | `han_dog` | 主程序入口、UnifiedCmsServer、硬件驱动、ControlArbiter |
-| 推理核心 | `han_dog_brain` | Brain、FSM、Behaviour、Memory、**Gesture SDK**（**纯逻辑，无网络/硬件依赖**）|
-| 数学 | `skinny_dog_algebra` | JointsMatrix（16 关节矩阵） |
-| 协议 | `han_dog_message` | protoc 生成，**不可手动编辑** |
+### Tier 1 — 运控核心（必须理解）
+
+| 包 | 文件数 | 说明 |
+|----|--------|------|
+| `han_dog` | 52 | 主程序入口、UnifiedCmsServer、硬件驱动、ControlArbiter、Xbox/Gamepad |
+| `han_dog_brain` | 35 | Brain、FSM、Behaviour、Memory、**Gesture SDK**（**纯逻辑，无网络/硬件依赖**）|
+| `skinny_dog_algebra` | 13 | JointsMatrix（16 关节矩阵） |
+
+### Tier 2 — 硬件驱动
+
+| 包 | 文件数 | 说明 |
+|----|--------|------|
+| `robo_device` | 25 | 机器人设备抽象层（依赖 pcan + serial_port + protoframe） |
+| `pcan` | 22 | PCAN CAN 总线通信 FFI |
+| `serial_port` | 17 | 串口通信 FFI |
+| `onnx_runtime` | 36 | ONNX Runtime 推理 FFI 绑定 |
+
+### Tier 3 — 协议层
+
+| 包 | 文件数 | 说明 |
+|----|--------|------|
+| `han_dog_message` | 50 | protoc 生成的 gRPC 消息，**不可手动编辑** |
+| `robo_device_proto` | 37 | robo_device 的 protobuf 定义 |
+| `protoframe` | 9 | 协议帧序列化/反序列化 |
+
+### Tier 4 — 应用 / 工具
+
+| 包 | 文件数 | 说明 |
+|----|--------|------|
+| `sirius` | 68 | Flutter Desktop 控制台 UI（通过 gRPC 连接 han_dog） |
+| `sim/` | 17 | MuJoCo 物理仿真资源（URDF/XML/STL/Python 脚本，非 Dart 包） |
+| `frequency_watch` | 13 | 频率监控工具库 |
+
+### 依赖图
+
+```
+                    han_dog (主程序)
+                   /    |     \      \
+        han_dog_brain  freq_watch  robo_device  han_dog_message
+           /    \                   /   |   \
+  skinny_dog  onnx_runtime     pcan serial protoframe
+   _algebra                         _port
+                                robo_device_proto
+```
+
+> **`_archive/`**: 旧版代码/资源归档（untracked），不参与构建。
 
 ## 主程序入口
 
@@ -68,7 +108,7 @@ _log.severe('描述', error, stackTrace);  // onError 必须带 StackTrace
 - `hardware` — 有 ControlArbiter，无 SimStateInjector
 
 ### 电机输出
-`han_dog.dart` 中电机输出当前已注释（`// joint.realActionExt(action)`），这是**有意为之**（测试阶段），不要取消注释。
+`han_dog.dart` 中电机输出通过 `motorOutputEnabled` 标志控制，由遥控器 Enable 按钮或 gRPC `Enable()` RPC 激活。硬件链路已验证通过。
 
 ## .claude/ 配置
 

@@ -1,0 +1,4426 @@
+% !TEX program = xelatex
+% ORIX 教育版四足机器狗 Python SDK 开发手册
+% 大算机器人
+% 2026年4月
+\documentclass[a4paper,11pt,openany]{book}
+
+% ============================================================
+%  基础包
+% ============================================================
+\usepackage[UTF8, heading=true]{ctex}
+\usepackage[margin=2.5cm, top=3cm, bottom=3cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{pifont}
+\usepackage{tocloft}
+
+% ============================================================
+%  颜色定义
+% ============================================================
+\definecolor{brandteal}{RGB}{8, 145, 178}        % #0891B2 primary
+\definecolor{brandtealdark}{RGB}{14, 116, 144}    % #0E7490 darker
+\definecolor{brandorange}{RGB}{249, 115, 22}      % #F97316 accent
+\definecolor{brandslate}{RGB}{100, 116, 139}      % #64748B neutral
+\definecolor{brandslatedark}{RGB}{30, 41, 59}     % #1E293B dark text
+\definecolor{codebg}{RGB}{245, 245, 245}
+\definecolor{codeframe}{RGB}{200, 200, 200}
+\definecolor{keywordcolor}{RGB}{0, 0, 180}
+\definecolor{stringcolor}{RGB}{0, 128, 0}
+\definecolor{commentcolor}{RGB}{128, 128, 128}
+\definecolor{warnorange}{RGB}{200, 120, 0}
+
+% ============================================================
+%  超链接配置
+% ============================================================
+\hypersetup{
+  colorlinks=true,
+  linkcolor=brandteal,
+  urlcolor=brandteal,
+  citecolor=brandteal,
+  bookmarks=true,
+  bookmarksnumbered=true,
+  pdfauthor={大算机器人},
+  pdftitle={ORIX 教育版四足机器狗 Python SDK 开发手册},
+  pdfsubject={ORIX SDK v1.0.0},
+}
+
+% ============================================================
+%  代码高亮配置
+% ============================================================
+\lstset{
+  basicstyle=\small\ttfamily,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  breaklines=true,
+  breakatwhitespace=false,
+  tabsize=4,
+  showstringspaces=false,
+  numbers=left,
+  numberstyle=\tiny\color{brandslate},
+  numbersep=8pt,
+  xleftmargin=1.5em,
+  framexleftmargin=1.5em,
+  aboveskip=1em,
+  belowskip=0.8em,
+  literate={-}{-}1,
+}
+
+\lstdefinestyle{python}{
+  language=Python,
+  keywordstyle=\color{keywordcolor}\bfseries,
+  stringstyle=\color{stringcolor},
+  commentstyle=\color{commentcolor}\itshape,
+  morekeywords={self, True, False, None, as, with, yield, async, await, f},
+}
+
+\lstdefinestyle{bash}{
+  language=bash,
+  keywordstyle=\color{keywordcolor}\bfseries,
+  stringstyle=\color{stringcolor},
+  commentstyle=\color{commentcolor}\itshape,
+  morekeywords={ssh, ping, nmap, systemctl, pip, python, nc, scp, grep, cat, tail, ls, cd, export},
+}
+
+\lstdefinestyle{plain}{
+  language={},
+  keywordstyle={},
+  stringstyle={},
+  commentstyle={},
+  numbers=none,
+}
+
+% ============================================================
+%  页眉页脚
+% ============================================================
+\usepackage{lastpage}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{brandslate} 大算机器人 | ORIX SDK v1.0.0}
+\fancyhead[R]{\small\color{brandslate}\leftmark}
+\fancyfoot[L]{\small\color{brandslate} 大算机器人}
+\fancyfoot[C]{\small 第 \thepage\ 页 / 共 \pageref{LastPage} 页}
+\fancyfoot[R]{\small\color{brandslate} ORIX 教育版四足机器狗}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.2pt}
+
+% ============================================================
+%  章节标题样式
+% ============================================================
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries\color{brandteal}}
+  {\chaptertitlename\ \thechapter}{20pt}{\Huge}[\vspace{4pt}{\color{brandteal}\titlerule[1.2pt]}]
+\titlespacing*{\chapter}{0pt}{-20pt}{30pt}
+
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{brandtealdark}}
+  {\thesection}{1em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{brandslatedark}}
+  {\thesubsection}{1em}{}
+
+% ============================================================
+%  自定义命令
+% ============================================================
+\newcommand{\warning}[1]{%
+  \begin{center}
+  \fcolorbox{warnorange}{warnorange!10}{%
+    \parbox{0.9\textwidth}{\textcolor{warnorange}{\textbf{注意：}}#1}%
+  }
+  \end{center}
+}
+
+\newcommand{\tip}[1]{%
+  \begin{center}
+  \fcolorbox{brandteal}{brandteal!8}{%
+    \parbox{0.9\textwidth}{\textcolor{brandteal}{\textbf{提示：}}#1}%
+  }
+  \end{center}
+}
+
+\newcommand{\chapterguide}[2]{%
+  \begin{center}
+  \fcolorbox{brandteal}{brandteal!6}{%
+    \parbox{0.92\textwidth}{%
+      \textcolor{brandteal}{\textbf{本章导读}}\\[0.4em]
+      #1\\[0.6em]
+      \textcolor{brandslatedark}{\textbf{阅读建议：}}#2%
+    }%
+  }
+  \end{center}
+}
+
+\newcommand{\degree}{^\circ}
+
+\newcommand{\apimethod}[1]{%
+  \paragraph{\texttt{#1}}%
+}
+
+% longtable 支持 booktabs
+\setlength{\LTpre}{0.8em}
+\setlength{\LTpost}{0.8em}
+
+% ============================================================
+%  文档开始
+% ============================================================
+\begin{document}
+
+% ============================================================
+%  封面
+% ============================================================
+\begin{titlepage}
+\begin{center}
+
+% ---- 顶部品牌色横幅 ----
+\noindent\colorbox{brandteal}{%
+  \parbox{\dimexpr\textwidth-2\fboxsep}{%
+    \vspace{0.6cm}
+    \centering\color{white}\Large\bfseries ORIX Education Series
+    \vspace{0.6cm}
+  }%
+}
+
+\vspace{2.5cm}
+
+{\Huge\bfseries\color{brandteal} ORIX 教育版四足机器狗\\[0.5em] Python SDK 开发手册}
+
+\vspace{0.8cm}
+
+{\large\color{brandslate} 面向教育场景的专业级机器人开发平台}
+
+\vspace{1.5cm}
+
+% ---- 分隔线 ----
+{\color{brandteal}\rule{0.6\textwidth}{1.2pt}}
+
+\vspace{1.5cm}
+
+{\LARGE\bfseries 大算机器人}
+
+\vspace{0.8cm}
+
+{\Large\color{brandslate} Brainstem SDK for Python}
+
+\vspace{2cm}
+
+\begin{tabular}{rl}
+\textbf{版本} & v1.0.0 \\
+\textbf{日期} & 2026年4月 \\
+\end{tabular}
+
+\vfill
+
+% ---- 底部品牌色条 ----
+{\color{brandteal}\rule{\textwidth}{0.8pt}}
+\vspace{0.3cm}
+
+{\small\color{brandslate} Copyright \copyright\ 2026 大算机器人. All rights reserved.}
+
+\end{center}
+\end{titlepage}
+
+% ============================================================
+%  版权页
+% ============================================================
+\thispagestyle{empty}
+\vspace*{\fill}
+\noindent\textbf{文档信息}\\[0.5em]
+\begin{tabular}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+文档名称 & ORIX 教育版四足机器狗 Python SDK 开发手册 \\
+版本号   & v1.0.0 \\
+编写日期 & 2026年4月 \\
+适用产品 & ORIX 教育版四足机器狗 \\
+适用 SDK & brainstem\_sdk (Python) \\
+\bottomrule
+\end{tabular}
+
+\vspace{2em}
+\noindent\textbf{版本历史}\\[0.5em]
+\begin{tabular}{llll}
+\toprule
+版本 & 日期 & 作者 & 说明 \\
+\midrule
+v1.0.0 & 2026-04 & 大算机器人 & 正式发布 \\
+\bottomrule
+\end{tabular}
+
+\vspace{2em}
+\noindent{\small 本文档为大算机器人内部技术文档，未经许可不得外传。}
+\newpage
+
+% ============================================================
+%  目录
+% ============================================================
+\tableofcontents
+\newpage
+
+% ============================================================
+%  前言
+% ============================================================
+\chapter*{前言}
+\addcontentsline{toc}{chapter}{前言}
+\thispagestyle{fancy}
+
+近年来，国家高度重视人工智能与机器人教育的发展。《新一代人工智能发展规划》明确要求在中小学和高等院校开设人工智能相关课程，《教育部关于加强和改进中小学实验教学的意见》强调动手实践和工程思维的培养，教育部《人工智能教育基地建设指南》进一步推动了 AI+机器人实验室在全国高校和中学的普及。在这一大背景下，实物机器人作为连接理论与实践的桥梁，正在成为教育体系的重要组成部分。
+
+四足机器人是一类典型的高集成度教学平台。它融合了机械工程（腿部机构设计、运动学建模）、电子控制（伺服驱动、传感器融合）、嵌入式系统（实时控制、CAN 总线通信）、计算机视觉（姿态估计、环境感知）和人工智能（强化学习策略训练、sim-to-real 迁移）等多个学科的核心内容。相较于传统的机械臂或移动底盘，四足机器人的动力学更加丰富，控制问题更具挑战性，能够让学生直观感受到理论与工程之间的差距，也能作为强化学习、仿生运动控制、自主导航等前沿技术的实验载体。
+
+ORIX 教育版四足机器狗是大算机器人面向教育场景推出的专业级开发平台。我们的设计遵循四个核心理念：\textbf{学以致用}——它不是展会上的观摩样品，而是一台可以编程、调参、训练自定义策略的真实机器人；\textbf{降低门槛}——3 行 Python 代码即可完成从连接到行走的全流程，学生不需要先掌握通信协议和控制理论；\textbf{不设天花板}——从入门的遥控行走到高级的 RL 策略训练、多传感器融合、SLAM 建图和自主导航，一个平台覆盖从本科到研究生的完整学习路径；\textbf{工业级可靠}——采用与工业机器人相同的 FSM 状态机、控制权仲裁和 E-Stop 安全机制，学生接触的是真实的工程实践。
+
+本手册是 ORIX Python SDK 的完整开发指南，面向四类读者：高校教师（了解平台能力、设计课程实验方案）、学生开发者（从零开始学习机器人编程、完成课程项目和毕业设计）、科研人员（利用 SDK 传感器接口和控制 API 进行算法验证）以及竞赛团队（快速搭建原型参加 RoboCup、全国大学生机器人大赛等赛事）。手册覆盖从环境安装到高级开发的完整流程，建议首次使用时按顺序阅读前三章（前言、概述、快速开始），完成首次连通后再根据兴趣阅读理论基础和 API 参考。
+
+\vspace{1em}
+\begin{flushright}
+\textit{大算机器人技术团队\quad 2026 年 4 月}
+\end{flushright}
+
+\newpage
+
+% ============================================================
+%  概述 (来自 README.md)
+% ============================================================
+\chapter{概述}
+\label{ch:overview}
+
+\chapterguide
+{本章建立对 ORIX 平台的整体认识：它解决什么问题、能做什么、适合什么场景、后续章节如何组织。阅读后您将对整个 SDK 有全局认识，便于根据自己的目标决定详读哪些章节。}
+{如果您想尽快跑通机器人控制，可跳到第~\ref{ch:quickstart}~章；如果您关心控制理论，可直接读第~\ref{ch:theory}~章。}
+
+\section{产品定位}
+
+ORIX 教育版四足机器狗是一个集成了运动控制、传感器融合、强化学习策略推理和安全机制的完整机器人平台。它由机器狗本体（16 DOF 四足机器人）、Python SDK（\texttt{brainstem-sdk}）和开发文档三部分组成。机器狗内置完整的控制系统，开发者通过 SDK 在开发电脑上编写 Python 代码远程控制机器人，无需接触底层 C++ 或嵌入式代码。
+
+\section{SDK 能做什么}
+
+\texttt{brainstem-sdk} 提供了对机器狗的全方位控制能力，主要包括以下五类接口：
+
+\begin{itemize}
+  \item \textbf{运动控制} --- 使能/禁用电机、站立、坐下、行走、切换速度模式、播放预设动作
+  \item \textbf{传感器读取} --- IMU 姿态数据流（50Hz）、关节编码器数据流、电机状态、母线电压
+  \item \textbf{状态管理} --- 查询 FSM 状态、订阅状态变化事件、切换运动策略
+  \item \textbf{诊断与维护} --- 读取电机故障码、清除故障、电机标零、健康检查
+  \item \textbf{摄像头接口} --- USB 摄像头拍照、录像、MJPEG 流媒体服务（可选模块）
+\end{itemize}
+
+整个 SDK 遵循简洁设计原则：客户代码完全不需要了解 gRPC、protobuf、状态机实现细节，所有复杂性隐藏在 \texttt{OrixClient} 类后面。
+
+\section{典型开发流程}
+
+一个典型的 ORIX 开发流程包含以下步骤：
+
+\begin{enumerate}
+  \item \textbf{环境准备} --- 开发电脑装 Python 3.8+，机器狗开机并连接局域网（详见第~\ref{ch:quickstart}~章）
+  \item \textbf{安装 SDK} --- \texttt{pip install brainstem-sdk}
+  \item \textbf{验证连接} --- 运行验证脚本，确认与机器狗通信正常
+  \item \textbf{编写控制代码} --- 使用 \texttt{OrixClient} 发送运动指令和读取传感器数据
+  \item \textbf{调试与迭代} --- 根据需要切换策略、调整参数、查看日志
+  \item \textbf{高级开发} --- 集成计算机视觉、训练自定义 RL 策略、与 ROS2 对接
+\end{enumerate}
+
+\section{手册结构}
+
+本手册共 9 章，按"入门 $\to$ 理论 $\to$ 参考 $\to$ 运维"的顺序组织：
+
+\begin{longtable}{llp{7cm}}
+\toprule
+\textbf{章} & \textbf{主题} & \textbf{适合谁} \\
+\midrule
+\endhead
+1 & 概述（本章） & 所有读者 \\
+2 & 快速开始 & 第一次使用的开发者 \\
+3 & 理论基础 & 希望理解控制原理的学生/研究人员 \\
+4 & 硬件概览 & 需要了解硬件参数的工程师 \\
+5 & 坐标系与关节 & 进行运动规划的开发者 \\
+6 & 状态机与运动控制 & 编写控制逻辑的开发者 \\
+7 & 传感器数据 & 进行数据采集和算法研究的开发者 \\
+8 & API 参考 & 查阅接口细节时的所有开发者 \\
+9 & 安全指南 & 上手前必读 \\
+10 & 常见问题 & 遇到问题时查阅 \\
+\bottomrule
+\end{longtable}
+
+\vspace{0.5em}
+
+首次使用建议按顺序阅读第 1--2 章（概述 + 快速开始），完成首次连通和基本控制验证。之后可根据需要跳读：如果关心控制理论，读第 3 章；如果要做运动规划，读第 5--6 章；如果要开发传感器融合或 RL 策略，读第 7 章；遇到具体接口问题查第 8 章。安全指南（第 9 章）在真机操作前必读。
+
+
+
+% ============================================================
+%  第 1 章：快速开始
+% ============================================================
+\chapter{快速开始}
+\label{ch:quickstart}
+
+本文档帮助您在 5 分钟内完成 ORIX SDK 的安装、连接和第一次控制。
+
+\chapterguide
+{本章以“先跑通、再理解”为目标，带您完成安装、网络连通性验证和第一次完整动作闭环。即使您已经有机器人经验，也建议至少执行一次连接检查脚本。}
+{按“环境要求 -> 安装 -> 首次连接检查清单 -> 验证连接脚本 -> 第一次完整操作”的顺序阅读。不要跳过安全提醒和状态机说明。}
+
+\section{环境要求}
+
+在开始安装 SDK 之前，请确认您的开发环境满足以下最低要求。ORIX SDK 基于纯 gRPC 通信，不依赖 ROS 或其他中间件。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 要求 \\
+\midrule
+\endhead
+Python & >= 3.8 \\
+操作系统 & Windows / Linux / macOS \\
+网络 & 开发机与机器人在同一局域网 \\
+端口 & TCP 13145（gRPC over HTTP/2） \\
+\bottomrule
+\end{longtable}
+
+\warning{不需要安装 ROS、消息中间件或其他额外组件。SDK 通过纯 gRPC 直连机器人。}
+
+\section{安装}
+
+\subsection{方式一：本地开发安装（推荐）}
+
+推荐使用可编辑模式安装，便于在开发过程中随时修改 SDK 源码并立即生效。
+
+\begin{lstlisting}[style=bash]
+cd sdk/python
+pip install -e .
+\end{lstlisting}
+
+\subsection{方式二：直接安装依赖}
+
+如果只需使用 SDK 而不修改源码，可以直接安装核心依赖包。
+
+\begin{lstlisting}[style=bash]
+pip install grpcio>=1.50.0 protobuf>=4.21.0
+\end{lstlisting}
+
+安装完成后验证：
+
+\begin{lstlisting}[style=bash]
+python -c "from brainstem_sdk import OrixClient; print('OK')"
+\end{lstlisting}
+
+输出 \texttt{OK} 即安装成功。
+
+\section{三行代码控制机器人}
+
+下面这段代码适合作为“环境和链路是否通了”的最小验证，而不是正式的运动脚本。正式任务中，您仍然需要补齐使能、电机状态确认、站起和安全收尾等步骤。
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import OrixClient
+
+dog = OrixClient("192.168.66.190")
+dog.walk(vx=0.3)  # 30% 速度前进
+\end{lstlisting}
+
+这三行代码做了以下事情：
+\begin{enumerate}[nosep]
+  \item 导入 SDK
+  \item 通过 gRPC 连接到机器人（默认端口 13145）
+  \item 发送前进指令
+\end{enumerate}
+
+\warning{实际使用中，您需要先 \texttt{enable()} 使能电机并 \texttt{stand\_up()} 站起来，才能执行 \texttt{walk()}。完整的操作流程见下方``第一次完整操作''。}
+
+\section{首次连接检查清单}
+
+在第一次连接机器人之前，请逐项确认：
+
+\begin{itemize}[nosep]
+  \item[$\square$] 机器人已上电，电池电压正常（正常工作电压约 24V，低压保护 18V）
+  \item[$\square$] 机器人主控板（S100P）已启动完成（约 30 秒）
+  \item[$\square$] brainstem 服务已运行（\texttt{systemctl status brainstem}）
+  \item[$\square$] 开发机与机器人在同一局域网（可以 \texttt{ping 192.168.66.190}）
+  \item[$\square$] 遥控器已关闭或置于空闲状态（遥控器优先级高于 SDK）
+  \item[$\square$] 机器人放置在平坦地面上，四足触地
+\end{itemize}
+
+\section{网络配置}
+
+开发机（PC 或笔记本，IP 为 192.168.66.xxx）与 ORIX 机器人（IP 为 192.168.66.190）需处于同一局域网内，通过以太网或 WiFi 连接。SDK 使用 TCP 端口 13145 进行 gRPC 通信，无需额外中间件。
+
+\begin{longtable}{lll}
+\toprule
+参数 & 默认值 & 说明 \\
+\midrule
+\endhead
+机器人 IP & \texttt{192.168.66.190} & S100P 主控板默认地址 \\
+gRPC 端口 & \texttt{13145} & 无需修改 \\
+协议 & gRPC (HTTP/2) & 无加密（局域网内使用） \\
+超时 & 5.0 秒 & 可通过 \texttt{timeout} 参数调整 \\
+\bottomrule
+\end{longtable}
+
+如果机器人 IP 不同，连接时指定即可：
+
+\begin{lstlisting}[style=python]
+dog = OrixClient("10.0.0.100", port=13145, timeout=5.0)
+\end{lstlisting}
+
+\section{验证连接脚本}
+
+首次连接机器狗时，建议使用以下验证脚本逐项检查通信状态。该脚本会自动查询状态机、电压、电机和策略信息，帮助您快速确认连接是否正常。它的价值不只是“能不能连上”，还在于能快速判断问题属于网络、服务、控制权还是硬件在线状态。将以下脚本保存为 \texttt{verify\_connection.py} 并运行：
+
+\begin{lstlisting}[style=python]
+"""验证与 ORIX 机器人的连接。"""
+
+from brainstem_sdk import OrixClient
+
+ROBOT_IP = "192.168.66.190"
+
+print(f"正在连接 ORIX @ {ROBOT_IP}:13145 ...")
+
+try:
+    dog = OrixClient(ROBOT_IP, timeout=3.0)
+
+    # 1. 查询状态机
+    state = dog.get_state()
+    print(f"[OK] 状态机: {state}")
+
+    # 2. 查询电压
+    voltages = dog.get_voltage()
+    if voltages:
+        avg_v = sum(voltages) / len(voltages)
+        print(f"[OK] 平均电压: {avg_v:.1f}V ({len(voltages)} 个电机)")
+    else:
+        print("[OK] 电压查询成功（无数据）")
+
+    # 3. 查询电机状态
+    motors = dog.get_motor_status()
+    online = sum(1 for m in motors if m.online)
+    print(f"[OK] 电机在线: {online}/{len(motors)}")
+
+    # 4. 查询当前策略
+    profile = dog.get_profile()
+    print(f"[OK] 当前策略: {profile.current}")
+    print(f"     可用策略: {profile.available}")
+
+    print("\n--- 连接验证通过 ---")
+
+    dog.close()
+
+except Exception as e:
+    print(f"\n[FAIL] 连接失败: {e}")
+    print("\n排查步骤:")
+    print("  1. 确认机器人已上电并启动完成")
+    print("  2. 确认网络连通: ping 192.168.66.190")
+    print("  3. 确认服务运行: ssh sunrise@192.168.66.190 'systemctl status brainstem'")
+    print("  4. 确认端口可达: 无防火墙阻断 13145/TCP")
+\end{lstlisting}
+
+运行：
+
+\begin{lstlisting}[style=bash]
+python verify_connection.py
+\end{lstlisting}
+
+预期输出：
+
+\begin{lstlisting}[style=plain,numbers=none]
+正在连接 ORIX @ 192.168.66.190:13145 ...
+[OK] 状态机: grounded
+[OK] 平均电压: 25.5V (16 个电机)
+[OK] 电机在线: 16/16
+[OK] 当前策略: default
+     可用策略: ['default', 'mini']
+
+--- 连接验证通过 ---
+\end{lstlisting}
+
+\section{第一次完整操作}
+
+确认连接验证通过后，尝试完整的站起-行走-坐下流程。这个流程比“三行代码”更接近真实使用场景，因为它包含了状态切换等待、停步和安全收尾，是后续编写课堂演示脚本、实验脚本和自动化测试脚本的推荐模板。
+
+\begin{lstlisting}[style=python]
+import time
+from brainstem_sdk import OrixClient
+
+dog = OrixClient("192.168.66.190")
+
+# 使能电机
+dog.enable()
+print(f"状态: {dog.get_state()}")   # grounded
+
+# 站起来（约 3 秒过渡）
+dog.stand_up()
+time.sleep(4)
+print(f"状态: {dog.get_state()}")   # standing
+
+# 前进
+dog.walk(vx=0.3)
+time.sleep(3)
+
+# 停步
+dog.walk()    # 无参数 = 停步
+time.sleep(1)
+
+# 坐下（约 3 秒过渡）
+dog.sit_down()
+time.sleep(4)
+print(f"状态: {dog.get_state()}")   # grounded
+
+# 禁用电机
+dog.disable()
+dog.close()
+\end{lstlisting}
+
+\warning{首次操作建议在台架上进行，或有人在旁边准备随时用遥控器接管。遥控器具有最高优先级，任何时候拨动遥控器都可以立即接管控制权。}
+
+\section{使用 with 语句}
+
+为了避免忘记关闭连接，SDK 支持 Python 上下文管理器（\texttt{with} 语句）。退出 \texttt{with} 块时会自动释放 gRPC 通道资源，这是推荐的资源管理方式。
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import OrixClient
+
+with OrixClient("192.168.66.190") as dog:
+    state = dog.get_state()
+    print(f"当前状态: {state}")
+# 退出 with 块时自动调用 dog.close()
+\end{lstlisting}
+
+\section{常见问题}
+
+\subsection{连接超时}
+
+如果出现以下连接超时错误，通常是网络配置或服务未启动导致的。
+
+\begin{lstlisting}[style=plain,numbers=none]
+grpc._channel._InactiveRpcError: ... UNAVAILABLE
+\end{lstlisting}
+
+\noindent\textbf{排查步骤}：
+\begin{enumerate}[nosep]
+  \item 确认机器人已上电且启动完成
+  \item \texttt{ping 192.168.66.190} 确认网络连通
+  \item SSH 登录确认服务运行：\texttt{ssh sunrise@192.168.66.190 'systemctl status brainstem'}
+  \item 检查防火墙是否阻断了 13145/TCP
+\end{enumerate}
+
+\subsection{walk() 没反应}
+
+行走指令未生效是新手最常遇到的问题之一。必须按照状态机顺序操作：\texttt{enable()} $\to$ \texttt{stand\_up()} $\to$ 等待站稳 $\to$ \texttt{walk()}。
+
+\begin{lstlisting}[style=python]
+state = dog.get_state()
+print(state)  # 如果不是 "standing"，walk() 不会生效
+\end{lstlisting}
+
+\subsection{电机不动}
+
+电机无响应可能由多种原因引起，请按以下顺序逐一排查：
+
+\begin{enumerate}[nosep]
+  \item 确认已调用 \texttt{dog.enable()}
+  \item 遥控器在线时会抢占控制权------关闭或放下遥控器
+  \item 查看电机状态：\texttt{dog.get\_motor\_status()}
+\end{enumerate}
+
+\subsection{操作被拒绝}
+
+当状态机正在执行过渡动画时，新的运动指令会被拒绝。这是正常的安全保护行为。
+
+\begin{lstlisting}[style=plain,numbers=none]
+grpc._channel._InactiveRpcError: ... transition in progress
+\end{lstlisting}
+
+状态机正在过渡中（如站起/坐下动画），请等待过渡完成后再发送新指令。
+% ============================================================
+%  第 3 章：理论基础
+% ============================================================
+\chapter{理论基础}
+\label{ch:theory}
+
+\chapterguide
+{本章介绍 ORIX 机器狗控制系统涉及的核心理论，包括 PD 控制、强化学习策略、姿态表示和状态机形式化定义。理解这些理论有助于更好地使用 SDK 进行二次开发和算法研究。}
+{如果您只需要快速上手控制机器狗，可以跳过本章，直接阅读 API 参考章节。}
+
+% ------------------------------------------------------------
+\section{PD 位置控制}
+\label{sec:pd-control}
+
+四足机器人的每个关节电机均采用 PD（比例--微分）位置控制器。PD 控制器根据
+目标位置与当前位置的偏差，以及目标速度与当前速度的偏差，计算驱动关节所需的力矩。
+
+其基本控制律为：
+
+\begin{equation}
+\label{eq:pd-control}
+\tau = K_p \left( q_{\mathrm{target}} - q_{\mathrm{current}} \right)
+     + K_d \left( \dot{q}_{\mathrm{target}} - \dot{q}_{\mathrm{current}} \right)
+\end{equation}
+
+其中：
+\begin{itemize}[nosep]
+  \item $\tau$ —— 关节输出力矩（N$\cdot$m）
+  \item $K_p$ —— 比例增益（位置刚度），单位 N$\cdot$m/rad
+  \item $K_d$ —— 微分增益（速度阻尼），单位 N$\cdot$m$\cdot$s/rad
+  \item $q_{\mathrm{target}}$, $q_{\mathrm{current}}$ —— 目标与当前关节角度（rad）
+  \item $\dot{q}_{\mathrm{target}}$, $\dot{q}_{\mathrm{current}}$ —— 目标与当前关节角速度（rad/s）
+\end{itemize}
+
+\subsection{物理意义}
+
+$K_p$ 决定了关节的\textbf{刚度}：$K_p$ 越大，关节对位置偏差的响应越强，
+如同弹簧越硬。$K_d$ 决定了关节的\textbf{阻尼}：$K_d$ 越大，关节运动越平滑，
+振荡越少，如同液压阻尼器。
+
+\subsection{稳定性条件}
+
+PD 控制器稳定的必要条件为：
+
+\begin{equation}
+K_p > 0, \quad K_d > 0
+\end{equation}
+
+\subsection{阻尼比分析}
+
+将单关节建模为二阶系统 $I\ddot{q} + K_d\dot{q} + K_p q = 0$（$I$ 为关节转动惯量），
+可定义阻尼比 $\zeta$ 和固有频率 $\omega_n$：
+
+\begin{align}
+\omega_n &= \sqrt{\frac{K_p}{I}} \\
+\zeta    &= \frac{K_d}{2\sqrt{I \cdot K_p}}
+\end{align}
+
+不同阻尼比对应不同的动态行为：
+
+\begin{itemize}[nosep]
+  \item $\zeta < 1$（\textbf{欠阻尼}）：关节到达目标位置时会出现振荡，适用于需要快速响应的场景，但可能引起机械抖动。
+  \item $\zeta = 1$（\textbf{临界阻尼}）：关节以最快速度到达目标位置且不超调。这是理论上最优的阻尼比。
+  \item $\zeta > 1$（\textbf{过阻尼}）：关节缓慢趋近目标位置，无超调但响应速度慢。
+\end{itemize}
+
+在实际机器人中，通常选取略欠阻尼（$\zeta \approx 0.7 \sim 0.9$）的参数，
+以兼顾响应速度和稳定性。
+
+% ------------------------------------------------------------
+\section{强化学习运动控制}
+\label{sec:rl-locomotion}
+
+ORIX 采用基于强化学习（Reinforcement Learning, RL）的方法训练四足步态策略。
+策略网络在高保真物理仿真器（Isaac Lab）中通过数百万次交互学习，然后直接部署到
+真实机器人上（Sim-to-Real）。
+
+\subsection{策略网络}
+
+策略网络 $\pi$ 是一个将观测映射到动作的神经网络：
+
+\begin{equation}
+\mathbf{a}_t = \pi(\mathbf{o}_t)
+\end{equation}
+
+其中 $\mathbf{o}_t$ 为 $t$ 时刻的观测向量，$\mathbf{a}_t$ 为输出动作。
+
+\subsection{观测空间}
+
+单帧观测向量维度为 57，概念上由以下部分组成：
+
+\begin{equation}
+\mathbf{o} = \begin{bmatrix}
+  \boldsymbol{\omega} \\ \mathbf{g}_{\mathrm{proj}} \\ \mathbf{c}_{\mathrm{cmd}} \\
+  \mathbf{q}_{\mathrm{pos}} \\ \dot{\mathbf{q}} \\ \mathbf{a}_{\mathrm{prev}} \\
+  \mathbf{b}_{\mathrm{contact}}
+\end{bmatrix}
+\in \mathbb{R}^{57}
+\end{equation}
+
+各分量含义如下：
+
+\begin{longtable}{llp{7.5cm}}
+\toprule
+分量 & 维度 & 说明 \\
+\midrule
+$\boldsymbol{\omega}$ & 3 & 陀螺仪角速度（机体坐标系） \\
+$\mathbf{g}_{\mathrm{proj}}$ & 3 & 投影重力向量（见~\ref{sec:attitude}~节） \\
+$\mathbf{c}_{\mathrm{cmd}}$ & 3 & 速度指令 $(v_x, v_y, \omega_z)$ \\
+$\mathbf{q}_{\mathrm{pos}}$ & 12 & 关节位置（12 腿关节，rad） \\
+$\dot{\mathbf{q}}$ & 12 & 关节速度（rad/s） \\
+$\mathbf{a}_{\mathrm{prev}}$ & 12 & 上一时刻动作输出 \\
+$\mathbf{b}_{\mathrm{contact}}$ & 12 & 足端接触布尔量 \\
+\bottomrule
+\end{longtable}
+
+\textbf{注：}本章描述的是概念模型，实际部署版本的观测向量和动作维度可能因 Profile 配置和 ONNX 模型而异。具体维度请通过 \texttt{model\_info} 接口查询或参考您训练时使用的 env config。
+
+\subsection{历史帧堆叠}
+
+为了让策略感知时序动态信息，通常将连续 $H$ 帧观测堆叠为一个输入：
+
+\begin{equation}
+\mathbf{O}_t = \begin{bmatrix}
+  \mathbf{o}_t & \mathbf{o}_{t-1} & \cdots & \mathbf{o}_{t-H+1}
+\end{bmatrix}
+\in \mathbb{R}^{57 \times H}
+\end{equation}
+
+典型值 $H = 5$，因此策略网络的实际输入维度为 $57 \times 5 = 285$。
+
+\subsection{动作空间与缩放}
+
+策略网络输出 12 个腿关节的位置增量（另有 4 个脚轮关节由独立逻辑控制）。
+原始网络输出 $\mathbf{a} \in [-1, 1]^{12}$ 经缩放后变为目标关节角度：
+
+\begin{equation}
+\label{eq:action-scale}
+q_{\mathrm{target},i} = a_i \times \mathrm{actionScale}_i + q_{\mathrm{stand},i}
+\end{equation}
+
+其中 $\mathrm{actionScale}$ 为每个关节的缩放系数，$q_{\mathrm{stand}}$ 为默认站立姿态角度。
+
+\subsection{Sim-to-Real}
+
+策略在 Isaac Lab 仿真环境中训练，使用域随机化（Domain Randomization）缩小仿真与现实的差距。
+训练完成后，策略网络导出为 ONNX 格式，部署到真实机器人的嵌入式处理器上进行实时推理。
+
+% ------------------------------------------------------------
+\section{姿态表示与坐标变换}
+\label{sec:attitude}
+
+机器人的姿态（朝向）在三维空间中通常用四元数表示，它避免了欧拉角的万向锁问题。
+
+\subsection{四元数基础}
+
+单位四元数 $\mathbf{q}$ 定义为：
+
+\begin{equation}
+\mathbf{q} = (w, x, y, z), \quad \|\mathbf{q}\| = \sqrt{w^2 + x^2 + y^2 + z^2} = 1
+\end{equation}
+
+\subsection{四元数到旋转矩阵}
+
+四元数 $\mathbf{q} = (w, x, y, z)$ 对应的旋转矩阵 $R$ 为：
+
+\begin{equation}
+R = \begin{pmatrix}
+1 - 2(y^2 + z^2) & 2(xy - wz) & 2(xz + wy) \\
+2(xy + wz) & 1 - 2(x^2 + z^2) & 2(yz - wx) \\
+2(xz - wy) & 2(yz + wx) & 1 - 2(x^2 + y^2)
+\end{pmatrix}
+\end{equation}
+
+\subsection{投影重力计算}
+
+投影重力（Projected Gravity）是将世界坐标系的重力方向变换到机体坐标系，
+用于让策略感知机器人当前的倾斜状态。其计算公式为：
+
+\begin{equation}
+\label{eq:projected-gravity}
+\mathbf{g}_{\mathrm{body}} = R^\top \begin{pmatrix} 0 \\ 0 \\ -1 \end{pmatrix}
+\end{equation}
+
+其中 $R$ 为由 IMU 四元数计算得到的旋转矩阵。当机器人水平放置时，
+$\mathbf{g}_{\mathrm{body}} = (0, 0, -1)^\top$；当机器人倾斜时，重力在
+机体 $x$、$y$ 轴上会产生分量。
+
+\subsection{Hamilton 约定与 ROS 约定}
+
+两种常见的四元数排列约定：
+
+\begin{itemize}[nosep]
+  \item \textbf{Hamilton 约定}（ORIX / Protobuf）：$(w, x, y, z)$ —— 实部 $w$ 在前
+  \item \textbf{ROS 约定}（ROS2 / tf2）：$(x, y, z, w)$ —— 实部 $w$ 在后
+\end{itemize}
+
+在 ORIX 系统内部统一使用 Hamilton 约定。当与 ROS 系统交互时（如导航模块），
+\texttt{han\_dog\_bridge} 会自动完成两种约定之间的转换。
+
+% ------------------------------------------------------------
+\section{有限状态机}
+\label{sec:fsm-theory}
+
+ORIX 的运动控制流程由一个有限状态机（Finite State Machine, FSM）管理。
+FSM 确保机器人在任何时刻都处于明确定义的状态，且所有状态转换都经过安全校验。
+
+\subsection{形式化定义}
+
+FSM 形式化定义为五元组：
+
+\begin{equation}
+\mathrm{FSM} = (S,\; \Sigma,\; \delta,\; s_0,\; F)
+\end{equation}
+
+其中各元素定义如下：
+
+\begin{align}
+S      &= \{\texttt{Zero},\; \texttt{Grounded},\; \texttt{Standing},\; \texttt{Walking},\; \texttt{Transitioning}\} \\
+\Sigma &= \{\texttt{init},\; \texttt{standUp},\; \texttt{sitDown},\; \texttt{walk},\; \texttt{stop},\; \texttt{fault}\} \\
+s_0    &= \texttt{Zero}
+\end{align}
+
+$\delta: S \times \Sigma \to S$ 为状态转移函数，$F$ 为终态集合（在持续运行系统中通常为空集）。
+
+\subsection{状态转移表}
+
+\begin{longtable}{lll}
+\toprule
+当前状态 & 输入事件 & 下一状态 \\
+\midrule
+\texttt{Zero} & \texttt{init} & \texttt{Grounded} \\
+\texttt{Grounded} & \texttt{standUp} & \texttt{Transitioning} $\to$ \texttt{Standing} \\
+\texttt{Standing} & \texttt{walk} & \texttt{Walking} \\
+\texttt{Standing} & \texttt{sitDown} & \texttt{Transitioning} $\to$ \texttt{Grounded} \\
+\texttt{Walking} & \texttt{stop} & \texttt{Standing} \\
+\texttt{Walking} & \texttt{sitDown} & \texttt{Transitioning} $\to$ \texttt{Grounded} \\
+任意状态 & \texttt{fault} & \texttt{Grounded}（经由安全坐下） \\
+\bottomrule
+\end{longtable}
+
+\subsection{安全不变量}
+
+FSM 设计中最重要的安全不变量：
+
+\begin{quote}
+\textbf{从任意状态出发，收到 \texttt{fault} 信号后，系统必须经由安全坐下动画回到 \texttt{Grounded} 状态。}
+\end{quote}
+
+这意味着即使在行走过程中发生低电压告警、通信丢失或软件异常，
+机器人也会优雅地坐下而非直接断电跌倒。
+这一设计在代码中由 \texttt{Brain} 的 FSM 实现保证（见 \texttt{han\_dog\_brain/cms/}）。
+
+% ------------------------------------------------------------
+\section{控制频率与实时性}
+\label{sec:control-freq}
+
+ORIX 的主控制循环以 50\,Hz 固定频率运行，即每个控制周期为：
+
+\begin{equation}
+T = \frac{1}{50\,\mathrm{Hz}} = 20\,\mathrm{ms}
+\end{equation}
+
+\subsection{单周期流水线}
+
+每个 20\,ms 周期内，系统依次执行以下步骤：
+
+\begin{enumerate}[nosep]
+  \item \textbf{传感器读取}：从 IMU 和关节编码器获取最新数据
+  \item \textbf{观测构建}：将传感器数据组装为策略网络所需的观测向量
+  \item \textbf{神经网络推理}：策略网络前向传播，输出关节动作
+  \item \textbf{动作后处理}：应用 actionScale 缩放和安全限幅
+  \item \textbf{电机指令下发}：通过 CAN 总线发送 PD 位置指令
+\end{enumerate}
+
+\subsection{时间预算}
+
+典型的时间分配如下：
+
+\begin{longtable}{lr}
+\toprule
+阶段 & 耗时 \\
+\midrule
+神经网络推理（ONNX Runtime） & $< 1$\,ms \\
+传感器读取 + 观测构建 + 动作后处理 & $< 1$\,ms \\
+总流水线 & $< 2$\,ms \\
+事件循环空闲时间 & $\sim 18$\,ms \\
+\bottomrule
+\end{longtable}
+
+\subsection{为什么单线程事件循环足够}
+
+ORIX 主控程序采用 Dart 单线程异步事件循环模型。50\,Hz 控制循环的关键路径
+仅占用约 2\,ms，远小于 20\,ms 的周期。剩余 18\,ms 可用于处理 gRPC 请求、
+日志写入和状态广播等异步任务。
+
+单线程模型的优势在于：
+\begin{itemize}[nosep]
+  \item 无线程同步开销（无锁、无竞态条件）
+  \item 确定性的执行顺序，便于调试和分析
+  \item 更低的延迟抖动（jitter），提高控制精度
+\end{itemize}
+
+只要控制路径上的操作全部是非阻塞的（ORIX 通过异步 I/O 和 CAN 总线
+非阻塞写入保证这一点），单线程模型完全能够满足 50\,Hz 的实时性要求。
+
+
+% ============================================================
+%  第 4 章：坐标系与关节
+% ============================================================
+\chapter{坐标系与关节}
+\label{ch:coordinates}
+
+\chapterguide
+{本章用于统一方向、编号和姿态语言，避免多人协作时出现“左右相反”“关节号对不上”“旋转方向理解不一致”这类低级但高成本的问题。}
+{开始写控制代码前，至少应熟悉机体坐标系、四条腿的编号分组以及 \texttt{walk()} 的三个速度轴向定义。}
+
+本文档定义 ORIX 机器人的坐标系约定、16 个关节的编号规则、运动范围和典型姿态。
+
+\section{机体坐标系}
+
+ORIX 使用右手坐标系，原点位于机身几何中心：
+
+机体坐标系采用右手定则：X 轴指向机器人前方，Y 轴指向机器人左侧，Z 轴垂直向上。原点位于机身几何中心。
+
+\begin{longtable}{lll}
+\toprule
+轴 & 正方向 & 说明 \\
+\midrule
+\endhead
+X & 前方 (Forward) & 机器人头部方向 \\
+Y & 左方 (Left) & 机器人左侧方向 \\
+Z & 上方 (Up) & 垂直向上 \\
+\bottomrule
+\end{longtable}
+
+\subsection{正面视图}
+
+从正面观察机器人：Z 轴向上，Y 轴向右为负、向左为正。左上方为 FL 腿，右上方为 FR 腿，左下方为 RL 腿，右下方为 RR 腿。机身（body）位于中央。
+
+\subsection{侧面视图（右侧）}
+
+从右侧观察机器人：Z 轴向上，X 轴指向前方（即机器人前进方向）。机身上方连接两条腿，每条腿从上到下依次为 Hip、Thigh、Calf、Foot 关节，Foot（脚轮）接触地面。后方为后腿（RR），前方为前腿（FR）。
+
+\subsection{walk() 指令与坐标系的关系}
+
+理解行走指令参数与坐标轴的对应关系，是正确控制机器狗运动方向的前提。下表列出了三个速度参数的物理含义。
+
+\begin{longtable}{llll}
+\toprule
+参数 & 正值 & 负值 & 对应轴 \\
+\midrule
+\endhead
+\texttt{vx} & 前进 & 后退 & +X / -X \\
+\texttt{vy} & 向左 & 向右 & +Y / -Y \\
+\texttt{vyaw} & 逆时针 & 顺时针 & 绕 +Z 轴 \\
+\bottomrule
+\end{longtable}
+
+\section{关节编号总表}
+
+以下是 ORIX 全部 16 个关节的编号和 URDF 名称。编写底层控制或进行运动学分析时需要频繁参考此表。具体的运动范围请参考 URDF 文件或通过 SDK 接口查询。
+
+\begin{longtable}{cllll}
+\toprule
+索引 & 名称 & 腿 & 关节类型 & URDF 名称 \\
+\midrule
+\endhead
+0 & FR Hip & 前右 & 髋 (横滚) & \texttt{fr\_hip\_joint} \\
+1 & FR Thigh & 前右 & 大腿 (俯仰) & \texttt{fr\_thigh\_joint} \\
+2 & FR Calf & 前右 & 小腿 (俯仰) & \texttt{fr\_calf\_joint} \\
+3 & FR Foot & 前右 & 脚轮 (连续) & \texttt{fr\_foot\_joint} \\
+4 & FL Hip & 前左 & 髋 (横滚) & \texttt{fl\_hip\_joint} \\
+5 & FL Thigh & 前左 & 大腿 (俯仰) & \texttt{fl\_thigh\_joint} \\
+6 & FL Calf & 前左 & 小腿 (俯仰) & \texttt{fl\_calf\_joint} \\
+7 & FL Foot & 前左 & 脚轮 (连续) & \texttt{fl\_foot\_joint} \\
+8 & RR Hip & 后右 & 髋 (横滚) & \texttt{rr\_hip\_joint} \\
+9 & RR Thigh & 后右 & 大腿 (俯仰) & \texttt{rr\_thigh\_joint} \\
+10 & RR Calf & 后右 & 小腿 (俯仰) & \texttt{rr\_calf\_joint} \\
+11 & RR Foot & 后右 & 脚轮 (连续) & \texttt{rr\_foot\_joint} \\
+12 & RL Hip & 后左 & 髋 (横滚) & \texttt{rl\_hip\_joint} \\
+13 & RL Thigh & 后左 & 大腿 (俯仰) & \texttt{rl\_thigh\_joint} \\
+14 & RL Calf & 后左 & 小腿 (俯仰) & \texttt{rl\_calf\_joint} \\
+15 & RL Foot & 后左 & 脚轮 (连续) & \texttt{rl\_foot\_joint} \\
+\bottomrule
+\end{longtable}
+
+\section{关节分组}
+
+\subsection{按腿分组}
+
+在诊断特定腿部问题或编写单腿测试程序时，按腿分组的索引非常实用。
+
+\begin{longtable}{ll}
+\toprule
+腿 & 关节索引 \\
+\midrule
+前右 (FR) & {[}0, 1, 2, 3{]} \\
+前左 (FL) & {[}4, 5, 6, 7{]} \\
+后右 (RR) & {[}8, 9, 10, 11{]} \\
+后左 (RL) & {[}12, 13, 14, 15{]} \\
+\bottomrule
+\end{longtable}
+
+\subsection{按关节类型分组}
+
+按类型分组便于批量调整同类关节的 PD 参数或进行统一的故障检测。
+
+\begin{longtable}{lll}
+\toprule
+关节类型 & 索引 & 功能 \\
+\midrule
+所有 Hip & {[}0, 4, 8, 12{]} & 髋关节，控制腿的内外摆动 \\
+所有 Thigh & {[}1, 5, 9, 13{]} & 大腿关节，控制腿的前后摆动 \\
+所有 Calf & {[}2, 6, 10, 14{]} & 小腿关节，控制膝盖弯曲 \\
+所有 Foot & {[}3, 7, 11, 15{]} & 脚轮，控制轮式移动 \\
+\bottomrule
+\end{longtable}
+
+\subsection{俯瞰图 (Top View)}
+
+从俯瞰角度看，X 轴正方向朝前（Head），X 轴负方向朝后（Tail），Y 轴正方向朝左，Y 轴负方向朝右。四条腿的关节索引分布为：左前 FL{[}4--7{]} 位于左前方，右前 FR{[}0--3{]} 位于右前方，左后 RL{[}12--15{]} 位于左后方，右后 RR{[}8--11{]} 位于右后方。机身中心为坐标原点。
+
+\subsection{侧面图------单腿结构}
+
+以前右腿（FR）为例，单腿从躯干到地面的关节链结构如下：
+
+\begin{enumerate}[nosep]
+  \item \textbf{{[}0{]} Hip}（髋关节）：连接躯干，绕 X 轴旋转（横滚），控制腿的内外摆动。
+  \item \textbf{{[}1{]} Thigh}（大腿关节）：连接上臂段，绕 Y 轴旋转（俯仰），控制腿的前后摆动。
+  \item \textbf{{[}2{]} Calf}（小腿关节）：连接下臂段，绕 Y 轴旋转（俯仰），控制膝盖弯曲。
+  \item \textbf{{[}3{]} Foot}（脚轮）：末端执行器，连续旋转驱动轮毂，脚轮触地。
+\end{enumerate}
+
+\section{典型姿态}
+
+\subsection{站立姿态 (Standing Pose)}
+
+站立姿态定义了机器人正常直立时所有关节的目标角度。RL 策略的输出会在此姿态基础上叠加偏移量，驱动步态运动。以下是各关节的目标角度：
+
+\begin{lstlisting}[style=python]
+standing_pose = [
+     0.0, -0.65,  1.5,  0,    # FR: hip, thigh, calf, foot
+     0.0,  0.65, -1.5,  0,    # FL: hip, thigh, calf, foot
+     0.0, -0.65,  1.5,  0,    # RR: hip, thigh, calf, foot
+     0.0,  0.65, -1.5,  0,    # RL: hip, thigh, calf, foot
+]
+\end{lstlisting}
+
+各关节含义：
+
+\begin{longtable}{lll}
+\toprule
+关节 & FR 值 & 含义 \\
+\midrule
+\endhead
+Hip & 0.0 rad ($0\degree$) & 髋关节居中 \\
+Thigh & -0.65 rad ($-37.2\degree$) & 大腿向后摆约 37 度 \\
+Calf & 1.5 rad ($85.9\degree$) & 小腿弯曲约 86 度 \\
+Foot & 0 rad & 脚轮不转 \\
+\bottomrule
+\end{longtable}
+
+\warning{注意左右对称：FR 和 RR 的符号相同，FL 和 RL 的符号相同（镜像关系）。}
+
+\subsection{坐下姿态 (Sitting Pose)}
+
+坐下姿态即电机零位，所有关节角度为 0：
+
+\begin{lstlisting}[style=python]
+sitting_pose = [0, 0, 0, 0,   # FR
+                0, 0, 0, 0,   # FL
+                0, 0, 0, 0,   # RR
+                0, 0, 0, 0]   # RL
+\end{lstlisting}
+
+这是机器人趴在地面上的姿态，也是电机标零后的参考位。
+
+\subsection{姿态可视化}
+
+站立姿态（Standing）时，机器人四腿伸展支撑躯干离地，重心较高，脚轮接触地面。坐下姿态（Sitting / Zero）时，所有关节归零，腿部折叠收拢，躯干贴近地面，这是最稳定的安全状态。
+
+\section{PD 控制参数}
+
+每个关节的运动由 PD 控制器驱动：
+
+\[
+\tau = K_p \cdot (q_{\text{target}} - q_{\text{current}}) + K_d \cdot (\dot{q}_{\text{target}} - \dot{q}_{\text{current}})
+\]
+
+\subsection{推理阶段（行走时）}
+
+行走时 RL 策略以 50Hz 输出动作向量，经过动作缩放和 PD 控制器计算后转化为电机力矩指令。以下是各关节类型的控制参数。
+
+\begin{longtable}{lllll}
+\toprule
+索引 & 关节 & Kp & Kd & actionScale \\
+\midrule
+\endhead
+0, 4, 8, 12 & Hip & 80 & 10 & 0.15 \\
+1, 5, 9, 13 & Thigh & 100 & 10 & 0.25 \\
+2, 6, 10, 14 & Calf & 120 & 15 & 0.25 \\
+3, 7, 11, 15 & Foot & 0 & 1 & 5.0 \\
+\bottomrule
+\end{longtable}
+
+\texttt{actionScale} 是 RL 策略输出到实际弧度的缩放系数。策略输出值经过以下变换得到目标关节角度：
+
+\[
+q_{\text{target}} = \text{action\_output} \times \text{actionScale} + \text{standingPose}
+\]
+
+\subsection{站立姿态}
+
+站立姿态（Standing Pose）是机器狗正常直立时所有关节的目标角度。站起过程会从坐姿线性插值到站立姿态，约 3 秒完成。站立姿态和 PD 增益参数均通过 Profile JSON 文件配置，用户可以根据自己的需要调整。
+
+\subsection{PD 控制接口}
+
+机器狗的关节控制基于 PD（比例-微分）位置控制。每个关节独立接受 Kp（比例增益）和 Kd（微分增益）参数，不同的增益组合会产生不同的运动效果：Kp 越大关节越"硬"，响应越快但可能震荡；Kd 越大阻尼越强，运动越平滑但响应变慢。
+
+PD 参数通过 Profile JSON 文件配置，SDK 提供以下接口查看和切换策略：
+
+\begin{lstlisting}[style=python]
+# 查看当前策略（含 PD 增益配置）
+profile = dog.get_profile()
+print(profile.current)      # 当前策略名称
+print(profile.available)    # 所有可用策略
+
+# 切换到不同的 PD 参数组合（机器人须在着地状态）
+dog.switch_profile("my_custom_profile")
+\end{lstlisting}
+
+Profile JSON 文件中的 PD 相关字段：
+
+\begin{longtable}{lp{10cm}}
+\toprule
+字段 & 说明 \\
+\midrule
+\endhead
+\texttt{inferKp} / \texttt{inferKd} & 行走推理时的 PD 增益（16 个值，每关节独立） \\
+\texttt{standUpKp} / \texttt{standUpKd} & 站起过渡时的 PD 增益 \\
+\texttt{sitDownKp} / \texttt{sitDownKd} & 坐下过渡时的 PD 增益 \\
+\texttt{actionScale} & 动作缩放系数（4 个值，按关节类型） \\
+\bottomrule
+\end{longtable}
+
+详细的 JSON 格式规范请参考 \texttt{profile\_schema.json}。
+
+\section{编程中的关节操作}
+
+\subsection{读取关节数据}
+
+通过 \texttt{listen\_joint()} 流式接口可以实时获取每个关节的位置、速度和力矩数据，适合用于数据记录和运动分析。
+
+\begin{lstlisting}[style=python]
+# 实时流式读取
+for joint in dog.listen_joint():
+    print(f"关节 {joint.id}: "
+          f"位置={joint.position:.3f}rad "
+          f"速度={joint.velocity:.3f}rad/s "
+          f"力矩={joint.torque:.2f}Nm")
+\end{lstlisting}
+
+\subsection{诊断单条腿}
+
+当怀疑某条腿存在硬件问题时，可以单独查询该腿四个电机的状态信息。
+
+\begin{lstlisting}[style=python]
+# 检查前右腿 (FR) 的 4 个电机
+motors = dog.get_motor_status()
+fr_motors = [m for m in motors if m.id in [0, 1, 2, 3]]
+for m in fr_motors:
+    print(f"  关节{m.id}: online={m.online} temp={m.temperature:.1f}C")
+\end{lstlisting}
+
+\subsection{清除单腿故障}
+
+如果只有特定腿的电机报告故障，可以仅清除该腿的故障码，而不影响其他正常工作的电机。
+
+\begin{lstlisting}[style=python]
+# 只清除前右腿的电机故障
+dog.clear_motor_fault(joint_ids=[0, 1, 2, 3])
+\end{lstlisting}
+
+
+
+% ============================================================
+%  第 5 章：状态机与运动控制
+% ============================================================
+\chapter{状态机与运动控制}
+\label{ch:fsm}
+
+\chapterguide
+{本章解释“什么状态下什么指令才会生效”，是理解运动控制、排查动作不响应以及设计安全流程的核心章节。}
+{如果您刚开始接触 SDK，建议先读“状态机总览”“状态转换详解”和“典型使用流程”，再回头查各类异常和边界条件。}
+
+本文档详细说明 ORIX 机器人的有限状态机 (FSM)、状态转换规则、运动控制接口和安全机制。
+
+\section{状态机总览}
+
+ORIX 的运动控制由一个严格的有限状态机管理。所有 SDK 指令必须遵循状态机规则，非法的状态转换会被拒绝。
+
+\subsection{状态图}
+
+ORIX 的有限状态机包含五个状态，以下是完整的状态转换路径：
+
+\begin{longtable}{llll}
+\toprule
+起始状态 & 触发条件 & 中间状态 & 目标状态 \\
+\midrule
+\endhead
+Zero & 系统初始化 Init() & -- & Grounded \\
+Grounded & \texttt{stand\_up()} & Transitioning (StandUp) & Standing \\
+Standing & \texttt{walk(vx, vy, vyaw)} & -- & Walking \\
+Walking & \texttt{walk()} 停步或 Idle & Transitioning (StandUp) & Standing \\
+Standing & \texttt{sit\_down()} & Transitioning (SitDown) & Grounded \\
+Walking & \texttt{sit\_down()} & 先 StandUp 再 SitDown & Grounded \\
+任意运动状态 & Fault 故障 & 自动过渡 & Grounded（安全坐下） \\
+\bottomrule
+\end{longtable}
+
+\noindent 状态机的核心原则是：所有运动指令必须遵循状态转换顺序，Transitioning（过渡中）状态下拒绝新的运动指令，Fault 触发时系统会自动执行安全着陆。
+
+\subsection{五个状态}
+
+\begin{longtable}{lll}
+\toprule
+状态 & SDK 返回值 & 说明 \\
+\midrule
+\endhead
+\textbf{Zero} & \texttt{"zero"} & 上电初始态，FSM 尚未初始化。不接受任何运动指令。 \\
+\textbf{Grounded} & \texttt{"grounded"} & 坐姿/趴地。安全状态，电机可使能但不运动。 \\
+\textbf{Standing} & \texttt{"standing"} & 直立站稳。可以接收 \texttt{walk()} 或 \texttt{sit\_down()} 指令。 \\
+\textbf{Walking} & \texttt{"walking"} & 行走中。RL 策略以 50Hz 推理驱动步态。 \\
+\textbf{Transitioning} & \texttt{"transitioning"} & 过渡中（站起/坐下/动作播放）。拒绝新的运动指令。 \\
+\bottomrule
+\end{longtable}
+
+\section{状态转换详解}
+
+\subsection{Zero $\to$ Grounded}
+
+这是系统上电后的第一个自动状态转换，无需用户干预。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & 系统自动初始化 (Init) \\
+耗时 & 即时 \\
+用户操作 & 无需操作，上电后自动完成 \\
+\bottomrule
+\end{longtable}
+
+上电启动 brainstem 服务后，FSM 自动从 Zero 进入 Grounded。
+
+\subsection{Grounded $\to$ Standing（站起）}
+
+站起过程是用户主动触发的第一个运动动作，需要约 3 秒完成平滑过渡。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & \texttt{dog.stand\_up()} \\
+中间状态 & Transitioning (StandUp) \\
+耗时 & 150 ticks $\times$ 20ms = \textbf{3 秒} \\
+过程 & 从当前姿态线性插值到 standingPose \\
+PD 参数 & 由 Profile 配置决定（过渡阶段使用较高刚度，确保平稳） \\
+\bottomrule
+\end{longtable}
+
+站起过程是一段 150 帧的线性插值动画：
+
+站起过程分为 150 帧，按线性插值平滑过渡：第 0 帧为当前坐姿（sittingPose），第 75 帧为中间过渡态（50\% 位置），第 150 帧为完全站立姿态（standingPose）。
+
+\subsection{Standing $\to$ Walking（开始行走）}
+
+从站立到行走的切换是即时的，RL 步态策略会立即接管关节控制。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & \texttt{dog.walk(vx, vy, vyaw)} \\
+耗时 & 即时切换 \\
+过程 & RL 策略接管，以 50Hz 推理输出关节指令 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Walking 中更新方向}
+
+行走过程中可以随时更新速度方向，无需停步再重新发送指令。新的方向在下一个控制周期即刻生效。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & 再次调用 \texttt{dog.walk(vx, vy, vyaw)} \\
+耗时 & 即时生效（下一帧） \\
+过程 & 仅更新方向向量，不切换状态 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Walking $\to$ Standing（停步）}
+
+停步操作会让机器狗从行走状态平滑过渡回站立姿态。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & \texttt{dog.walk()} 无参数，或发送全零后超时自动触发 Idle \\
+中间状态 & Transitioning (StandUp)，从当前行走姿态插值到 standingPose \\
+耗时 & \textasciitilde 3 秒 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Standing $\to$ Grounded（坐下）}
+
+坐下是结束运动任务的标准操作，也是安全关机流程的必要步骤。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & \texttt{dog.sit\_down()} \\
+中间状态 & Transitioning (SitDown) \\
+耗时 & 150 ticks $\times$ 20ms = \textbf{3 秒} \\
+过程 & 从 standingPose 线性插值到 sittingPose (全零) \\
+\bottomrule
+\end{longtable}
+
+\subsection{Walking $\to$ Grounded（行走中直接坐下）}
+
+在行走状态下也可以直接调用坐下指令，系统会自动执行"先站稳、再坐下"的复合过渡。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+触发 & 在 Walking 状态调用 \texttt{dog.sit\_down()} \\
+过程 & 复合过渡：先自动站稳 (StandUp)，再坐下 (SitDown) \\
+耗时 & \textasciitilde 6 秒（两段过渡串联） \\
+\bottomrule
+\end{longtable}
+
+\section{非法操作处理}
+
+ORIX 的状态机设计优先保证安全性。高层 SDK API 会抛出 \texttt{InvalidStateError} 异常（从 \texttt{grpc.FAILED\_PRECONDITION} 映射而来）。如果您直接使用底层 stub 绕过 SDK，服务端可能静默忽略不合法的状态转换。推荐始终使用 \texttt{OrixClient} 并处理 \texttt{InvalidStateError}：
+
+\begin{longtable}{lll}
+\toprule
+当前状态 & 发送的指令 & 结果 \\
+\midrule
+\endhead
+Grounded & \texttt{walk()} & 忽略。必须先 \texttt{stand\_up()} \\
+Grounded & \texttt{sit\_down()} & 忽略。已在坐姿 \\
+Standing & \texttt{stand\_up()} & 忽略。已站立 \\
+Walking & \texttt{stand\_up()} & 触发从行走过渡到站立 \\
+Transitioning & 任何运动指令 & \textbf{拒绝}。过渡期间不接受新指令 \\
+Zero & 任何运动指令 & 忽略。FSM 未初始化 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{最佳实践}：在发送指令前先查询状态，确认状态机处于正确状态。
+
+\begin{lstlisting}[style=python]
+state = dog.get_state()
+if state == "standing":
+    dog.walk(vx=0.3)
+elif state == "grounded":
+    dog.stand_up()
+\end{lstlisting}
+
+\section{walk() 速度约定}
+
+\subsection{参数说明}
+
+\texttt{walk()} 方法接受三个归一化速度参数，分别控制前后、左右和旋转方向。所有参数默认为 0，即原地停步。
+
+阅读本节时，请把这三个参数理解为“控制意图”而不是“物理量”。它们表达的是当前策略允许范围内的归一化指令，因此安全调试时应优先从小值开始，例如 \texttt{0.1} 到 \texttt{0.2}，确认方向正确后再逐步加大。
+
+\begin{lstlisting}[style=python]
+dog.walk(vx=0.0, vy=0.0, vyaw=0.0)
+\end{lstlisting}
+
+\begin{longtable}{lllll}
+\toprule
+参数 & 范围 & 正值 & 负值 & 零值 \\
+\midrule
+\endhead
+\texttt{vx} & {[}-1.0, 1.0{]} & 前进 (+X) & 后退 (-X) & 不动 \\
+\texttt{vy} & {[}-1.0, 1.0{]} & 向左 (+Y) & 向右 (-Y) & 不动 \\
+\texttt{vyaw} & {[}-1.0, 1.0{]} & 逆时针 (+Z) & 顺时针 (-Z) & 不转 \\
+\bottomrule
+\end{longtable}
+
+三个参数均为\textbf{归一化速度}，1.0 对应最大速度，具体物理速度由 RL 策略决定。
+
+\subsection{常见用法}
+
+以下代码片段展示了最常用的运动指令组合，包括直线行走、横移、旋转和复合运动。
+
+\begin{lstlisting}[style=python]
+# 前进
+dog.walk(vx=0.5)
+
+# 后退
+dog.walk(vx=-0.3)
+
+# 向左平移
+dog.walk(vy=0.3)
+
+# 原地逆时针转
+dog.walk(vyaw=0.3)
+
+# 边走边转（前进 + 左转）
+dog.walk(vx=0.3, vyaw=0.2)
+
+# 停步（发送零速度）
+dog.walk()
+\end{lstlisting}
+
+\subsection{运动方向参考图}
+
+运动方向与参数的对应关系：\texttt{vx > 0} 为前进，\texttt{vx < 0} 为后退；\texttt{vy > 0} 为向左平移，\texttt{vy < 0} 为向右平移；\texttt{vyaw > 0} 为逆时针旋转（CCW），\texttt{vyaw < 0} 为顺时针旋转（CW）。三个参数可以组合使用，实现边走边转等复合运动。
+
+\section{电机使能/禁用生命周期}
+
+\subsection{完整生命周期}
+
+理解电机的使能/禁用生命周期对于安全操作至关重要。电机的生命周期如下：上电后电机默认处于禁用状态。调用 \texttt{enable()} 使能电机后，可以执行 \texttt{stand\_up()}、\texttt{walk()}、\texttt{sit\_down()} 等运动操作。在任何使能状态下调用 \texttt{disable()} 都会立即释放所有电机力矩，电机回到禁用状态。最终下电关闭电源。
+
+\subsection{关键规则}
+
+\begin{enumerate}[nosep]
+  \item \textbf{上电后电机默认禁用}。必须调用 \texttt{enable()} 才能运动。
+  \item \textbf{\texttt{disable()} 随时可调用}。会立即释放所有电机力矩（机器人会瘫软）。
+  \item \textbf{先坐下再禁用}。建议流程：\texttt{sit\_down()} $\to$ 等待 Grounded $\to$ \texttt{disable()}。
+  \item \textbf{低压自动禁用}。电压低于 18V 时，系统会先坐下再禁用，不会直接断电。
+\end{enumerate}
+
+\subsection{安全的关机流程}
+
+以下代码展示了如何从任意运动状态安全地关闭机器狗。核心原则是：先确认坐稳，再禁用电机。
+
+\begin{lstlisting}[style=python]
+import time
+
+# 确保从任何状态安全关闭
+state = dog.get_state()
+
+if state == "walking":
+    dog.sit_down()      # Walking -> StandUp -> SitDown (复合)
+    time.sleep(7)       # 等待两段过渡完成
+elif state == "standing":
+    dog.sit_down()
+    time.sleep(4)
+elif state == "transitioning":
+    time.sleep(4)       # 等待当前过渡完成
+
+# 确认已坐下
+assert dog.get_state() == "grounded"
+
+# 安全禁用
+dog.disable()
+\end{lstlisting}
+
+\section{控制权仲裁 (ControlArbiter)}
+
+\subsection{优先级机制}
+
+ORIX 支持多个控制源同时存在，通过 ControlArbiter 仲裁控制权：
+
+控制权优先级从高到低依次为：遥控器（最高优先级）、SDK gRPC（较低优先级）。遥控器活跃时，SDK 的指令将被忽略。遥控器无操作超过 3 秒后，控制权自动释放给 SDK。
+
+\subsection{仲裁规则}
+
+\begin{longtable}{ll}
+\toprule
+场景 & 行为 \\
+\midrule
+\endhead
+SDK 控制中，遥控器摇杆动 & SDK 被立即抢占，遥控器接管 \\
+遥控器控制中，SDK 发指令 & SDK 指令被忽略 \\
+遥控器松手不动 & 3 秒超时后自动释放，SDK 恢复控制权 \\
+SDK 控制中，遥控器关机 & SDK 保持控制权，不受影响 \\
+\bottomrule
+\end{longtable}
+
+\subsection{超时参数}
+
+\begin{longtable}{llll}
+\toprule
+参数 & 默认值 & 环境变量 & 说明 \\
+\midrule
+\endhead
+\texttt{arbiterTimeout} & 3 秒 & \texttt{HAN\_DOG\_ARBITER\_TIMEOUT} & 遥控器释放控制权的超时时间 \\
+\bottomrule
+\end{longtable}
+
+\subsection{SDK 开发建议}
+
+\begin{enumerate}[nosep]
+  \item \textbf{首次调试时关闭遥控器}，避免控制权冲突
+  \item \textbf{保留遥控器作为安全手段}，紧急情况下随时接管
+  \item \textbf{不要轮询状态来检测控制权}。当 SDK 指令与当前状态不匹配时，\texttt{OrixClient} 会抛出 \texttt{InvalidStateError} 异常。遥控器持有控制权时的 SDK 指令在仲裁层被拒绝，这种情况 SDK 不会报错（非状态机错误）。
+\end{enumerate}
+
+\section{故障处理}
+
+\subsection{Fault 状态转换}
+
+当系统检测到异常时，会触发 Fault 动作。不同状态下的 Fault 行为：
+
+\begin{longtable}{ll}
+\toprule
+当前状态 & Fault 行为 \\
+\midrule
+\endhead
+Grounded & 忽略（已在安全状态） \\
+Standing & 忽略（已在安全状态） \\
+Walking & 自动过渡到 StandUp（先站稳） \\
+Transitioning (StandUp) & 中止站起，转为 SitDown \\
+Transitioning (SitDown) & 强制进入 Grounded（避免死循环） \\
+\bottomrule
+\end{longtable}
+
+\subsection{电机故障清除}
+
+\begin{lstlisting}[style=python]
+# 查看电机状态
+motors = dog.get_motor_status()
+for m in motors:
+    if m.errors:
+        print(f"关节 {m.id} 故障: {m.errors}")
+
+# 清除全部故障
+dog.clear_motor_fault()
+
+# 清除指定关节的故障
+dog.clear_motor_fault(joint_ids=[0, 1, 2])
+\end{lstlisting}
+
+\subsection{低压保护}
+
+当任一电机总线电压低于 18V 时触发：
+
+低压保护触发后，系统依次执行以下步骤：（1）检测到低压（低于 18V）$\to$（2）自动发送坐下指令 $\to$（3）等待机器人进入 Grounded 状态 $\to$（4）禁用全部电机。
+
+低压保护是\textbf{不可逆的}（单次触发后标记 \texttt{lowVoltageTriggered}），需要重新上电才能恢复。
+
+\section{策略切换}
+
+ORIX 支持多种运动策略（Profile），每种策略包含不同的 ONNX 模型和 PD 参数。
+
+\subsection{查询和切换}
+
+\begin{lstlisting}[style=python]
+# 查看当前策略
+profile = dog.get_profile()
+print(f"当前: {profile.current}")
+print(f"可用: {profile.available}")
+
+# 切换策略（必须在 Grounded 状态）
+dog.switch_profile("mini")
+\end{lstlisting}
+
+\subsection{切换规则}
+
+\begin{itemize}[nosep]
+  \item 只能在 \textbf{Grounded} 状态下切换策略
+  \item 切换后会重新加载 ONNX 模型
+  \item 新策略的 PD 参数和动作缩放会立即生效
+\end{itemize}
+
+\section{典型使用流程}
+
+\subsection{标准操作序列}
+
+\begin{lstlisting}[style=python]
+import time
+from brainstem_sdk import OrixClient
+
+# 连接
+dog = OrixClient("192.168.66.190")
+
+# 1. 诊断检查
+state = dog.get_state()
+print(f"初始状态: {state}")          # 应为 "grounded"
+
+voltages = dog.get_voltage()
+avg_v = sum(voltages) / len(voltages) if voltages else 0
+print(f"电池电压: {avg_v:.1f}V")     # 应 > 18V
+
+motors = dog.get_motor_status()
+offline = [m.id for m in motors if not m.online]
+if offline:
+    print(f"警告: 关节 {offline} 离线")
+
+# 2. 使能电机
+dog.enable()
+
+# 3. 站起 (3 秒过渡)
+dog.stand_up()
+time.sleep(4)
+assert dog.get_state() == "standing"
+
+# 4. 行走
+dog.walk(vx=0.3)                     # 前进
+time.sleep(3)
+
+dog.walk(vx=0.3, vyaw=0.2)          # 前进 + 左转
+time.sleep(2)
+
+dog.walk()                            # 停步
+time.sleep(1)
+
+# 5. 坐下 (3 秒过渡)
+dog.sit_down()
+time.sleep(4)
+assert dog.get_state() == "grounded"
+
+# 6. 禁用电机
+dog.disable()
+
+# 7. 断开连接
+dog.close()
+\end{lstlisting}
+
+\subsection{实时数据监控}
+
+\begin{lstlisting}[style=python]
+import threading
+import time
+from brainstem_sdk import OrixClient
+
+dog = OrixClient("192.168.66.190")
+
+# 在后台线程中监听 IMU
+def monitor_imu():
+    for imu in dog.listen_imu():
+        gx, gy, gz = imu.gyroscope.x, imu.gyroscope.y, imu.gyroscope.z
+        print(f"\rIMU: gx={gx:+.2f} gy={gy:+.2f} gz={gz:+.2f}", end="")
+
+imu_thread = threading.Thread(target=monitor_imu, daemon=True)
+imu_thread.start()
+
+# 在后台线程中监听状态变化
+def monitor_state():
+    for state in dog.listen_state():
+        print(f"\n[STATE] -> {state}")
+
+state_thread = threading.Thread(target=monitor_state, daemon=True)
+state_thread.start()
+
+# 主线程执行操作
+dog.enable()
+dog.stand_up()
+time.sleep(4)
+dog.walk(vx=0.3)
+time.sleep(5)
+dog.sit_down()
+time.sleep(4)
+dog.disable()
+dog.close()
+\end{lstlisting}
+
+\subsection{安全包装器}
+
+建议在生产代码中使用 try/finally 确保安全退出：
+
+\begin{lstlisting}[style=python]
+import time
+from brainstem_sdk import OrixClient
+
+dog = OrixClient("192.168.66.190")
+
+try:
+    dog.enable()
+    dog.stand_up()
+    time.sleep(4)
+
+    # ... 您的业务逻辑 ...
+    dog.walk(vx=0.3)
+    time.sleep(5)
+
+finally:
+    # 无论发生什么异常，都确保安全坐下并禁用
+    try:
+        dog.sit_down()
+        time.sleep(5)
+    except Exception:
+        pass
+    try:
+        dog.disable()
+    except Exception:
+        pass
+    dog.close()
+\end{lstlisting}
+
+\section{关键参数速查}
+
+\begin{longtable}{lll}
+\toprule
+参数 & 值 & 说明 \\
+\midrule
+\endhead
+控制频率 & 50 Hz (20ms) & 主控制循环和推理频率 \\
+gRPC 端口 & 13145 & SDK 连接端口 \\
+站起耗时 & 3 秒 (150 ticks) & Grounded $\to$ Standing \\
+坐下耗时 & 3 秒 (150 ticks) & Standing $\to$ Grounded \\
+仲裁超时 & 3 秒 & 遥控器释放控制权的等待时间 \\
+低压阈值 & 18V & 低于此值触发保护坐下 \\
+启动超时 & 10 秒 & FSM 等待 Grounded 的超时 \\
+关机超时 & 8 秒 & 安全关机等待超时 \\
+RPC 超时 & 5 秒 & SDK 默认 RPC 超时 \\
+\bottomrule
+\end{longtable}
+
+
+
+% ============================================================
+%  实用开发指南
+% ============================================================
+\chapter{实用开发指南}
+\label{ch:practical}
+
+\chapterguide{本章汇集了在实际开发中经常遇到的场景和最佳实践。包括电池管理、数据记录、远程部署、集成 OpenCV 视觉、自定义 Profile 和多机器人管理等实用模式。每个场景都给出可直接使用的代码模板。}{本章不涉及新的 API，而是展示如何组合已有 API 解决真实问题。初次阅读可以略读，实际开发时作为速查参考。}
+
+\section{电池管理}
+
+机器狗采用 7 串锂电池，正常工作电压约 24V，低压保护阈值 18V。在长时间运行的应用中，建议实现主动电池监控而不是依赖低压保护被动触发。
+
+\subsection{电池电量估算}
+
+通过电压近似估算电池电量（线性估算，实际锂电放电曲线非线性，仅作参考）：
+
+\begin{lstlisting}[style=python]
+def estimate_battery_level(dog):
+    """估算电池电量百分比 (近似值)"""
+    voltages = dog.get_voltage()
+    valid = [v for v in voltages if v > 0]
+    if not valid:
+        return None
+    avg_v = sum(valid) / len(valid)
+    # 线性插值: 29.4V=100%, 18V=0%
+    pct = max(0, min(100, (avg_v - 18) / (29.4 - 18) * 100))
+    return pct, avg_v
+\end{lstlisting}
+
+\subsection{周期性电池监控}
+
+在长时间运行的任务中，建议每 30 秒检查一次电池，电量低于 30\% 时主动坐下并提醒用户：
+
+\begin{lstlisting}[style=python]
+import time
+from brainstem_sdk import OrixClient
+
+def monitor_battery_loop(dog, interval=30):
+    while True:
+        pct, v = estimate_battery_level(dog)
+        if v is None:
+            time.sleep(interval)
+            continue
+        print(f"电量: {pct:.0f}% ({v:.1f}V)")
+        if pct < 30:
+            print("低电量，主动收工...")
+            dog.sit_down()
+            dog.disable()
+            break
+        time.sleep(interval)
+\end{lstlisting}
+
+\section{数据记录与采集}
+
+机器狗的 IMU 和关节数据是进行算法研究和系统调试的重要数据源。SDK 的流式接口可以方便地记录这些数据到文件。
+
+\subsection{记录 IMU 数据到 CSV}
+
+\begin{lstlisting}[style=python]
+import csv
+from brainstem_sdk import OrixClient
+
+def record_imu_to_csv(duration_sec, filename):
+    dog = OrixClient("192.168.66.190")
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["time_ms", "gx", "gy", "gz",
+                         "qw", "qx", "qy", "qz"])
+        count = 0
+        target = duration_sec * 50  # 50 Hz
+        for imu in dog.listen_imu():
+            writer.writerow([
+                imu.timestamp_ms,
+                imu.gyroscope.x, imu.gyroscope.y, imu.gyroscope.z,
+                imu.quaternion.w, imu.quaternion.x,
+                imu.quaternion.y, imu.quaternion.z,
+            ])
+            count += 1
+            if count >= target:
+                break
+    dog.close()
+
+# 记录 10 秒 IMU 数据
+record_imu_to_csv(10, "imu_log.csv")
+\end{lstlisting}
+
+\subsection{同时记录 IMU 和关节数据}
+
+使用多线程同时订阅多个数据流，主线程负责写文件协调：
+
+\begin{lstlisting}[style=python]
+import threading
+from queue import Queue
+
+def record_all_sensors(dog, duration_sec, prefix="log"):
+    imu_q = Queue()
+    joint_q = Queue()
+    stop_event = threading.Event()
+
+    def imu_worker():
+        for imu in dog.listen_imu():
+            if stop_event.is_set():
+                break
+            imu_q.put(imu)
+
+    def joint_worker():
+        for j in dog.listen_joint():
+            if stop_event.is_set():
+                break
+            joint_q.put(j)
+
+    t1 = threading.Thread(target=imu_worker, daemon=True)
+    t2 = threading.Thread(target=joint_worker, daemon=True)
+    t1.start()
+    t2.start()
+
+    time.sleep(duration_sec)
+    stop_event.set()
+
+    # 保存队列内容到文件
+    # ... (写 CSV 逻辑)
+\end{lstlisting}
+
+\section{远程部署}
+
+大多数情况下您在开发电脑上运行 Python 代码通过 gRPC 远程控制机器狗。但有时需要将代码部署到机器狗本体上运行（例如减少网络延迟、脱离开发机运行）。
+
+\subsection{SSH 部署工作流}
+
+将本地脚本上传到机器狗并运行：
+
+\begin{lstlisting}[style=bash]
+# 上传脚本到机器狗
+scp my_script.py sunrise@192.168.66.190:~/scripts/
+
+# SSH 远程执行
+ssh sunrise@192.168.66.190 "cd scripts && python3 my_script.py"
+
+# 长期后台运行
+ssh sunrise@192.168.66.190 "nohup python3 scripts/my_script.py > log.txt 2>&1 &"
+\end{lstlisting}
+
+在机器狗本地运行时，SDK 的连接地址使用 \texttt{localhost}：
+
+\begin{lstlisting}[style=python]
+# 本地运行（在机器狗上）
+dog = OrixClient("localhost")
+
+# 远程运行（在开发机上）
+dog = OrixClient("192.168.66.190")
+\end{lstlisting}
+
+\section{集成计算机视觉}
+
+结合 OpenCV 可以实现基于视觉的控制，例如目标跟踪、障碍物检测等。以下是一个最简的颜色追踪示例：
+
+\begin{lstlisting}[style=python]
+import cv2
+import numpy as np
+from brainstem_sdk import OrixClient, OrixCamera
+
+def follow_red_ball():
+    dog = OrixClient("192.168.66.190")
+    cam = OrixCamera()
+    cam.open()
+
+    dog.enable()
+    dog.stand_up()
+
+    try:
+        while True:
+            frame = cam.read()
+            if frame is None:
+                continue
+
+            # 检测红色区域
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            mask = cv2.inRange(hsv, (0, 100, 100), (10, 255, 255))
+            moments = cv2.moments(mask)
+
+            if moments["m00"] > 500:
+                # 红色物体中心 x 坐标
+                cx = int(moments["m10"] / moments["m00"])
+                frame_center = frame.shape[1] // 2
+                # 根据偏差控制转向
+                turn = -(cx - frame_center) / frame_center * 0.3
+                dog.walk(vx=0.2, vyaw=turn)
+            else:
+                dog.walk()  # 停止
+
+            if cv2.waitKey(1) == ord('q'):
+                break
+    finally:
+        dog.walk()
+        dog.sit_down()
+        dog.disable()
+        cam.close()
+        dog.close()
+\end{lstlisting}
+
+\section{自定义 Profile}
+
+Profile 是机器狗的运动参数集合，用户可以通过自定义 Profile 调整 PD 增益、站立姿态和 ONNX 模型路径。自定义 Profile 的典型用途包括：训练自己的 RL 策略、调参使机器狗更稳定、适配不同地形。
+
+\subsection{Profile 文件结构}
+
+Profile 是 JSON 文件，存放在机器狗的 \texttt{profiles/} 目录下。以下是一个完整示例的骨架：
+
+\begin{lstlisting}[style=plain]
+{
+  "name": "my_custom",
+  "description": "自定义策略",
+  "modelPath": "model/my_policy.onnx",
+  "standingPose": [0.0, -0.65, 1.5, 0.0, ...],
+  "sittingPose": [0.0, 0.0, 0.0, 0.0, ...],
+  "inferKp": [...], "inferKd": [...],
+  "standUpKp": [...], "standUpKd": [...],
+  "sitDownKp": [...], "sitDownKd": [...],
+  "standUpCounts": 150,
+  "sitDownCounts": 150,
+  "imuGyroscopeScale": 0.25,
+  "jointVelocityScale": [0.05, 0.05, 0.05, 0.05],
+  "actionScale": [0.125, 0.25, 0.25, 5.0]
+}
+\end{lstlisting}
+
+完整字段说明参见 SDK 安装目录下的 \texttt{profile\_schema.json}。
+
+\subsection{部署自定义 Profile}
+
+\begin{lstlisting}[style=bash]
+# 上传到机器狗
+scp my_custom.json sunrise@192.168.66.190:~/profiles/
+
+# 控制系统每 30 秒自动扫描 profiles/ 目录，无需重启
+# 上传后在 SDK 中即可切换
+\end{lstlisting}
+
+\begin{lstlisting}[style=python]
+# 切换到自定义策略
+dog.switch_profile("my_custom")
+print(f"当前策略: {dog.get_profile().current}")
+\end{lstlisting}
+
+\section{开发建议与最佳实践}
+
+\begin{itemize}
+  \item \textbf{始终使用 try/finally} --- 确保异常时机器狗能安全收工（坐下 + 禁用电机）
+  \item \textbf{先查状态再发指令} --- 状态不匹配的指令会被静默忽略，先 \texttt{get\_state()} 可以避免误判
+  \item \textbf{流式接口用迭代器} --- \texttt{listen\_imu()} 等返回迭代器，用 \texttt{for} 循环消费，不要一次性 \texttt{list()}
+  \item \textbf{网络延迟补偿} --- 通过 Wi-Fi 连接时有 5-20ms 延迟，对需要高实时性的控制任务建议部署到机器狗本地
+  \item \textbf{日志分级} --- 开发时用 \texttt{INFO} 查看状态，调试时用 \texttt{DEBUG}，生产时用 \texttt{WARNING}
+  \item \textbf{测试先仿真后真机} --- 大算机器人提供 MuJoCo 仿真环境，建议先在仿真中验证逻辑再部署到真机
+  \item \textbf{电池健康} --- 经常使用到低压的电池寿命会下降，建议保持在 20\%--80\% 之间充放电
+\end{itemize}
+
+
+% ============================================================
+%  第 6 章：传感器数据
+% ============================================================
+\chapter{传感器数据}
+\label{ch:sensors}
+
+\chapterguide
+{本章重点说明各类传感器数据的含义、频率和代码读取方式，适合做数据记录、状态监测、教学实验和上层算法开发时查阅。}
+{如果您只想快速拿到稳定可用的数据流，建议优先阅读“IMU 惯性测量单元”“关节编码器”和“综合示例：传感器数据记录到 CSV”。}
+
+本章介绍 ORIX 教育版四足机器狗所有传感器的数据类型、坐标约定、采集方式和编程接口。
+
+\section{传感器总览}
+
+{\small
+\begin{longtable}{llllll}
+\toprule
+传感器 & 硬件 & 数据内容 & 接口方法 & 更新频率 & 传输方式 \\
+\midrule
+\endhead
+IMU & HI91 & 角速度 + 四元数 & \texttt{listen\_imu()} & \textasciitilde 50 Hz & 串口 $\to$ gRPC 流 \\
+关节编码器 & Robstride 内置 & 位置/速度/力矩 & \texttt{listen\_joint()} & \textasciitilde 50 Hz & CAN $\to$ gRPC 流 \\
+电机状态 & Robstride & 在线/温度/电压/故障 & \texttt{get\_motor\_status()} & 按需查询 & CAN $\to$ gRPC 单次 \\
+总线电压 & Robstride & 16 路母线电压 (V) & \texttt{get\_voltage()} & 按需查询 & CAN $\to$ gRPC 单次 \\
+状态机 & 软件 & FSM 状态字符串 & \texttt{listen\_state()} & 事件驱动 & gRPC 流 \\
+\bottomrule
+\end{longtable}
+}
+
+\section{IMU 惯性测量单元}
+
+\subsection{硬件与数据}
+
+ORIX 搭载 HI91 惯性测量单元，安装于机身躯干中心，通过串口 (\texttt{/dev/ttyUSB1}) 以约 50 Hz 频率上报数据。每帧包含：
+
+\begin{longtable}{llll}
+\toprule
+字段 & 类型 & 单位 & 说明 \\
+\midrule
+\endhead
+\texttt{gyroscope.x} & float & rad/s & 绕机体 X 轴角速度 (Roll) \\
+\texttt{gyroscope.y} & float & rad/s & 绕机体 Y 轴角速度 (Pitch) \\
+\texttt{gyroscope.z} & float & rad/s & 绕机体 Z 轴角速度 (Yaw) \\
+\texttt{quaternion.w} & float & 无量纲 & 四元数实部 \\
+\texttt{quaternion.x} & float & 无量纲 & 四元数虚部 i \\
+\texttt{quaternion.y} & float & 无量纲 & 四元数虚部 j \\
+\texttt{quaternion.z} & float & 无量纲 & 四元数虚部 k \\
+\texttt{timestamp\_ms} & float & ms & 数据时间戳（毫秒） \\
+\bottomrule
+\end{longtable}
+
+\subsection{坐标系}
+
+IMU 数据使用\textbf{机体坐标系 (Body Frame)}：
+
+IMU 坐标系与机体坐标系一致：+X 指向前进方向，+Y 指向左侧，-Y 指向右侧，+Z 垂直向上。
+
+\begin{itemize}[nosep]
+  \item X 轴：指向机器人前方
+  \item Y 轴：指向机器人左侧
+  \item Z 轴：指向上方（右手坐标系）
+\end{itemize}
+
+\subsection{四元数约定}
+
+ORIX SDK 使用 \textbf{Hamilton 约定}，四元数顺序为 \texttt{(w, x, y, z)}：
+
+\[
+q = w + x\mathbf{i} + y\mathbf{j} + z\mathbf{k}
+\]
+
+\begin{itemize}[nosep]
+  \item 表示\textbf{世界坐标系到机体坐标系}的旋转
+  \item 单位四元数满足 $w^2 + x^2 + y^2 + z^2 = 1$
+  \item 机器人水平静止时：$q = (1, 0, 0, 0)$
+\end{itemize}
+
+\warning{ROS 等系统常用 \texttt{(x, y, z, w)} 顺序，与本 SDK 不同。如需与 ROS 对接，请手动调整字段顺序。}
+
+\subsection{订阅 IMU 数据}
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import OrixClient
+
+dog = OrixClient("192.168.66.190")
+
+# listen_imu() 返回一个迭代器，持续产出 ImuData
+for imu in dog.listen_imu():
+    gx, gy, gz = imu.gyroscope.x, imu.gyroscope.y, imu.gyroscope.z
+    qw, qx, qy, qz = (
+        imu.quaternion.w,
+        imu.quaternion.x,
+        imu.quaternion.y,
+        imu.quaternion.z,
+    )
+
+    print(f"角速度: ({gx:+.4f}, {gy:+.4f}, {gz:+.4f}) rad/s")
+    print(f"四元数: ({qw:.4f}, {qx:.4f}, {qy:.4f}, {qz:.4f})")
+    print(f"时间戳: {imu.timestamp_ms:.0f} ms")
+\end{lstlisting}
+
+\texttt{listen\_imu()} 是一个阻塞式 gRPC 服务端流，循环会持续运行直到：
+\begin{itemize}[nosep]
+  \item 手动 \texttt{break} 跳出
+  \item 按 \texttt{Ctrl+C} 中断
+  \item 网络断开或服务端关闭连接
+\end{itemize}
+
+\subsection{数据解读}
+
+\noindent\textbf{角速度解读：}
+
+\begin{longtable}{llll}
+\toprule
+运动场景 & gyro.x (Roll) & gyro.y (Pitch) & gyro.z (Yaw) \\
+\midrule
+\endhead
+机器人静止 & \textasciitilde 0 & \textasciitilde 0 & \textasciitilde 0 \\
+直线行走 & 小幅波动 & 周期性波动 & \textasciitilde 0 \\
+原地左转 & \textasciitilde 0 & \textasciitilde 0 & > 0 \\
+左侧倾斜 & > 0 & \textasciitilde 0 & \textasciitilde 0 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{四元数转欧拉角（参考）：}
+
+\begin{lstlisting}[style=python]
+import math
+
+def quat_to_euler(q):
+    """Hamilton 四元数 (w,x,y,z) 转欧拉角 (roll, pitch, yaw)，单位 rad。"""
+    w, x, y, z = q.w, q.x, q.y, q.z
+    # Roll (X)
+    sinr = 2.0 * (w * x + y * z)
+    cosr = 1.0 - 2.0 * (x * x + y * y)
+    roll = math.atan2(sinr, cosr)
+    # Pitch (Y)
+    sinp = 2.0 * (w * y - z * x)
+    sinp = max(-1.0, min(1.0, sinp))
+    pitch = math.asin(sinp)
+    # Yaw (Z)
+    siny = 2.0 * (w * z + x * y)
+    cosy = 1.0 - 2.0 * (y * y + z * z)
+    yaw = math.atan2(siny, cosy)
+    return roll, pitch, yaw
+\end{lstlisting}
+
+\section{关节编码器}
+
+\subsection{关节布局}
+
+ORIX 共有 16 个自由度，每条腿 3 个旋转关节 + 1 个脚轮：
+
+关节编号按四条腿分组：前右 FR（0--3）、前左 FL（4--7）、后右 RR（8--11）、后左 RL（12--15）。每条腿内部依次为 Hip、Thigh、Calf、Foot。
+
+\begin{itemize}[nosep]
+  \item \textbf{Hip}：髋关节，控制腿的前后/内外摆动
+  \item \textbf{Thigh}：大腿关节，控制大腿抬起/放下
+  \item \textbf{Calf}：小腿关节，控制小腿伸展/收缩
+  \item \textbf{Foot}：脚轮关节，控制脚部轮毂转动
+\end{itemize}
+
+\subsection{数据内容}
+
+每个关节上报以下数据：
+
+\begin{longtable}{llll}
+\toprule
+字段 & 类型 & 单位 & 说明 \\
+\midrule
+\endhead
+\texttt{id} & int & -- & 关节编号 (0--15) \\
+\texttt{position} & float & rad & 当前角位置 \\
+\texttt{velocity} & float & rad/s & 当前角速度 \\
+\texttt{torque} & float & Nm & 当前力矩 \\
+\texttt{status} & int & -- & 状态码 (0 = 正常) \\
+\bottomrule
+\end{longtable}
+
+\subsection{订阅关节数据}
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import OrixClient
+
+dog = OrixClient("192.168.66.190")
+
+print("订阅关节数据 (Ctrl+C 退出)...")
+try:
+    for joint in dog.listen_joint():
+        print(
+            f"Joint {joint.id:2d}: "
+            f"pos={joint.position:+.4f} rad  "
+            f"vel={joint.velocity:+.4f} rad/s  "
+            f"torque={joint.torque:+.4f} Nm  "
+            f"status={joint.status}"
+        )
+except KeyboardInterrupt:
+    print("\n停止。")
+finally:
+    dog.close()
+\end{lstlisting}
+
+\warning{\texttt{listen\_joint()} 逐关节上报，每次 \texttt{yield} 一个关节的数据。要获取完整的 16 关节快照，需要自行缓存最近一帧的所有关节数据。}
+
+\begin{lstlisting}[style=python]
+latest = [None] * 16
+
+for joint in dog.listen_joint():
+    latest[joint.id] = joint
+
+    # 检查是否收齐了所有 16 个关节
+    if all(j is not None for j in latest):
+        # 处理完整快照
+        for j in latest:
+            print(f"  Joint {j.id}: {j.position:+.3f} rad")
+        latest = [None] * 16  # 重置，等待下一帧
+\end{lstlisting}
+
+\subsection{关节位置安全限位}
+
+系统默认关节绝对限位为 3.14 rad。任一关节位置的绝对值超过此阈值将立即触发故障保护。该阈值可通过环境变量 \texttt{HAN\_DOG\_JOINT\_LIMIT\_RAD} 调整（设置更小的值可提供提前保护）。
+
+\section{电机状态}
+
+\subsection{查询电机状态}
+
+\texttt{get\_motor\_status()} 返回 16 个 \texttt{MotorInfo} 对象，包含完整的电机健康信息：
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import OrixClient
+
+dog = OrixClient("192.168.66.190")
+
+motors = dog.get_motor_status()
+for m in motors:
+    status = "在线" if m.online else "离线"
+    fault = f"故障码: {m.errors}" if m.errors else "无故障"
+    print(
+        f"Joint {m.id:2d}: {status}  "
+        f"温度={m.temperature:.0f}C  "
+        f"电压={m.voltage:.1f}V  "
+        f"位置={m.position:+.3f}rad  "
+        f"速度={m.velocity:+.3f}rad/s  "
+        f"力矩={m.torque:+.3f}Nm  "
+        f"{fault}"
+    )
+\end{lstlisting}
+
+\subsection{MotorInfo 字段说明}
+
+\begin{longtable}{llll}
+\toprule
+字段 & 类型 & 单位 & 说明 \\
+\midrule
+\endhead
+\texttt{id} & int & -- & 关节编号 (0--15) \\
+\texttt{online} & bool & -- & 电机是否在线（CAN 通信正常） \\
+\texttt{temperature} & float & C & 电机内部温度 \\
+\texttt{voltage} & float & V & 电机母线电压 \\
+\texttt{position} & float & rad & 当前编码器位置 \\
+\texttt{velocity} & float & rad/s & 当前转速 \\
+\texttt{torque} & float & Nm & 当前输出力矩 \\
+\texttt{errors} & list[int] & -- & 故障码列表，空列表表示无故障 \\
+\bottomrule
+\end{longtable}
+
+\subsection{故障码解读}
+
+\begin{longtable}{lll}
+\toprule
+场景 & 表现 & 处理方式 \\
+\midrule
+\endhead
+\texttt{online=False} & 电机未响应 CAN 通信 & 检查 CAN 线缆连接和电源 \\
+\texttt{errors} 非空 & 电机报告故障 & 调用 \texttt{clear\_motor\_fault()} 清除 \\
+\texttt{temperature > 80} & 电机过热 & 降低负载或暂停运动，等待冷却 \\
+\texttt{voltage < 42} & 母线电压过低 & 立即充电，系统将自动触发低压保护 \\
+\bottomrule
+\end{longtable}
+
+\subsection{清除电机故障}
+
+\begin{lstlisting}[style=python]
+# 清除所有电机故障
+dog.clear_motor_fault()
+
+# 只清除特定关节（例如前右腿的 3 个关节）
+dog.clear_motor_fault(joint_ids=[0, 1, 2])
+\end{lstlisting}
+
+\section{电压监控}
+
+\subsection{读取电压}
+
+\texttt{get\_voltage()} 返回 16 个浮点数，对应 16 个电机的母线电压（单位 V）：
+
+\begin{lstlisting}[style=python]
+voltages = dog.get_voltage()
+print(f"电压范围: {min(voltages):.1f}V ~ {max(voltages):.1f}V")
+
+for i, v in enumerate(voltages):
+    warning = " [低压!]" if v < 18.0 else ""
+    print(f"  Joint {i:2d}: {v:.1f}V{warning}")
+\end{lstlisting}
+
+\subsection{低压保护机制}
+
+\begin{longtable}{ll}
+\toprule
+阈值 & 行为 \\
+\midrule
+\endhead
+$<$ 18.0 V & 系统自动执行坐下动作，等待 Grounded 状态确认后禁用电机 \\
+\bottomrule
+\end{longtable}
+
+低压保护是\textbf{不可绕过}的安全机制。当任一电机报告的母线电压低于 18V，控制系统将：
+
+\begin{enumerate}[nosep]
+  \item 立即发送 \texttt{SitDown} 指令
+  \item 等待机器人进入 Grounded 状态
+  \item 禁用所有电机
+\end{enumerate}
+
+此过程通过日志输出 \texttt{LOW VOLTAGE: xx.xV < 18V -- graceful sitDown}。
+
+\subsection{电压监控最佳实践}
+
+\begin{lstlisting}[style=python]
+import time
+
+def monitor_voltage(dog, interval=5.0, warn_threshold=20.0):
+    """周期性检查电压，提前预警。"""
+    while True:
+        voltages = dog.get_voltage()
+        min_v = min(voltages)
+        if min_v < warn_threshold:
+            print(f"[警告] 电压偏低: {min_v:.1f}V (阈值 {warn_threshold}V)")
+            if min_v < 18.0:
+                print("[严重] 已触发低压保护，请立即充电！")
+                break
+        else:
+            print(f"电压正常: {min_v:.1f}V")
+        time.sleep(interval)
+\end{lstlisting}
+
+\section{综合示例：传感器数据记录到 CSV}
+
+以下示例同时订阅 IMU 和关节数据，记录到 CSV 文件，便于后续分析：
+
+\begin{lstlisting}[style=python]
+"""传感器数据记录器 -- 同时采集 IMU 和关节数据写入 CSV。"""
+
+import csv
+import time
+import threading
+from datetime import datetime
+from brainstem_sdk import OrixClient
+
+
+def record_sensors(host="192.168.66.190", duration=30.0):
+    """记录传感器数据到 CSV 文件。
+
+    Args:
+        host: 机器人 IP 地址。
+        duration: 记录时长（秒）。
+    """
+    dog = OrixClient(host)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stop_event = threading.Event()
+
+    # ---- IMU 记录线程 ----
+    def record_imu():
+        imu_file = f"imu_{timestamp}.csv"
+        with open(imu_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "timestamp_ms",
+                "gyro_x", "gyro_y", "gyro_z",
+                "quat_w", "quat_x", "quat_y", "quat_z",
+            ])
+            try:
+                for imu in dog.listen_imu():
+                    if stop_event.is_set():
+                        break
+                    writer.writerow([
+                        f"{imu.timestamp_ms:.1f}",
+                        f"{imu.gyroscope.x:.6f}",
+                        f"{imu.gyroscope.y:.6f}",
+                        f"{imu.gyroscope.z:.6f}",
+                        f"{imu.quaternion.w:.6f}",
+                        f"{imu.quaternion.x:.6f}",
+                        f"{imu.quaternion.y:.6f}",
+                        f"{imu.quaternion.z:.6f}",
+                    ])
+            except Exception as e:
+                print(f"IMU 记录异常: {e}")
+        print(f"IMU 数据已保存: {imu_file}")
+
+    # ---- 关节记录线程 ----
+    def record_joints():
+        joint_file = f"joint_{timestamp}.csv"
+        with open(joint_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "time_s", "joint_id",
+                "position_rad", "velocity_rad_s", "torque_nm",
+                "status",
+            ])
+            t0 = time.monotonic()
+            try:
+                for joint in dog.listen_joint():
+                    if stop_event.is_set():
+                        break
+                    elapsed = time.monotonic() - t0
+                    writer.writerow([
+                        f"{elapsed:.4f}",
+                        joint.id,
+                        f"{joint.position:.6f}",
+                        f"{joint.velocity:.6f}",
+                        f"{joint.torque:.6f}",
+                        joint.status,
+                    ])
+            except Exception as e:
+                print(f"关节记录异常: {e}")
+        print(f"关节数据已保存: {joint_file}")
+
+    # ---- 启动记录 ----
+    imu_thread = threading.Thread(target=record_imu, daemon=True)
+    joint_thread = threading.Thread(target=record_joints, daemon=True)
+
+    print(f"开始记录 {duration} 秒...")
+    imu_thread.start()
+    joint_thread.start()
+
+    try:
+        time.sleep(duration)
+    except KeyboardInterrupt:
+        print("\n手动中断。")
+
+    stop_event.set()
+    dog.close()
+
+    imu_thread.join(timeout=3.0)
+    joint_thread.join(timeout=3.0)
+    print("记录完成。")
+
+
+if __name__ == "__main__":
+    record_sensors(duration=30.0)
+\end{lstlisting}
+
+\noindent\textbf{输出文件格式：}
+
+\texttt{imu\_20260403\_143000.csv}:
+\begin{lstlisting}[style=plain,numbers=none]
+timestamp_ms,gyro_x,gyro_y,gyro_z,quat_w,quat_x,quat_y,quat_z
+1234567.0,0.001234,-0.002345,0.000456,0.999800,0.012300,0.005600,0.001200
+...
+\end{lstlisting}
+
+\texttt{joint\_20260403\_143000.csv}:
+\begin{lstlisting}[style=plain,numbers=none]
+time_s,joint_id,position_rad,velocity_rad_s,torque_nm,status
+0.0000,0,0.123456,0.001234,0.456789,0
+0.0001,1,-0.234567,0.002345,-0.567890,0
+...
+\end{lstlisting}
+
+\section*{附录：传感器数据速查表}
+
+{\small
+\begin{longtable}{llllll}
+\toprule
+数据项 & SDK 方法 & 返回类型 & 单位 & 频率 & 备注 \\
+\midrule
+\endhead
+角速度 & \texttt{listen\_imu()} & \texttt{ImuData.gyroscope} & rad/s & \textasciitilde 50 Hz & 机体坐标系 \\
+姿态四元数 & \texttt{listen\_imu()} & \texttt{ImuData.quaternion} & 无量纲 & \textasciitilde 50 Hz & Hamilton (w,x,y,z) \\
+IMU 时间戳 & \texttt{listen\_imu()} & \texttt{ImuData.timestamp\_ms} & ms & \textasciitilde 50 Hz & -- \\
+关节位置 & \texttt{listen\_joint()} & \texttt{JointData.position} & rad & \textasciitilde 50 Hz & 绝对位置 \\
+关节速度 & \texttt{listen\_joint()} & \texttt{JointData.velocity} & rad/s & \textasciitilde 50 Hz & -- \\
+关节力矩 & \texttt{listen\_joint()} & \texttt{JointData.torque} & Nm & \textasciitilde 50 Hz & -- \\
+电机在线状态 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.online} & bool & 按需 & CAN 通信 \\
+电机温度 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.temperature} & C & 按需 & 内部温度 \\
+电机电压 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.voltage} & V & 按需 & 母线电压 \\
+电机故障码 & \texttt{get\_motor\_status()} & \texttt{MotorInfo.errors} & list[int] & 按需 & 空=无故障 \\
+母线电压(16路) & \texttt{get\_voltage()} & list[float] & V & 按需 & 低压阈值 18V \\
+FSM 状态变化 & \texttt{listen\_state()} & str & -- & 事件驱动 & 状态切换时触发 \\
+\bottomrule
+\end{longtable}
+}
+
+
+
+% ============================================================
+%  第 7 章：API 参考
+% ============================================================
+\chapter{API 参考}
+\label{ch:api}
+
+本章提供 ORIX Python SDK (\texttt{brainstem\_sdk}) 全部公开接口的完整参考。
+
+\chapterguide
+{本章按“查手册”的方式组织，不强调教学顺序，而强调接口签名、前置条件、返回值和常见调用场景。}
+{第一次阅读时建议按“客户端构造与连接 -> 电机控制 -> 运动指令 -> 状态查询 -> 诊断与标定 -> 实时数据流”的顺序浏览，形成稳定的接口心智模型。}
+
+\section{OrixClient 构造与连接}
+
+\subsection{构造函数}
+
+这一节解释如何创建 SDK 客户端对象。创建成功只说明网络通道已经建立，不代表机器人已经具备执行动作的安全条件；真正发运动指令前，仍应检查状态、电压和控制权。
+
+\begin{lstlisting}[style=python]
+OrixClient(host="192.168.66.190", port=13145, timeout=5.0)
+\end{lstlisting}
+
+\begin{longtable}{llll}
+\toprule
+参数 & 类型 & 默认值 & 说明 \\
+\midrule
+\endhead
+\texttt{host} & str & \texttt{"192.168.66.190"} & 机器人 IP 地址 \\
+\texttt{port} & int & \texttt{13145} & gRPC 服务端口 \\
+\texttt{timeout} & float & \texttt{5.0} & 默认 RPC 超时时间（秒） \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{说明}：构造函数创建一个 gRPC 不安全通道（insecure channel），连接到 \texttt{host:port}。通道创建即连接，无需额外调用。推荐把客户端对象视为“当前会话的控制入口”，在一个脚本或任务中尽量复用同一个连接，避免反复创建和销毁。
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import OrixClient
+
+# 默认连接
+dog = OrixClient("192.168.66.190")
+
+# 自定义参数
+dog = OrixClient("10.0.0.100", port=13145, timeout=10.0)
+\end{lstlisting}
+
+\subsection{close()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.close() -> None
+\end{lstlisting}
+
+关闭 gRPC 通道，释放网络资源。关闭后不可再调用任何方法。
+
+\subsection{上下文管理器}
+
+\texttt{OrixClient} 支持 \texttt{with} 语句，退出时自动调用 \texttt{close()}。如果您的脚本只执行一次短任务，这通常是最稳妥的写法，因为它能避免异常退出时遗留未关闭连接。
+
+\begin{lstlisting}[style=python]
+with OrixClient("192.168.66.190") as dog:
+    dog.enable()
+    dog.stand_up()
+    dog.walk(vx=0.3)
+    dog.sit_down()
+    dog.disable()
+# 退出 with 块后通道自动关闭
+\end{lstlisting}
+
+\section{电机控制}
+
+\subsection{enable()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.enable() -> None
+\end{lstlisting}
+
+使能全部 16 个电机。调用后电机通电并进入闭环控制。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & gRPC 连接正常，控制权未被遥控器占用 \\
+异常 & \texttt{grpc.RpcError} -- 超时或连接失败 \\
+\bottomrule
+\end{longtable}
+
+\subsection{disable()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.disable() -> None
+\end{lstlisting}
+
+禁用全部电机（安全停止）。电机断电，关节自由落体。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 无（任何状态下均可调用） \\
+建议 & 在 Grounded 状态下调用，避免机器人从站立姿态跌落 \\
+异常 & \texttt{grpc.RpcError} -- 超时或连接失败 \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}[style=python]
+# 安全关机序列
+dog.walk(vx=0.0)   # 停步
+dog.sit_down()      # 坐下
+# 等待机器人坐稳...
+dog.disable()       # 禁用电机
+\end{lstlisting}
+
+\section{运动指令}
+
+\subsection{walk()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.walk(vx=0.0, vy=0.0, vyaw=0.0) -> None
+\end{lstlisting}
+
+发送行走速度指令。
+
+\begin{longtable}{lllll}
+\toprule
+参数 & 类型 & 默认值 & 范围 & 说明 \\
+\midrule
+\endhead
+\texttt{vx} & float & \texttt{0.0} & {[}-1.0, 1.0{]} & 前后速度。正值=前进，负值=后退 \\
+\texttt{vy} & float & \texttt{0.0} & {[}-1.0, 1.0{]} & 左右速度。正值=向左，负值=向右 \\
+\texttt{vyaw} & float & \texttt{0.0} & {[}-1.0, 1.0{]} & 旋转速度。正值=逆时针，负值=顺时针 \\
+\bottomrule
+\end{longtable}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 机器人处于 Standing 或 Walking 状态 \\
+停步 & 调用 \texttt{dog.walk()} 或 \texttt{dog.walk(0, 0, 0)} \\
+异常 & \texttt{grpc.RpcError} -- 超时、连接失败或 Arbiter 拒绝 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{速度参数为归一化值}，不是物理速度。\texttt{vx=1.0} 表示当前策略允许的最大前进速度，实际物理速度取决于所加载的运动策略。
+
+\begin{lstlisting}[style=python]
+# 前进
+dog.walk(vx=0.5)
+
+# 向左平移
+dog.walk(vy=0.3)
+
+# 前进 + 左转
+dog.walk(vx=0.3, vyaw=0.2)
+
+# 原地停步
+dog.walk()
+\end{lstlisting}
+
+\subsection{stand\_up()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.stand_up() -> None
+\end{lstlisting}
+
+从坐姿过渡到站立。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 机器人处于 Grounded 状态，电机已使能 \\
+状态变化 & Grounded $\to$ Transitioning $\to$ Standing \\
+异常 & \texttt{grpc.RpcError} -- 超时或连接失败 \\
+\bottomrule
+\end{longtable}
+
+\subsection{sit\_down()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.sit_down() -> None
+\end{lstlisting}
+
+从站立过渡到坐姿。如果正在行走，会先停步再坐下。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 机器人处于 Standing 或 Walking 状态 \\
+状态变化 & Standing/Walking $\to$ Transitioning $\to$ Grounded \\
+异常 & \texttt{grpc.RpcError} -- 超时或连接失败 \\
+\bottomrule
+\end{longtable}
+
+\section{状态查询}
+
+\subsection{get\_state()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.get_state() -> str
+\end{lstlisting}
+
+查询当前机器人状态。
+
+\begin{longtable}{ll}
+\toprule
+返回值 & 说明 \\
+\midrule
+\endhead
+\texttt{"zero"} & 初始化 / 未使能 \\
+\texttt{"grounded"} & 坐姿（安全状态） \\
+\texttt{"standing"} & 站立，可接收行走指令 \\
+\texttt{"walking"} & 行走中 \\
+\texttt{"transitioning"} & 状态过渡中（站起 / 坐下） \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}[style=python]
+state = dog.get_state()
+print(f"当前状态: {state}")
+
+if state == "standing":
+    dog.walk(vx=0.3)
+\end{lstlisting}
+
+\subsection{get\_voltage()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.get_voltage() -> list[float]
+\end{lstlisting}
+
+读取 16 个电机的母线电压。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+返回值 & 长度为 16 的浮点数列表，单位 V \\
+索引 & 对应关节编号 0--15 \\
+低压阈值 & 18V，低于此值系统自动触发保护 \\
+\bottomrule
+\end{longtable}
+
+\subsection{get\_motor\_status()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.get_motor_status() -> list[MotorInfo]
+\end{lstlisting}
+
+获取全部 16 个电机的健康状态。
+
+\begin{lstlisting}[style=python]
+motors = dog.get_motor_status()
+for m in motors:
+    if not m.online:
+        print(f"Joint {m.id} 离线!")
+    if m.errors:
+        print(f"Joint {m.id} 故障: {m.errors}")
+    if m.temperature > 70:
+        print(f"Joint {m.id} 温度偏高: {m.temperature}C")
+\end{lstlisting}
+
+\section{策略管理}
+
+\subsection{get\_profile()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.get_profile() -> ProfileInfo
+\end{lstlisting}
+
+获取当前运动策略信息及可用策略列表。
+
+\begin{lstlisting}[style=python]
+profile = dog.get_profile()
+print(f"当前策略: {profile.current}")
+print(f"可用策略: {profile.available}")
+for name, desc in zip(profile.available, profile.descriptions):
+    print(f"  {name}: {desc}")
+\end{lstlisting}
+
+\subsection{switch\_profile()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.switch_profile(name: str) -> ProfileInfo
+\end{lstlisting}
+
+切换运动策略。
+
+\begin{longtable}{lll}
+\toprule
+参数 & 类型 & 说明 \\
+\midrule
+\endhead
+\texttt{name} & str & 目标策略名称，必须在 \texttt{get\_profile().available} 列表中 \\
+\bottomrule
+\end{longtable}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 机器人处于 \textbf{Grounded} 状态 \\
+返回值 & 切换后的 \texttt{ProfileInfo} \\
+异常 & \texttt{grpc.RpcError} -- 策略不存在、状态不对或超时 \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}[style=python]
+# 查看可用策略
+profile = dog.get_profile()
+print(f"可用: {profile.available}")
+
+# 切换策略（必须先坐下）
+dog.sit_down()
+# 等待 Grounded ...
+new_profile = dog.switch_profile("mini")
+print(f"已切换到: {new_profile.current}")
+\end{lstlisting}
+
+\section{诊断与标定}
+
+\subsection{clear\_motor\_fault()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.clear_motor_fault(joint_ids=None) -> None
+\end{lstlisting}
+
+清除电机故障码。
+
+\begin{longtable}{llll}
+\toprule
+参数 & 类型 & 默认值 & 说明 \\
+\midrule
+\endhead
+\texttt{joint\_ids} & list[int] | None & \texttt{None} & 要清除的关节编号列表 (0--15)。\texttt{None} 表示清除全部 \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}[style=python]
+# 清除所有电机故障
+dog.clear_motor_fault()
+
+# 只清除前右腿
+dog.clear_motor_fault(joint_ids=[0, 1, 2, 3])
+
+# 只清除单个关节
+dog.clear_motor_fault(joint_ids=[5])
+\end{lstlisting}
+
+\subsection{set\_zero()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.set_zero() -> None
+\end{lstlisting}
+
+将当前关节位置标定为零位。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+前置条件 & 机器人处于 \textbf{Grounded} 状态 \\
+用途 & 出厂标定或维修后重新校准零位 \\
+注意 & 错误的零位会导致运动异常，非必要不调用 \\
+\bottomrule
+\end{longtable}
+
+\begin{lstlisting}[style=python]
+# 确保在 Grounded 状态下执行
+state = dog.get_state()
+if state == "grounded":
+    dog.set_zero()
+    print("零位标定完成。")
+else:
+    print(f"当前状态 {state}，请先坐下。")
+\end{lstlisting}
+
+\section{实时数据流}
+
+所有 \texttt{listen\_*} 方法返回 Python 迭代器（\texttt{Iterator}），底层为 gRPC 服务端流。迭代器在以下情况终止：
+
+\begin{itemize}[nosep]
+  \item 手动 \texttt{break}
+  \item 键盘中断 (\texttt{Ctrl+C})
+  \item 调用 \texttt{dog.close()} 关闭通道
+  \item 网络断开
+\end{itemize}
+
+\subsection{listen\_imu()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.listen_imu() -> Iterator[ImuData]
+\end{lstlisting}
+
+订阅 IMU 实时数据流，约 50Hz。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+产出 & \texttt{ImuData}（含 \texttt{gyroscope}, \texttt{quaternion}, \texttt{timestamp\_ms}） \\
+频率 & \textasciitilde 50 Hz \\
+阻塞 & 是（在 \texttt{for} 循环中阻塞等待下一帧） \\
+\bottomrule
+\end{longtable}
+
+\subsection{listen\_joint()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.listen_joint() -> Iterator[JointData]
+\end{lstlisting}
+
+订阅关节实时数据流。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+产出 & \texttt{JointData}（含 \texttt{id}, \texttt{position}, \texttt{velocity}, \texttt{torque}, \texttt{status}） \\
+频率 & \textasciitilde 50 Hz（逐关节上报） \\
+阻塞 & 是 \\
+\bottomrule
+\end{longtable}
+
+\subsection{listen\_state()}
+
+\begin{lstlisting}[style=python,numbers=none]
+dog.listen_state() -> Iterator[str]
+\end{lstlisting}
+
+订阅状态机变化事件。仅在状态切换时产出，不定频。
+
+\begin{longtable}{ll}
+\toprule
+项目 & 说明 \\
+\midrule
+\endhead
+产出 & 状态字符串：\texttt{"zero"}, \texttt{"grounded"}, \texttt{"standing"}, \texttt{"walking"}, \texttt{"transitioning"} \\
+频率 & 事件驱动（仅状态变化时触发） \\
+阻塞 & 是 \\
+\bottomrule
+\end{longtable}
+
+\section{数据类型参考}
+
+\subsection{Vec3}
+
+三维向量。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class Vec3:
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
+\end{lstlisting}
+
+\subsection{Quat}
+
+四元数（Hamilton 约定：w, x, y, z）。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class Quat:
+    w: float = 1.0    # 实部
+    x: float = 0.0    # 虚部 i
+    y: float = 0.0    # 虚部 j
+    z: float = 0.0    # 虚部 k
+\end{lstlisting}
+
+\subsection{ImuData}
+
+IMU 惯性测量数据帧。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class ImuData:
+    gyroscope: Vec3       # 角速度 (rad/s)
+    quaternion: Quat      # 姿态四元数 (Hamilton w,x,y,z)
+    timestamp_ms: float   # 时间戳 (ms)
+\end{lstlisting}
+
+\subsection{JointData}
+
+单个关节的实时数据。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class JointData:
+    id: int            # 关节编号 (0-15)
+    position: float    # 角位置 (rad)
+    velocity: float    # 角速度 (rad/s)
+    torque: float      # 力矩 (Nm)
+    status: int        # 状态码 (0=正常)
+\end{lstlisting}
+
+\subsection{MotorInfo}
+
+电机完整健康状态。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class MotorInfo:
+    id: int              # 关节编号 (0-15)
+    online: bool         # 是否在线
+    temperature: float   # 温度 (C)
+    voltage: float       # 母线电压 (V)
+    position: float      # 编码器位置 (rad)
+    velocity: float      # 转速 (rad/s)
+    torque: float        # 输出力矩 (Nm)
+    errors: list[int]    # 故障码列表 (空=无故障)
+\end{lstlisting}
+
+\subsection{ProfileInfo}
+
+运动策略信息。
+
+\begin{lstlisting}[style=python]
+@dataclass
+class ProfileInfo:
+    current: str           # 当前激活的策略名称
+    available: list[str]   # 所有可用策略名称
+    descriptions: list[str] # 各策略说明文字
+\end{lstlisting}
+
+\subsection{RobotState}
+
+状态机常量（字符串）。
+
+\begin{lstlisting}[style=python]
+class RobotState:
+    ZERO = "zero"
+    GROUNDED = "grounded"
+    STANDING = "standing"
+    WALKING = "walking"
+    TRANSITIONING = "transitioning"
+\end{lstlisting}
+
+使用方式：
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import RobotState
+
+state = dog.get_state()
+if state == RobotState.STANDING:
+    dog.walk(vx=0.3)
+\end{lstlisting}
+
+\section{错误处理}
+
+\texttt{OrixClient} 的所有方法在遇到错误时会抛出 SDK 异常类：\texttt{OrixConnectionError}（网络不通）、\texttt{OrixTimeoutError}（超时）、\texttt{InvalidStateError}（状态错误）、\texttt{OrixError}（其他错误）。高级用户直接使用底层 stub 时才会遇到 \texttt{grpc.RpcError}。
+
+\subsection{连接超时}
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import OrixClient, OrixConnectionError, InvalidStateError
+
+try:
+    dog = OrixClient("192.168.66.190")
+    dog.stand_up()
+    dog.walk(vx=0.5)
+except OrixConnectionError:
+    print("无法连接机器人")
+except InvalidStateError as e:
+    print(f"状态错误: {e}")
+\end{lstlisting}
+
+\subsection{常见错误码}
+
+\begin{longtable}{lll}
+\toprule
+gRPC 状态码 & 含义 & 常见原因 \\
+\midrule
+\endhead
+\texttt{UNAVAILABLE} & 服务不可达 & 机器人未开机、IP 错误、服务未启动 \\
+\texttt{DEADLINE\_EXCEEDED} & 请求超时 & 网络延迟、服务端无响应 \\
+\texttt{FAILED\_PRECONDITION} & 前置条件不满足 & 状态不对（如在 Zero 状态下调用 walk） \\
+\texttt{PERMISSION\_DENIED} & 权限被拒 & Arbiter 控制权被遥控器占用 \\
+\texttt{INTERNAL} & 服务端内部错误 & 硬件异常或程序错误 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Arbiter 控制权冲突}
+
+ORIX 的控制仲裁器（ControlArbiter）确保遥控器始终具有最高优先级。当遥控器在线时，gRPC 指令可能被拒绝：
+
+\begin{itemize}[nosep]
+  \item 遥控器在线且正在操作：gRPC 运动指令将被忽略
+  \item 遥控器在线但空闲超过 3 秒：gRPC 自动获得控制权
+  \item 遥控器离线：gRPC 始终拥有控制权
+\end{itemize}
+
+\begin{lstlisting}[style=python]
+import grpc
+import time
+
+def safe_walk(dog, vx=0.0, vy=0.0, vyaw=0.0, retries=3):
+    """带重试的行走指令。"""
+    for attempt in range(retries):
+        try:
+            dog.walk(vx=vx, vy=vy, vyaw=vyaw)
+            return True
+        except grpc.RpcError as e:
+            if e.code() == grpc.StatusCode.PERMISSION_DENIED:
+                print(f"控制权被遥控器占用，等待 ({attempt+1}/{retries})...")
+                time.sleep(1.0)
+            else:
+                raise
+    print("无法获得控制权。请确认遥控器已松开操控杆。")
+    return False
+\end{lstlisting}
+
+\subsection{流式接口异常处理}
+
+\begin{lstlisting}[style=python]
+try:
+    for imu in dog.listen_imu():
+        # 处理数据...
+        pass
+except grpc.RpcError as e:
+    if e.code() == grpc.StatusCode.UNAVAILABLE:
+        print("连接断开，尝试重连...")
+    else:
+        print(f"流异常: {e.code()}")
+except KeyboardInterrupt:
+    print("用户中断。")
+finally:
+    dog.close()
+\end{lstlisting}
+
+\section*{附录：方法速查表}
+
+{\small
+\begin{longtable}{llll}
+\toprule
+分类 & 方法 & 返回值 & 说明 \\
+\midrule
+\endhead
+\textbf{连接} & \texttt{OrixClient(host, port, timeout)} & -- & 构造并连接 \\
+ & \texttt{close()} & None & 关闭连接 \\
+\textbf{电机} & \texttt{enable()} & None & 使能全部电机 \\
+ & \texttt{disable()} & None & 禁用全部电机 \\
+\textbf{运动} & \texttt{walk(vx, vy, vyaw)} & None & 行走指令 \\
+ & \texttt{stand\_up()} & None & 坐姿 $\to$ 站立 \\
+ & \texttt{sit\_down()} & None & 站立 $\to$ 坐姿 \\
+\textbf{状态} & \texttt{get\_state()} & str & 查询 FSM 状态 \\
+ & \texttt{get\_voltage()} & list[float] & 16 路母线电压 \\
+ & \texttt{get\_motor\_status()} & list[MotorInfo] & 16 个电机健康状态 \\
+\textbf{策略} & \texttt{get\_profile()} & ProfileInfo & 当前策略信息 \\
+ & \texttt{switch\_profile(name)} & ProfileInfo & 切换运动策略 \\
+\textbf{诊断} & \texttt{clear\_motor\_fault(joint\_ids)} & None & 清除电机故障 \\
+ & \texttt{set\_zero()} & None & 标定零位 \\
+ & \texttt{ping()} & bool & 检查连接状态 \\
+\textbf{速度模式} & \texttt{set\_high\_speed(enabled)} & None & 开启/关闭高速模式（最大 2.5\,m/s） \\
+ & \texttt{get\_speed\_mode()} & str & 返回 "normal" 或 "high\_speed" \\
+\textbf{手势} & \texttt{list\_gestures()} & list[GestureInfo] & 列出所有预设动作 \\
+ & \texttt{play\_gesture(name, timeout)} & None & 播放预设动作（默认超时 30\,s） \\
+\textbf{数据流} & \texttt{listen\_imu()} & Iterator[ImuData] & IMU 实时流 \\
+ & \texttt{listen\_joint()} & Iterator[JointData] & 关节实时流 \\
+ & \texttt{listen\_state()} & Iterator[str] & 状态变化流 \\
+\bottomrule
+\end{longtable}
+}
+
+\section*{附录：OrixCamera 速查表}
+
+\texttt{OrixCamera} 是可选的摄像头辅助模块（依赖 \texttt{opencv-python}），提供拍照、录像和 MJPEG 流功能。
+
+{\small
+\begin{longtable}{lll}
+\toprule
+方法 & 返回值 & 说明 \\
+\midrule
+\endhead
+\texttt{open()} & None & 打开摄像头设备 \\
+\texttt{close()} & None & 关闭摄像头设备 \\
+\texttt{read()} & ndarray & 读取单帧图像 \\
+\texttt{save\_photo(path)} & None & 拍照并保存到指定路径 \\
+\texttt{start\_recording(path)} & None & 开始录像 \\
+\texttt{stop\_recording()} & None & 停止录像 \\
+\texttt{stream\_mjpeg(host, port)} & None & 启动 MJPEG HTTP 流服务 \\
+\bottomrule
+\end{longtable}
+}
+
+\noindent 使用示例：
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import OrixCamera
+
+with OrixCamera() as cam:
+    cam.save_photo("photo.jpg")
+\end{lstlisting}
+
+
+
+% ============================================================
+%  第 8 章：安全指南
+% ============================================================
+\chapter{安全指南}
+\label{ch:safety}
+
+\chapterguide
+{本章不是附录，而是实际调机和教学演示前必须执行的操作约束。很多“偶发故障”本质上都来自跳过检查、错误顺序或在不稳定环境中直接上动作。}
+{任何涉及站起、行走、调零、清故障和切换策略的操作，建议先完成本章中的检查清单，再开始编写或运行脚本。}
+
+ORIX 教育版四足机器狗是一台具有高扭矩电机的自主运动设备。操作不当可能造成设备损坏或人员伤害。请在使用前仔细阅读本章全部内容。
+
+\section{操作前检查清单}
+
+\textbf{每次启动机器人前，必须逐项确认以下事项：}
+
+{\small
+\begin{longtable}{clll}
+\toprule
+序号 & 检查项 & 确认方法 & 通过标准 \\
+\midrule
+\endhead
+1 & 电池电量充足 & \texttt{dog.get\_voltage()} & 所有电机电压 >= 24V \\
+2 & 操作区域净空 & 目视检查 & 周围 1.5 米内无人员/易碎物品 \\
+3 & 机器人放置在地面 & 目视检查 & 四脚均接触平坦地面 \\
+4 & 急停装置就绪 & 确认遥控器在手 & 遥控器已开机，电量充足 \\
+5 & CAN 总线连接牢固 & 目视检查 & 所有 CAN 线缆插头无松动 \\
+6 & 控制服务已启动 & SSH 检查 & \texttt{systemctl status brainstem} 显示 active \\
+7 & 电机状态正常 & \texttt{get\_motor\_status()} & 16 个电机全部在线，无故障 \\
+8 & 关节位置合理 & \texttt{get\_motor\_status()} & 所有关节位置绝对值 $<$ 1.0 rad \\
+9 & 遥控器优先级确认 & 操控遥控器摇杆 & 遥控器能正常控制机器人 \\
+10 & 运行环境温度适宜 & 环境检查 & 0--40\textdegree C 室温，非湿滑地面 \\
+\bottomrule
+\end{longtable}
+}
+
+\noindent\textbf{完整的启动前检查代码：}
+
+\begin{lstlisting}[style=python]
+from brainstem_sdk import OrixClient
+
+dog = OrixClient("192.168.66.190")
+
+# 1. 检查电压
+voltages = dog.get_voltage()
+min_v = min(voltages)
+print(f"电压: {min_v:.1f}V", "-- 通过" if min_v >= 24.0 else "-- 不通过! 请充电")
+
+# 2. 检查电机状态
+motors = dog.get_motor_status()
+offline = [m for m in motors if not m.online]
+faulted = [m for m in motors if m.errors]
+
+if offline:
+    print(f"离线电机: {[m.id for m in offline]} -- 不通过!")
+else:
+    print("电机在线: 全部 16/16 -- 通过")
+
+if faulted:
+    print(f"故障电机: {[m.id for m in faulted]} -- 尝试清除...")
+    dog.clear_motor_fault()
+else:
+    print("电机故障: 无 -- 通过")
+
+# 3. 检查关节位置
+bad_joints = [m for m in motors if abs(m.position) > 1.0]
+if bad_joints:
+    print(f"关节位置异常: {[(m.id, f'{m.position:.2f}rad') for m in bad_joints]}")
+else:
+    print("关节位置: 正常 -- 通过")
+
+# 4. 检查温度
+hot = [m for m in motors if m.temperature > 60]
+if hot:
+    print(f"温度偏高: {[(m.id, f'{m.temperature:.0f}C') for m in hot]}")
+else:
+    print("电机温度: 正常 -- 通过")
+
+# 5. 检查状态
+state = dog.get_state()
+print(f"当前状态: {state}", "-- 通过" if state == "grounded" else "-- 注意: 非 Grounded")
+
+dog.close()
+\end{lstlisting}
+
+\section{低压保护}
+
+\subsection{保护机制}
+
+当任一电机报告的母线电压低于 \textbf{18V} 时，系统自动触发低压保护：
+
+低压保护的完整流程如下：
+
+\begin{enumerate}[nosep]
+  \item 检测到任一电机母线电压低于 18V
+  \item 自动发送 SitDown 指令
+  \item 等待机器人进入 Grounded 状态（安全着地）
+  \item 禁用全部电机（Disable）
+  \item 日志输出：\texttt{LOW VOLTAGE: xx.xV < 18V -- graceful sitDown}
+\end{enumerate}
+
+此保护是\textbf{优雅坐下}流程，不是直接断电。系统会等待机器人安全着地后才禁用电机，避免从站立姿态跌落。
+
+\subsection{电压等级参考}
+
+\begin{longtable}{lll}
+\toprule
+电压范围 & 状态 & 建议 \\
+\midrule
+\endhead
+$\geq$ 24V & 正常 & 正常使用 \\
+20V -- 24V & 偏低 & 关注电量，准备充电 \\
+18V -- 20V & 低电量 & 尽快结束任务 \\
+$<$ 18V & 危险 & 自动触发保护，必须立即充电 \\
+\bottomrule
+\end{longtable}
+
+\subsection{注意事项}
+
+\begin{itemize}[nosep]
+  \item 低压保护\textbf{不可通过 SDK 绕过}
+  \item 大电流运动（快速行走、爬坡）会导致瞬时压降，可能在电池未耗尽时触发保护
+  \item 建议在电压低于 24V 时即结束运动任务
+  \item 触发低压保护后，必须充电至 24V 以上才可重新启动
+\end{itemize}
+
+\section{关节限位保护}
+
+\subsection{保护机制}
+
+每个关节的位置都受到绝对限位保护。默认限位为 \textbf{3.14 rad}（即 $\pi$，约 180 度）。任一关节位置绝对值超过此阈值将立即触发故障（Fault）。
+
+\begin{longtable}{llll}
+\toprule
+配置 & 环境变量 & 默认值 & 说明 \\
+\midrule
+\endhead
+关节限位 & \texttt{HAN\_DOG\_JOINT\_LIMIT\_RAD} & 3.14 & 绝对值限位，单位 rad \\
+\bottomrule
+\end{longtable}
+
+\subsection{触发后果}
+
+关节超限后：
+\begin{enumerate}[nosep]
+  \item 对应电机立即进入故障状态
+  \item 机器人可能失去该腿的控制，导致摔倒
+  \item 必须手动清除故障后才能恢复
+\end{enumerate}
+
+\subsection{预防措施}
+
+\begin{itemize}[nosep]
+  \item 确保零位标定正确（\texttt{set\_zero()} 在标准坐姿下执行）
+  \item 不要在关节卡住或受阻的情况下强行运动
+  \item 如果需要更严格的保护，可设置更小的限位值：
+\end{itemize}
+
+\begin{lstlisting}[style=bash]
+export HAN_DOG_JOINT_LIMIT_RAD=2.5  # 约 143 度
+\end{lstlisting}
+
+\noindent 注：控制系统内部环境变量名仍沿用历史名称 \texttt{HAN\_DOG\_*}，这是为了向后兼容既有部署脚本。
+
+\section{电机故障处理}
+
+\subsection{检测故障}
+
+\begin{lstlisting}[style=python]
+motors = dog.get_motor_status()
+for m in motors:
+    if m.errors:
+        print(f"Joint {m.id} 故障码: {m.errors}")
+    if not m.online:
+        print(f"Joint {m.id} 离线 (CAN 通信中断)")
+\end{lstlisting}
+
+\subsection{清除故障}
+
+\begin{lstlisting}[style=python]
+# 方法 1: 清除所有电机故障
+dog.clear_motor_fault()
+
+# 方法 2: 只清除特定关节
+dog.clear_motor_fault(joint_ids=[0, 1, 2])
+\end{lstlisting}
+
+\subsection{故障处理流程}
+
+发现电机故障后，推荐按以下步骤处理：
+
+\begin{enumerate}[nosep]
+  \item 判断机器人是否正在运动中。
+  \item \textbf{如果在运动中}：先调用 \texttt{dog.sit\_down()} 安全坐下，等待进入 Grounded 状态，再调用 \texttt{dog.clear\_motor\_fault()} 清除故障，最后重新检查电机状态。
+  \item \textbf{如果未在运动中}：直接调用 \texttt{dog.clear\_motor\_fault()} 清除故障，然后重新检查。
+  \item 如果故障清除成功，可恢复正常运动；如果故障持续存在，需检查硬件（CAN 线缆、电源、电机本体）。
+\end{enumerate}
+
+\subsection{反复出现的故障}
+
+如果 \texttt{clear\_motor\_fault()} 后故障立即重新出现，说明存在持续性硬件问题：
+
+\begin{longtable}{lll}
+\toprule
+表现 & 可能原因 & 处理 \\
+\midrule
+\endhead
+单个电机反复故障 & CAN 线缆松动 & 重新插拔对应 CAN 接头 \\
+多个电机同时故障 & 母线问题 & 检查电池和配电板 \\
+故障码伴随高温 & 电机过热 & 停止运动，等待冷却至 50\textdegree C 以下 \\
+关节位置跳变后故障 & 编码器异常 & 重新标零 \texttt{set\_zero()} \\
+\bottomrule
+\end{longtable}
+
+\section{急停程序}
+
+按紧急程度从低到高，有三种急停方式：
+
+\subsection{软件急停（SDK）}
+
+适用于程序可控的紧急情况：
+
+\begin{lstlisting}[style=python]
+# 优雅急停：停步 -> 坐下 -> 禁用
+dog.walk(vx=0.0, vy=0.0, vyaw=0.0)
+dog.sit_down()
+# 等待进入 Grounded ...
+dog.disable()
+\end{lstlisting}
+
+\subsection{遥控器急停}
+
+适用于现场操作人员发现危险时：
+
+\begin{enumerate}[nosep]
+  \item \textbf{立即操控遥控器摇杆} -- 遥控器自动获得最高控制权，接管机器人
+  \item 通过遥控器操作坐下
+  \item 遥控器上的急停按钮可直接断开电机使能
+\end{enumerate}
+
+\warning{遥控器始终具有最高优先级，可在任何时刻覆盖 SDK 指令。}
+
+\subsection{硬件断电}
+
+适用于最紧急的情况（机器人失控、硬件冒烟等）：
+
+\begin{enumerate}[nosep]
+  \item \textbf{直接关闭电池开关或拔出电池}
+  \item 机器人将立即断电跌落
+  \item 注意：断电跌落可能造成机械损伤，仅在绝对必要时使用
+\end{enumerate}
+
+\subsection{急停优先级}
+
+急停方式按优先级从高到低排列：
+
+\begin{longtable}{cll}
+\toprule
+优先级 & 方式 & 说明 \\
+\midrule
+\endhead
+1 & 硬件断电 & 物理级，不可覆盖 \\
+2 & 遥控器控制 & Arbiter 保证最高软件优先级 \\
+3 & SDK \texttt{disable()} & gRPC 调用 \\
+4 & 低压自动保护 & 系统自动触发 \\
+\bottomrule
+\end{longtable}
+
+\section{Arbiter 控制仲裁安全}
+
+\subsection{仲裁规则}
+
+ORIX 的 ControlArbiter（控制仲裁器）实施以下安全规则：
+
+\begin{longtable}{ll}
+\toprule
+规则 & 说明 \\
+\midrule
+\endhead
+遥控器优先 & 遥控器的优先级永远高于 SDK 指令，3 秒无操作自动释放 \\
+超时释放 & 遥控器停止操作 3 秒后，gRPC 自动获得控制权 \\
+无抢占 & gRPC 不能强行抢占遥控器的控制权 \\
+超时可配 & 超时时间通过 \texttt{HAN\_DOG\_ARBITER\_TIMEOUT} 配置，默认 3 秒 \\
+\bottomrule
+\end{longtable}
+
+\subsection{对 SDK 开发者的影响}
+
+当 SDK 发送 \texttt{walk()} 等运动指令时，Arbiter 首先检查当前控制权归属。如果 gRPC 拥有控制权，指令正常执行；如果遥控器正在占用控制权，指令将被忽略或拒绝。
+
+\begin{itemize}[nosep]
+  \item 当遥控器在线并活跃时，SDK 的运动指令将被忽略
+  \item 状态查询（\texttt{get\_state()}, \texttt{get\_voltage()} 等）不受 Arbiter 影响，始终可用
+  \item 遥控器释放后约 3 秒，SDK 自动恢复控制权，无需额外操作
+\end{itemize}
+
+\subsection{安全启示}
+
+\begin{itemize}[nosep]
+  \item \textbf{现场测试时务必携带遥控器}，作为最后的安全手段
+  \item 不要依赖 SDK 作为唯一的急停方式
+  \item 如果 SDK 指令无响应，先检查遥控器是否在线
+\end{itemize}
+
+\section{禁止操作}
+
+以下操作可能导致设备损坏或人员伤害，\textbf{严格禁止}：
+
+{\small
+\begin{longtable}{cll}
+\toprule
+序号 & 禁止操作 & 原因 \\
+\midrule
+\endhead
+1 & 在桌面、高台上运行机器人 & 摔落损坏，可能伤人 \\
+2 & 电机使能状态下翻转机器人 & 电机强力对抗将损坏齿轮箱 \\
+3 & 跳过 Grounded 状态直接启用电机运动 & 状态机保护被绕过 \\
+4 & 在电机使能状态下插拔 CAN 线缆 & 可能导致 CAN 总线短路 \\
+5 & 长时间运行而不监控温度 & 电机过热会永久损坏绕组 \\
+6 & 在关节卡死时反复发送运动指令 & 电流持续上升，烧毁电机 \\
+7 & 在充电状态下运行电机 & 部分充电器不支持边充边放 \\
+8 & 修改关节限位为极大值 & 失去关节保护 \\
+9 & 在湿滑/不平地面运行而无人看护 & 跌倒后持续运动可能损坏关节 \\
+10 & 多个 SDK 客户端同时发送运动指令 & 指令冲突导致运动抖动 \\
+\bottomrule
+\end{longtable}
+}
+
+\section{标准关机序列}
+
+每次使用结束后，必须执行以下关机序列：
+
+\begin{lstlisting}[style=python]
+import time
+
+# 步骤 1: 停止行走
+dog.walk(vx=0.0, vy=0.0, vyaw=0.0)
+
+# 步骤 2: 坐下
+dog.sit_down()
+
+# 步骤 3: 等待进入 Grounded 状态
+for state in dog.listen_state():
+    if state == "grounded":
+        break
+
+# 步骤 4: 禁用电机
+dog.disable()
+
+# 步骤 5: 关闭连接
+dog.close()
+
+print("安全关机完成。")
+\end{lstlisting}
+
+\noindent\textbf{简化版（带超时保护）：}
+
+\begin{lstlisting}[style=python]
+import time
+
+def safe_shutdown(dog, timeout=10.0):
+    """安全关机，带超时保护。"""
+    try:
+        dog.walk()
+        dog.sit_down()
+
+        # 轮询等待 Grounded，而非使用流式接口
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if dog.get_state() == "grounded":
+                break
+            time.sleep(0.2)
+
+        dog.disable()
+    except Exception as e:
+        print(f"关机异常: {e}")
+        # 最后手段：直接禁用
+        try:
+            dog.disable()
+        except Exception:
+            pass
+    finally:
+        dog.close()
+\end{lstlisting}
+
+\noindent\textbf{关键原则}：先坐稳再断电。直接调用 \texttt{disable()} 而不先 \texttt{sit\_down()} 会导致机器人从站立姿态自由跌落。
+
+\section{故障诊断树}
+
+遇到问题时，按以下诊断树逐步排查：
+
+遇到机器人异常时，按以下步骤逐级排查：
+
+\begin{enumerate}[nosep]
+  \item \textbf{机器人是否有响应？}
+  \begin{itemize}[nosep]
+    \item \textbf{无响应}：检查电源（电池是否有电、开关是否打开）、检查网络连通性（ping 测试）、检查 CAN 线缆连接、SSH 是否可连通、brainstem 服务是否运行。
+    \item \textbf{有响应}：进入下一步。
+  \end{itemize}
+  \item \textbf{机器人是否在运动中？}
+  \begin{itemize}[nosep]
+    \item \textbf{在运动中}：检查运动是否正常。如运动异常，参考下方运动异常诊断。
+    \item \textbf{未运动}：调用 \texttt{dog.get\_state()} 查询状态。如可查询，再用 \texttt{dog.get\_motor\_status()} 检查电机状态和故障码；如不可查询，排查网络问题。
+  \end{itemize}
+  \item \textbf{有故障码}：调用 \texttt{dog.clear\_motor\_fault()} 清除后重新检查。
+  \item \textbf{无故障码}：检查状态机当前状态是否正确。
+\end{enumerate}
+
+\noindent\textbf{运动异常诊断：}
+
+运动异常诊断步骤：
+
+\begin{enumerate}[nosep]
+  \item \textbf{机器人摔倒}：首先用 \texttt{get\_voltage()} 检查电压。低于 18V 说明是低压保护触发；电压正常则检查关节限位是否超限。
+  \item \textbf{运动不流畅}：用 \texttt{get\_motor\_status()} 检查电机温度。温度超过 70\textdegree C 说明过热，需暂停运动等待冷却。
+  \item \textbf{指令无效}：检查 Arbiter 状态，确认遥控器是否在线占用控制权。
+\end{enumerate}
+
+\section*{附录：安全相关环境变量}
+
+\begin{longtable}{lll}
+\toprule
+环境变量 & 默认值 & 说明 \\
+\midrule
+\endhead
+\texttt{HAN\_DOG\_JOINT\_LIMIT\_RAD} & 3.14 & 关节绝对限位 (rad) \\
+\texttt{HAN\_DOG\_ARBITER\_TIMEOUT} & 3 & 遥控器释放后 gRPC 获取控制权等待时间 (s) \\
+\texttt{HAN\_DOG\_SHUTDOWN\_TIMEOUT} & 8 & 关机等待超时 (s) \\
+\texttt{HAN\_DOG\_STARTUP\_TIMEOUT} & 10 & FSM 启动等待 Grounded 超时 (s) \\
+\texttt{HAN\_DOG\_SENSOR\_LOW\_THRESHOLD} & 3 & 传感器低阈值（连续低读数计数） \\
+\bottomrule
+\end{longtable}
+
+\section*{附录：安全操作总结}
+
+\warning{\textbf{ORIX 安全操作五条铁律：}
+\begin{enumerate}[nosep]
+  \item \textbf{永远带遥控器} --- 遥控器是最终安全手段
+  \item \textbf{先坐再断电} --- \texttt{disable()} 前必须 \texttt{sit\_down()}
+  \item \textbf{关注电压} --- 低于 24V 准备收工
+  \item \textbf{监控温度} --- 超过 70\textdegree C 立即休息
+  \item \textbf{地面运行} --- 永远在地面操作，永远不上桌
+\end{enumerate}}
+
+
+
+% ============================================================
+%  第 9 章：常见问题
+% ============================================================
+\chapter{常见问题}
+\label{ch:faq}
+
+\chapterguide
+{本章按现场排障顺序组织，优先覆盖连接、控制权、电压、状态机和传感器这五类高频问题。}
+{排障时请先确认现象，再执行对应的小脚本或检查命令，不要一开始就同时修改网络、服务和代码，否则很难定位根因。}
+
+本章汇总使用 ORIX Python SDK 过程中的常见问题及解决方案。
+
+\section{连接问题}
+
+处理连接问题时，建议按“网络是否可达 -> 服务是否存活 -> 端口是否开放 -> 控制脚本是否超时配置合理”的顺序逐层检查。这样可以最快把问题范围收敛到某一个环节，而不是在 Python 代码层面盲目重试。
+
+\subsection{Q: 连接超时 (DEADLINE\_EXCEEDED)}
+
+\noindent\textbf{现象}：调用任何 SDK 方法时抛出 \texttt{grpc.RpcError}，状态码 \texttt{DEADLINE\_EXCEEDED}。
+
+\noindent\textbf{排查步骤}：
+
+\begin{lstlisting}[style=bash]
+# 1. 确认网络可达
+ping 192.168.66.190
+
+# 2. 确认 gRPC 端口开放
+# Linux/macOS:
+nc -zv 192.168.66.190 13145
+# Windows:
+Test-NetConnection -ComputerName 192.168.66.190 -Port 13145
+
+# 3. 确认 brainstem 服务正在运行
+ssh sunrise@192.168.66.190 "systemctl status brainstem"
+\end{lstlisting}
+
+\noindent\textbf{常见原因与解决}：
+
+\begin{longtable}{ll}
+\toprule
+原因 & 解决 \\
+\midrule
+\endhead
+机器人未开机 & 打开电池开关，等待系统启动（约 30 秒） \\
+开发机和机器人不在同一网段 & 确认两台设备在同一局域网 \\
+brainstem 服务未启动 & SSH 登录后运行 \texttt{systemctl start brainstem} \\
+防火墙拦截 & 确认开发机防火墙放行 13145 端口 \\
+超时时间太短 & 构造时增大 timeout：\texttt{OrixClient(host, timeout=10.0)} \\
+\bottomrule
+\end{longtable}
+
+\subsection{Q: 连接被拒绝 (UNAVAILABLE)}
+
+\noindent\textbf{现象}：\texttt{grpc.RpcError} 状态码 \texttt{UNAVAILABLE}，提示 \texttt{Connection refused}。
+
+\noindent\textbf{排查}：
+
+\begin{lstlisting}[style=python]
+import grpc
+
+try:
+    dog = OrixClient("192.168.66.190")
+    dog.get_state()
+except grpc.RpcError as e:
+    print(f"状态码: {e.code()}")
+    print(f"详情: {e.details()}")
+\end{lstlisting}
+
+\noindent\textbf{常见原因}：
+\begin{itemize}[nosep]
+  \item brainstem 服务未启动或崩溃 -- 检查 \texttt{systemctl status brainstem}
+  \item 端口被其他服务占用 -- 检查 \texttt{ss -tlnp | grep 13145}
+  \item IP 地址错误 -- 确认机器人实际 IP
+\end{itemize}
+
+\subsection{Q: IP 地址不确定}
+
+如果不确定机器人 IP：
+
+\begin{lstlisting}[style=bash]
+# 方法 1: 通过路由器管理页面查看 DHCP 租约
+
+# 方法 2: 在已知网段扫描 gRPC 端口
+# Linux (需安装 nmap):
+nmap -p 13145 192.168.66.0/24
+
+# 方法 3: 如果有 USB 串口连接
+# 登录后查看 IP:
+ip addr show
+\end{lstlisting}
+
+默认 IP 为 \texttt{192.168.66.190}，如果网络配置未更改，直接使用即可。
+
+\section{电机不动}
+
+\subsection{Q: 调用了 enable() 但电机没反应}
+
+\noindent\textbf{排查清单}：
+
+\begin{lstlisting}[style=python]
+# 1. 确认状态
+state = dog.get_state()
+print(f"状态: {state}")
+# 应该是 "grounded" 或 "zero"
+
+# 2. 检查电机在线状态
+motors = dog.get_motor_status()
+offline = [m for m in motors if not m.online]
+if offline:
+    print(f"离线电机: {[m.id for m in offline]}")
+
+# 3. 检查故障
+faulted = [m for m in motors if m.errors]
+if faulted:
+    print(f"故障电机: {[(m.id, m.errors) for m in faulted]}")
+    # 尝试清除
+    dog.clear_motor_fault()
+
+# 4. 检查电压
+voltages = dog.get_voltage()
+print(f"电压范围: {min(voltages):.1f}V ~ {max(voltages):.1f}V")
+\end{lstlisting}
+
+\noindent\textbf{常见原因}：
+
+\begin{longtable}{ll}
+\toprule
+原因 & 解决 \\
+\midrule
+\endhead
+未调用 \texttt{enable()} & 先调用 \texttt{dog.enable()} \\
+电机有故障未清除 & \texttt{dog.clear\_motor\_fault()} \\
+CAN 线缆松动 & 检查并重新插紧 CAN 接头 \\
+电池电量不足 & 充电至 24V 以上 \\
+遥控器占用控制权 & 松开遥控器摇杆，等待 3 秒 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Q: 只有部分电机动，其他不动}
+
+\noindent\textbf{排查}：
+
+\begin{lstlisting}[style=python]
+motors = dog.get_motor_status()
+for m in motors:
+    status = "OK" if m.online and not m.errors else "FAIL"
+    print(f"Joint {m.id:2d}: {status}  online={m.online}  errors={m.errors}")
+\end{lstlisting}
+
+\noindent\textbf{常见原因}：
+\begin{itemize}[nosep]
+  \item 对应腿的 CAN 线缆断开 -- 检查该腿的 CAN 总线物理连接
+  \item 单个电机驱动板故障 -- 更换后重试
+  \item 电机过热保护 -- 查看温度值，等待冷却
+\end{itemize}
+
+\subsection{Q: enable() 后状态没变化}
+
+\texttt{enable()} 使能电机，但不会改变 FSM 状态。使能后需要手动切换状态：
+
+\begin{lstlisting}[style=python]
+dog.enable()
+# 此时状态仍为 "grounded"，电机通电但保持坐姿
+dog.stand_up()
+# 现在状态变为 "standing"
+\end{lstlisting}
+
+\section{机器人摔倒}
+
+\subsection{Q: 行走中突然坐下}
+
+\noindent\textbf{最可能原因}：低压保护触发。
+
+\begin{lstlisting}[style=python]
+# 检查电压历史
+voltages = dog.get_voltage()
+print(f"当前电压: {min(voltages):.1f}V")
+# 如果 < 18V，说明是低压保护
+\end{lstlisting}
+
+\noindent\textbf{其他可能原因}：
+
+\begin{longtable}{ll}
+\toprule
+原因 & 诊断方法 \\
+\midrule
+\endhead
+低电压 ($<$ 18V) & \texttt{get\_voltage()} 返回值低于 18 \\
+电机过热 & \texttt{get\_motor\_status()} 中 temperature $>$ 80\textdegree C \\
+关节超限 & \texttt{get\_motor\_status()} 中 position 绝对值过大 \\
+CAN 通信中断 & \texttt{get\_motor\_status()} 中部分电机 online=False \\
+传感器断开 & 查看 brainstem 日志中的 SEVERE 信息 \\
+\bottomrule
+\end{longtable}
+
+\noindent\textbf{查看系统日志}：
+
+\begin{lstlisting}[style=bash]
+# SSH 登录机器人查看日志
+ssh sunrise@192.168.66.190
+# 日志文件在 logs/ 目录下
+ls logs/
+cat logs/orix_$(date +%Y%m%d).log | tail -50
+\end{lstlisting}
+
+\subsection{Q: 站起来后立即摔倒}
+
+\noindent\textbf{排查}：
+\begin{enumerate}[nosep]
+  \item 地面是否太滑 -- 在有摩擦力的地面（橡胶垫、地毯）上测试
+  \item 零位是否正确 -- 如果关节零位偏移，站立姿态会畸形
+  \item 策略是否匹配 -- 确认加载的运动策略与当前机器人硬件配置一致
+\end{enumerate}
+
+\section{行走指令无效}
+
+\subsection{Q: walk() 调用成功但机器人不动}
+
+\noindent\textbf{排查顺序}：
+
+\begin{lstlisting}[style=python]
+# 1. 检查状态 -- 必须是 Standing 或 Walking
+state = dog.get_state()
+print(f"状态: {state}")  # 必须是 "standing" 或 "walking"
+
+# 2. 如果状态不对
+if state == "grounded":
+    print("需要先站起来: dog.stand_up()")
+elif state == "zero":
+    print("需要先使能: dog.enable() -> dog.stand_up()")
+elif state == "transitioning":
+    print("正在过渡，请等待...")
+\end{lstlisting}
+
+\noindent\textbf{常见原因}：
+
+\begin{longtable}{ll}
+\toprule
+原因 & 解决 \\
+\midrule
+\endhead
+不在 Standing 状态 & 先调用 \texttt{stand\_up()} \\
+遥控器占用控制权 & 松开遥控器摇杆，等待 3 秒超时 \\
+速度参数为 0 & 检查参数：\texttt{dog.walk(vx=0.3)} \\
+策略不支持该运动 & 检查当前策略是否支持横移或旋转 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Q: 遥控器在线时 SDK 指令被忽略}
+
+这是\textbf{正常行为}。ControlArbiter 保证遥控器始终具有最高优先级。
+
+\noindent\textbf{解决方案}：
+\begin{enumerate}[nosep]
+  \item 关闭遥控器
+  \item 或松开遥控器摇杆，等待 3 秒后 SDK 自动获得控制权
+\end{enumerate}
+
+\begin{lstlisting}[style=python]
+import time
+
+# 等待控制权释放
+print("等待遥控器释放控制权...")
+time.sleep(4)  # 等待超过 arbiter timeout (默认 3 秒)
+dog.walk(vx=0.3)  # 现在应该生效
+\end{lstlisting}
+
+\section{策略切换失败}
+
+\subsection{Q: switch\_profile() 报错}
+
+\noindent\textbf{前置条件}：策略切换只能在 \textbf{Grounded} 状态下执行。
+
+\begin{lstlisting}[style=python]
+state = dog.get_state()
+if state != "grounded":
+    print(f"当前状态 {state}，需要先坐下。")
+    dog.walk()       # 停步
+    dog.sit_down()   # 坐下
+    # 等待到 grounded
+    import time
+    for _ in range(50):
+        if dog.get_state() == "grounded":
+            break
+        time.sleep(0.2)
+
+# 现在可以切换
+profile = dog.switch_profile("mini")
+print(f"已切换到: {profile.current}")
+\end{lstlisting}
+
+\subsection{Q: 策略名称不存在}
+
+\begin{lstlisting}[style=python]
+# 先查看可用策略
+profile = dog.get_profile()
+print(f"可用策略: {profile.available}")
+print(f"策略说明: {profile.descriptions}")
+
+# 使用列表中的名称
+dog.switch_profile(profile.available[0])
+\end{lstlisting}
+
+\subsection{Q: 切换策略后行为异常}
+
+每个策略针对特定硬件配置和运动模式进行训练。切换策略后如果出现异常运动：
+\begin{enumerate}[nosep]
+  \item 确认策略与当前硬件配置匹配
+  \item 立即坐下：\texttt{dog.sit\_down()}
+  \item 切回之前正常工作的策略
+\end{enumerate}
+
+\section{IMU 数据异常}
+
+\subsection{Q: 四元数数值看起来不对}
+
+\noindent\textbf{Hamilton vs ROS 约定}：
+
+ORIX SDK 使用 Hamilton 约定：\texttt{(w, x, y, z)}
+
+\begin{lstlisting}[style=python]
+imu = next(iter(dog.listen_imu()))
+# SDK 返回: (w, x, y, z)
+print(f"w={imu.quaternion.w}, x={imu.quaternion.x}, "
+      f"y={imu.quaternion.y}, z={imu.quaternion.z}")
+\end{lstlisting}
+
+如果你的应用使用 ROS 约定 \texttt{(x, y, z, w)}，需要手动转换：
+
+\begin{lstlisting}[style=python]
+# SDK (Hamilton) -> ROS
+ros_quat = (imu.quaternion.x, imu.quaternion.y,
+            imu.quaternion.z, imu.quaternion.w)
+
+# 如果使用 scipy
+from scipy.spatial.transform import Rotation
+r = Rotation.from_quat([
+    imu.quaternion.x,
+    imu.quaternion.y,
+    imu.quaternion.z,
+    imu.quaternion.w,
+])  # scipy 使用 (x,y,z,w) 顺序
+euler = r.as_euler('xyz', degrees=True)
+\end{lstlisting}
+
+\subsection{Q: 机器人静止但角速度不为零}
+
+IMU 的陀螺仪存在零偏（bias），静止时读数不会严格为零。典型零偏范围：
+
+典型零偏范围：$|\text{gyro.x}| < 0.02$ rad/s 属于正常；$|\text{gyro.x}| > 0.05$ rad/s 可能需要重新标定。
+
+如需高精度角速度，可在启动时采集 100 帧静止数据取均值作为零偏，后续数据减去此偏移。
+
+\subsection{Q: listen\_imu() 频率不是 50Hz}
+
+IMU 标称频率约 50Hz，实际可能在 48--52Hz 波动。这是正常的。如果频率显著偏低（$<$ 30Hz），检查：
+\begin{itemize}[nosep]
+  \item 串口连接是否正常
+  \item brainstem 服务是否负载过高
+  \item 网络延迟（gRPC 传输开销）
+\end{itemize}
+
+\section{性能与延迟}
+
+\subsection{Q: gRPC 调用延迟有多大？}
+
+\begin{longtable}{lll}
+\toprule
+调用类型 & 典型延迟 & 说明 \\
+\midrule
+\endhead
+单次查询 (\texttt{get\_state()} 等) & 1--5 ms & 局域网内 \\
+运动指令 (\texttt{walk()} 等) & 1--5 ms & 局域网内 \\
+首次连接 & 50--200 ms & 包含 HTTP/2 握手 \\
+流式数据 (\texttt{listen\_imu()} 等) & $<$ 1 ms/帧 & 建立后持续推送 \\
+\bottomrule
+\end{longtable}
+
+\subsection{Q: 50Hz 控制频率够用吗？}
+
+ORIX 的运动控制循环固定为 50Hz（20ms 周期）。SDK 发送的指令在下一个控制周期生效。这意味着：
+\begin{itemize}[nosep]
+  \item 指令最大延迟：20ms（一个控制周期）
+  \item 不需要以超过 50Hz 的频率发送 walk() 指令
+  \item 建议的 walk() 指令发送频率：10--50Hz
+\end{itemize}
+
+\begin{lstlisting}[style=python]
+import time
+
+# 不需要这样做（浪费资源）:
+while True:
+    dog.walk(vx=0.3)
+    time.sleep(0.001)  # 1000Hz -- 过高，无意义
+
+# 推荐做法:
+while True:
+    dog.walk(vx=0.3)
+    time.sleep(0.05)  # 20Hz -- 足够
+\end{lstlisting}
+
+\subsection{Q: Python GIL 会影响实时性吗？}
+
+Python 的全局解释器锁（GIL）对 gRPC 调用影响很小，因为 gRPC 底层使用 C 扩展进行网络 I/O，不受 GIL 限制。但以下场景需要注意：
+
+\begin{itemize}[nosep]
+  \item \textbf{多线程同时调用}：gRPC 客户端本身是线程安全的，但应避免多线程同时发送运动指令（语义冲突）
+  \item \textbf{数据处理密集}：如果在 \texttt{listen\_imu()} 回调中做大量 numpy 计算，可能导致帧处理延迟。建议将数据处理放到独立线程
+\end{itemize}
+
+\begin{lstlisting}[style=python]
+import threading
+import queue
+
+# 推荐模式：生产者-消费者
+data_queue = queue.Queue(maxsize=100)
+
+def imu_reader(dog):
+    """生产者：读取 IMU 数据放入队列。"""
+    for imu in dog.listen_imu():
+        try:
+            data_queue.put_nowait(imu)
+        except queue.Full:
+            data_queue.get()  # 丢弃最旧的
+            data_queue.put_nowait(imu)
+
+def data_processor():
+    """消费者：处理 IMU 数据。"""
+    while True:
+        imu = data_queue.get()
+        # 在这里做复杂计算...
+        pass
+
+reader = threading.Thread(target=imu_reader, args=(dog,), daemon=True)
+processor = threading.Thread(target=data_processor, daemon=True)
+reader.start()
+processor.start()
+\end{lstlisting}
+
+\section{环境变量参考}
+
+以下环境变量在机器人端（brainstem 服务）生效，SDK 客户端不直接使用。了解这些变量有助于理解系统行为和排障。
+
+{\small
+\begin{longtable}{lllll}
+\toprule
+环境变量 & 类型 & 默认值 & 有效范围 & 说明 \\
+\midrule
+\endhead
+\texttt{HAN\_DOG\_PORT} & int & 13145 & 1--65535 & gRPC 服务监听端口 \\
+\texttt{HAN\_DOG\_IMU\_PORT} & str & /dev/ttyUSB1 & 设备路径 & IMU 串口设备 \\
+\texttt{HAN\_DOG\_CONTROLLER} & str & auto & 设备路径 & 遥控器设备（自动检测） \\
+\texttt{HAN\_DOG\_DEFAULT\_PROFILE} & str & (无) & 策略名称 & 默认加载的运动策略 \\
+\texttt{HAN\_DOG\_PROFILE\_DIR} & str & profiles/ & 目录路径 & 策略文件目录 \\
+\texttt{HAN\_DOG\_ARBITER\_TIMEOUT} & int & 3 & 1--60 & 遥控器释放后控制权切换 (s) \\
+\texttt{HAN\_DOG\_SENSOR\_LOW\_THRESHOLD} & int & 3 & $\geq$ 1 & 传感器低读数计数阈值 \\
+\texttt{HAN\_DOG\_SHUTDOWN\_TIMEOUT} & int & 8 & 1--300 & 关机等待超时 (s) \\
+\texttt{HAN\_DOG\_STARTUP\_TIMEOUT} & int & 10 & 1--300 & 启动等待 Grounded 超时 (s) \\
+\texttt{HAN\_DOG\_JOINT\_LIMIT\_RAD} & float & 3.14 & $>$ 0 & 关节绝对限位 (rad) \\
+\texttt{HAN\_DOG\_LOG\_DIR} & str & logs & 目录路径 & 日志文件目录 \\
+\texttt{HAN\_DOG\_LOG} & str & INFO & Logger 级别 & 日志级别 \\
+\texttt{HAN\_DOG\_DEBUG\_TUI} & str & (无) & true/其他 & 启用调试 TUI \\
+\texttt{MEDULLA\_STANDALONE} & str & (无) & 1/其他 & 启用独立模式 \\
+\bottomrule
+\end{longtable}
+}
+
+\section{网络排障}
+
+\subsection{基本连通性检查}
+
+\begin{lstlisting}[style=bash]
+# 第 1 步: Ping 机器人
+ping 192.168.66.190
+# 预期: 响应时间 < 5ms (局域网)
+
+# 第 2 步: 检查 gRPC 端口
+# Linux/macOS:
+nc -zv 192.168.66.190 13145
+# 预期输出: Connection to 192.168.66.190 13145 port [tcp/*] succeeded!
+
+# Windows PowerShell:
+Test-NetConnection -ComputerName 192.168.66.190 -Port 13145
+# 预期: TcpTestSucceeded : True
+
+# 第 3 步: 检查服务状态 (SSH)
+ssh sunrise@192.168.66.190 "systemctl status brainstem"
+# 预期: Active: active (running)
+\end{lstlisting}
+
+\subsection{防火墙检查}
+
+\begin{lstlisting}[style=bash]
+# Linux 开发机
+sudo iptables -L -n | grep 13145
+
+# Windows 开发机
+netsh advfirewall firewall show rule name=all | findstr 13145
+
+# 临时放行 (Linux)
+sudo iptables -A OUTPUT -p tcp --dport 13145 -j ACCEPT
+
+# 临时放行 (Windows PowerShell, 管理员)
+New-NetFirewallRule -DisplayName "ORIX gRPC" -Direction Outbound -Protocol TCP -RemotePort 13145 -Action Allow
+\end{lstlisting}
+
+\subsection{网络拓扑要求}
+
+开发机（192.168.66.x）与 ORIX 机器人（192.168.66.190）必须处于同一局域网或交换机下，不经过 NAT 和代理直连。
+
+\begin{itemize}[nosep]
+  \item SDK 使用 gRPC over HTTP/2，需要直连（不经过 HTTP 代理）
+  \item 不支持跨 NAT 连接（如果开发机在不同子网，需要配置路由）
+  \item Wi-Fi 连接可能有延迟抖动，建议使用有线网络
+\end{itemize}
+
+\subsection{远程开发（通过 SSH 隧道）}
+
+如果开发机不在局域网内，可通过 SSH 隧道连接：
+
+\begin{lstlisting}[style=bash]
+# 在有局域网访问的跳板机上建立隧道
+ssh -L 13145:192.168.66.190:13145 sunrise@192.168.66.190
+
+# 然后 SDK 连接 localhost
+dog = OrixClient("127.0.0.1", port=13145)
+\end{lstlisting}
+
+\section{提交 Bug 报告}
+
+遇到无法自行解决的问题时，请按以下格式提交 Bug 报告。
+
+\subsection{必要信息}
+
+\begin{lstlisting}[style=plain,numbers=none]
+1. SDK 版本:
+   python -c "import brainstem_sdk; print(brainstem_sdk.__version__)"
+
+2. Python 版本:
+   python --version
+
+3. 操作系统:
+   (例: Ubuntu 22.04 / Windows 11 / macOS 14)
+
+4. 机器人固件版本:
+   (SSH 登录后查看 brainstem 版本)
+
+5. 问题描述:
+   (清晰描述预期行为和实际行为)
+
+6. 复现步骤:
+   (从连接开始，逐步列出操作)
+
+7. 错误信息:
+   (完整的异常堆栈或错误输出)
+
+8. 机器人日志:
+   (SSH 登录，提供 logs/han_dog_YYYYMMDD.log 中相关片段)
+\end{lstlisting}
+
+\subsection{收集诊断信息的脚本}
+
+\begin{lstlisting}[style=python]
+"""诊断信息收集脚本。将输出复制到 Bug 报告中。"""
+
+import sys
+import platform
+import grpc
+
+try:
+    import brainstem_sdk
+    sdk_ver = brainstem_sdk.__version__
+except Exception as e:
+    sdk_ver = f"导入失败: {e}"
+
+print("=" * 50)
+print("ORIX SDK 诊断信息")
+print("=" * 50)
+print(f"SDK 版本:    {sdk_ver}")
+print(f"Python:      {sys.version}")
+print(f"平台:        {platform.platform()}")
+print(f"grpc 版本:   {grpc.__version__}")
+print()
+
+host = input("机器人 IP (默认 192.168.66.190): ").strip() or "192.168.66.190"
+
+try:
+    from brainstem_sdk import OrixClient
+    dog = OrixClient(host, timeout=5.0)
+
+    # 状态
+    state = dog.get_state()
+    print(f"连接:        成功")
+    print(f"机器人状态:  {state}")
+
+    # 电压
+    voltages = dog.get_voltage()
+    print(f"电压范围:    {min(voltages):.1f}V ~ {max(voltages):.1f}V")
+
+    # 电机
+    motors = dog.get_motor_status()
+    online_count = sum(1 for m in motors if m.online)
+    fault_count = sum(1 for m in motors if m.errors)
+    max_temp = max(m.temperature for m in motors)
+    print(f"电机在线:    {online_count}/16")
+    print(f"电机故障:    {fault_count}/16")
+    print(f"最高温度:    {max_temp:.0f}C")
+
+    # 故障详情
+    for m in motors:
+        if m.errors or not m.online:
+            print(f"  Joint {m.id}: online={m.online} errors={m.errors} "
+                  f"temp={m.temperature:.0f}C voltage={m.voltage:.1f}V")
+
+    # 策略
+    profile = dog.get_profile()
+    print(f"当前策略:    {profile.current}")
+    print(f"可用策略:    {profile.available}")
+
+    dog.close()
+
+except grpc.RpcError as e:
+    print(f"连接:        失败")
+    print(f"错误码:      {e.code()}")
+    print(f"详情:        {e.details()}")
+except Exception as e:
+    print(f"异常:        {type(e).__name__}: {e}")
+
+print()
+print("=" * 50)
+print("请将以上输出复制到 Bug 报告中。")
+\end{lstlisting}
+
+\subsection{日志收集}
+
+\begin{lstlisting}[style=bash]
+# SSH 登录机器人
+ssh sunrise@192.168.66.190
+
+# 查看今天的日志
+cat logs/han_dog_$(date +%Y%m%d).log
+
+# 只看错误和警告
+grep -E "WARNING|SEVERE" logs/han_dog_$(date +%Y%m%d).log
+
+# 查看最近 100 行
+tail -100 logs/han_dog_$(date +%Y%m%d).log
+
+# 导出日志到本地（在开发机上执行）
+scp sunrise@192.168.66.190:logs/han_dog_*.log ./han_dog_logs/
+\end{lstlisting}
+
+\subsection{联系方式}
+
+\begin{itemize}[nosep]
+  \item GitHub Issues：在 brainstem 仓库提交 Issue
+  \item 附上诊断脚本输出和相关日志
+\end{itemize}
+
+\section{SSH 访问与系统服务}
+\label{sec:ssh-access}
+
+大多数排障操作都需要 SSH 登录机器人查看日志或重启服务。出厂镜像默认已启用 SSH，无需额外配置。
+
+\subsection{默认账户}
+
+\begin{longtable}{ll}
+\toprule
+项目 & 默认值 \\
+\midrule
+\endhead
+用户名 & \texttt{sunrise} \\
+密码 & \texttt{sunrise} \\
+IP 地址 & \texttt{192.168.66.190} \\
+SSH 端口 & \texttt{22} \\
+\bottomrule
+\end{longtable}
+
+\noindent 出厂镜像默认开启 SSH 服务，无需手动启用。登录命令：
+
+\begin{lstlisting}[style=bash]
+ssh sunrise@192.168.66.190
+# 提示输入密码: sunrise
+\end{lstlisting}
+
+\subsection{brainstem 服务管理}
+
+ORIX 的控制栈（\texttt{brainstem}）以 \texttt{systemd} 服务形式运行，开机自启。以下命令在 SSH 登录后执行：
+
+\begin{lstlisting}[style=bash]
+# 查看服务状态
+systemctl status brainstem
+
+# 查看最近 100 行日志
+journalctl -u brainstem -n 100
+
+# 实时跟踪日志
+journalctl -u brainstem -f
+
+# 重启服务（通常在切换策略或修改配置后）
+sudo systemctl restart brainstem
+
+# 停止服务（调试时临时关闭控制栈）
+sudo systemctl stop brainstem
+
+# 启动服务
+sudo systemctl start brainstem
+\end{lstlisting}
+
+\subsection{无网络环境下的备选连接方式}
+
+如果 SSH 被校园网或企业防火墙拦截，或机器人未能获取 DHCP 地址，可以使用 RJ45 网线直连：
+
+\begin{enumerate}[nosep]
+  \item 用网线将开发机直接连接到机器人的 RJ45 口
+  \item 将开发机的以太网接口配置为静态 IP，例如 \texttt{192.168.66.100/24}
+  \item 使用默认地址连接：\texttt{ssh sunrise@192.168.66.190}
+\end{enumerate}
+
+\noindent 这种方式不依赖任何路由器或交换机，是调试现场最可靠的连接手段。
+
+\section*{附录：快速排障速查表}
+
+{\small
+\begin{longtable}{llll}
+\toprule
+症状 & 首先检查 & 可能原因 & 解决方案 \\
+\midrule
+\endhead
+连接超时 & \texttt{ping} 机器人 & 网络不通 & 检查网线/Wi-Fi/IP \\
+连接被拒 & brainstem 服务状态 & 服务未启动 & \texttt{systemctl start brainstem} \\
+enable() 无效 & \texttt{get\_motor\_status()} & 电机离线/有故障 & 检查 CAN 线，清除故障 \\
+walk() 无效 & \texttt{get\_state()} & 不在 Standing & 先 \texttt{stand\_up()} \\
+walk() 被忽略 & 遥控器状态 & Arbiter 被占用 & 松开遥控器，等 3 秒 \\
+突然坐下 & \texttt{get\_voltage()} & 低压保护 ($<$ 18V) & 充电 \\
+突然摔倒 & 电机温度 & 过热/关节超限 & 冷却 / 重新标零 \\
+策略切换失败 & \texttt{get\_state()} & 不在 Grounded & 先 \texttt{sit\_down()} \\
+IMU 数据异常 & 四元数约定 & Hamilton vs ROS & 调整字段顺序 \\
+数据流中断 & 网络连接 & gRPC 通道断开 & 重建 OrixClient \\
+多客户端冲突 & 客户端数量 & 多 SDK 实例 & 保证单客户端 \\
+\bottomrule
+\end{longtable}
+}
+
+% ============================================================
+%  文档结束
+% ============================================================
+
+\end{document}

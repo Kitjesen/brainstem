@@ -61,11 +61,3 @@ extension MemoryHistoryExtension on Memory<History> {
       nextStream.map((h) => h.nextAction);
 }
 
-/// 策略输出追踪：独立于 History.nextAction（物理目标）。
-/// 让 obs 里的 last_action 始终反映真实 ONNX 输出，
-/// 即使 Idle/StandUp 阶段物理目标是 standingPose/插值。
-class PolicyActionTracker {
-  JointsMatrix _action = JointsMatrix.zero();
-  JointsMatrix get action => _action;
-  set action(JointsMatrix value) => _action = value;
-}

@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inovxio.com/brainstem/profile/v1",
+  "title": "Thunder Robot Profile",
+  "description": "运动策略配置文件。定义机器人的站立姿态、PD 增益、ONNX 模型路径等参数。",
+  "type": "object",
+  "required": ["name", "modelPath", "standingPose", "sittingPose", "inferKp", "inferKd", "standUpKp", "standUpKd", "sitDownKp", "sitDownKd"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "策略名称，唯一标识。用于 SDK 的 switch_profile() 和 get_profile()。",
+      "examples": ["default", "mini"]
+    },
+    "description": {
+      "type": "string",
+      "description": "策略说明，显示在 ProfileInfo.descriptions 中。"
+    },
+    "modelPath": {
+      "type": "string",
+      "description": "ONNX 策略模型文件路径（相对于工作目录）。",
+      "examples": ["model/policy_260106.onnx"]
+    },
+    "standingPose": {
+      "type": "array",
+      "description": "站立姿态关节角度 (rad)，16 个值，顺序: FR髋腿膝足 FL髋腿膝足 RR髋腿膝足 RL髋腿膝足。",
+      "items": { "type": "number" },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "sittingPose": {
+      "type": "array",
+      "description": "坐下姿态关节角度 (rad)，16 个值。通常全零（电机零位）。",
+      "items": { "type": "number" },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "inferKp": {
+      "type": "array",
+      "description": "行走推理时的 PD 比例增益，16 个值。足轮通常为 0。",
+      "items": { "type": "number", "minimum": 0 },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "inferKd": {
+      "type": "array",
+      "description": "行走推理时的 PD 微分增益，16 个值。",
+      "items": { "type": "number", "minimum": 0 },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "standUpKp": {
+      "type": "array",
+      "description": "站起过渡的 PD 比例增益，16 个值。",
+      "items": { "type": "number", "minimum": 0 },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "standUpKd": {
+      "type": "array",
+      "description": "站起过渡的 PD 微分增益，16 个值。",
+      "items": { "type": "number", "minimum": 0 },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "sitDownKp": {
+      "type": "array",
+      "description": "坐下过渡的 PD 比例增益，16 个值。",
+      "items": { "type": "number", "minimum": 0 },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "sitDownKd": {
+      "type": "array",
+      "description": "坐下过渡的 PD 微分增益，16 个值。",
+      "items": { "type": "number", "minimum": 0 },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "standUpCounts": {
+      "type": "integer",
+      "description": "站起过渡的插值帧数。50Hz 下 150 = 3 秒。",
+      "default": 150,
+      "minimum": 1
+    },
+    "sitDownCounts": {
+      "type": "integer",
+      "description": "坐下过渡的插值帧数。50Hz 下 150 = 3 秒。",
+      "default": 150,
+      "minimum": 1
+    },
+    "imuGyroscopeScale": {
+      "type": "number",
+      "description": "IMU 陀螺仪缩放系数（observation 构建用）。",
+      "default": 0.25
+    },
+    "jointVelocityScale": {
+      "type": "array",
+      "description": "关节速度缩放系数，4 个值（每种关节类型一个: hip, thigh, calf, foot）。",
+      "items": { "type": "number" },
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "actionScale": {
+      "type": "array",
+      "description": "动作缩放系数，4 个值。target = action_output * actionScale + standingPose。",
+      "items": { "type": "number" },
+      "minItems": 4,
+      "maxItems": 4
+    }
+  },
+  "additionalProperties": true
+}

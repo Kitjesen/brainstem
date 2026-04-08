@@ -20,13 +20,11 @@ abstract class Behaviour {
   final ImuService imu;
   final JointService joint;
   final Memory<History> memory;
-  final PolicyActionTracker policyTracker;
   const Behaviour({
     required this.clock,
     required this.imu,
     required this.joint,
     required this.memory,
-    required this.policyTracker,
   });
 
   Stream<void> get ts => clock.stream;
@@ -45,7 +43,7 @@ abstract class Behaviour {
 }
 
 class Idle extends Behaviour {
-  /// 推理回调：每帧跑 ONNX，存到 policyTracker（给 obs 用）。
+  /// 推理回调：每帧跑 ONNX（给 obs 的 action 字段保持活跃）。
   /// 返回 real action（已 scale + offset）。
   JointsMatrix Function()? inferAction;
 
@@ -54,14 +52,11 @@ class Idle extends Behaviour {
     required super.imu,
     required super.joint,
     required super.memory,
-    required super.policyTracker,
     this.inferAction,
   });
 
   Stream<History> get doing => ts.map((_) {
-        // 跑 ONNX 更新 policyTracker（给下一帧 obs 的 action 字段用）
-        final onnxOutput = inferAction?.call();
-        if (onnxOutput != null) policyTracker.action = onnxOutput;
+        inferAction?.call();
         // 物理目标：保持上一帧的 nextAction（standingPose）
         return next(command: .idle(), nextAction: memory.latestAction);
       });
@@ -76,7 +71,6 @@ class SitDown extends Behaviour {
     required super.imu,
     required super.joint,
     required super.memory,
-    required super.policyTracker,
     required this.sittingPose,
     required this.counts,
   });
@@ -108,7 +102,6 @@ class StandUp extends Behaviour {
     required super.imu,
     required super.joint,
     required super.memory,
-    required super.policyTracker,
     required this.standingPose,
     required this.counts,
   });
@@ -141,7 +134,6 @@ class Gesture extends Behaviour {
     required super.imu,
     required super.joint,
     required super.memory,
-    required super.policyTracker,
     required this.definition,
   });
 
@@ -184,7 +176,6 @@ class Walk extends Behaviour {
     required super.imu,
     required super.joint,
     required super.memory,
-    required super.policyTracker,
     required super.clock,
   });
 
@@ -288,7 +279,6 @@ class Walk extends Behaviour {
         observationBuffer[lastOffset + j] = lastRow[j];
       }
       final nextAction = clampAction(toRealAction(_run(observationBuffer)));
-      policyTracker.action = nextAction; // 更新策略输出（给下一帧 obs 用）
       // debug: 保存 285 维 obs buffer 供外部对比
       lastObservation = Float64List.fromList(observationBuffer);
       return holdNext.copyWith(nextAction: nextAction);
@@ -316,7 +306,6 @@ class Walk extends Behaviour {
       buf[lastOffset + j] = lastRow[j];
     }
     final result = clampAction(toRealAction(_run(buf)));
-    policyTracker.action = result;
     return result;
   }
 

@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:han_dog_brain/han_dog_brain.dart';
-import 'package:han_dog_brain/src/memory.dart';
 import 'package:han_dog_brain/src/behaviour.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
@@ -107,7 +106,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
         definition: definition,
       );
 
@@ -148,7 +146,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
         definition: definition,
       );
 
@@ -194,7 +191,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
         definition: definition,
       );
 
@@ -241,7 +237,6 @@ void main() {
         imu: imu,
         joint: joint,
         memory: memory,
-      policyTracker: PolicyActionTracker(),
         definition: definition,
       );
 
@@ -485,8 +480,7 @@ void main() {
             ..stubPosition()
             ..stubVelocity(),
           memory: Memory<History>(historySize: 1, initial: History.zero()),
-          policyTracker: PolicyActionTracker(),
-          definition: GestureDefinition(
+              definition: GestureDefinition(
             name: 'bow',
             keyframes: [
               Keyframe(
