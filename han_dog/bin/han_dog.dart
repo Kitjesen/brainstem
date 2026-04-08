@@ -26,6 +26,9 @@ RealJoint? _jointForCleanup;
 /// 策略热加载定时器（关机时取消）
 Timer? _profileReloadTimer;
 
+/// Xbox 热插检测定时器（关机时取消）
+Timer? _controllerHotplugTimer;
+
 void main() {
   setupLogging(logDir: _cfg.logDir);
   runZonedGuarded(
@@ -176,6 +179,14 @@ Future<void> _run() async {
 
   // ──── 3. 手柄（YUNZHUO → Xbox → gRPC-only 三级降级）────────
   Gamepad? controller;
+  // 预加载 Xbox 配置（供初始化和热插检测共用）
+  XboxConfig xboxConfig = const XboxConfig();
+  try {
+    xboxConfig = await XboxConfig.loadFromFile(_cfg.xboxConfigPath);
+    _log.info('Xbox config loaded: ${_cfg.xboxConfigPath}');
+  } catch (_) {
+    _log.fine('Xbox config not found, using defaults');
+  }
   {
     // 优先尝试 YUNZHUO 遥控器
     final yunzhuo = RealController(_cfg.yunzhuoPort);
@@ -184,14 +195,6 @@ Future<void> _run() async {
       _log.info('YUNZHUO controller opened.');
     } else {
       _log.info('YUNZHUO not available, trying Xbox...');
-      // 尝试 Xbox 手柄
-      XboxConfig xboxConfig = const XboxConfig();
-      try {
-        xboxConfig = await XboxConfig.loadFromFile(_cfg.xboxConfigPath);
-        _log.info('Xbox config loaded: ${_cfg.xboxConfigPath}');
-      } catch (_) {
-        _log.fine('Xbox config not found, using defaults');
-      }
       final xbox = XboxController(_cfg.xboxDevice, config: xboxConfig);
       if (xbox.open()) {
         controller = xbox;
@@ -264,15 +267,8 @@ Future<void> _run() async {
   var motorOutputEnabled = false;
 
   // 推理输出 → 电机动作 (gated through MotorHealthManager)
-  var _actionCount = 0;
   _subs.add(brain.nextActionStream.listen(
     (action) {
-      _actionCount++;
-      if (_actionCount <= 3 || _actionCount % 50 == 0) {
-        _log.info('ACTION[$_actionCount] enabled=$motorOutputEnabled '
-            'state=${arbiter.state.runtimeType} '
-            'a0=${action.values[0].toStringAsFixed(3)}');
-      }
       if (!motorOutputEnabled) return;
 
       if (arbiter.state is Grounded) {
@@ -325,6 +321,45 @@ Future<void> _run() async {
     _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
   } else {
     _log.info('No controller — motor enable via gRPC only');
+    // ──── Xbox 热插检测（每 3 秒扫描，接入后自动初始化）─────────
+    _controllerHotplugTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (controller != null) { _controllerHotplugTimer?.cancel(); return; }
+      // 先检查设备节点存在再尝试打开，避免 SEVERE 日志噪音
+      if (!File(_cfg.xboxDevice).existsSync()) return;
+      final xbox = XboxController(_cfg.xboxDevice, config: xboxConfig);
+      if (!xbox.open()) { xbox.dispose(); return; }
+      _controllerHotplugTimer?.cancel();
+      controller = xbox;
+      _log.info('Xbox hot-plugged: ${_cfg.xboxDevice}');
+      controlDog = RealControlDog(
+        brain: brain,
+        imu: imu,
+        joint: joint,
+        arbiter: arbiter,
+        inferKd: defaultProfile.inferKd,
+        inferKp: defaultProfile.inferKp,
+        standUpKd: defaultProfile.standUpKd,
+        standUpKp: defaultProfile.standUpKp,
+        sitDownKd: defaultProfile.sitDownKd,
+        sitDownKp: defaultProfile.sitDownKp,
+        controller: xbox,
+      );
+      final pm = ProfileManager(
+        profiles: profiles,
+        brain: brain,
+        controlDog: controlDog!,
+        initial: defaultProfile.name,
+      );
+      profileManager = pm;
+      controlDog!.onProfileSwitch = () => pm.toggle();
+      controlDog!.onMotorEnableChanged = (enabled) { motorOutputEnabled = enabled; };
+      _profileReloadTimer ??= Timer.periodic(const Duration(seconds: 30), (_) {
+        pm.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
+          _log.warning('Profile hot-reload failed', e, st);
+        });
+      });
+      _log.info('Xbox hot-plug: ProfileManager ready: ${profiles.keys.join(", ")}');
+    });
   }
 
   // ──── 4c. 策略热加载（每 30s 扫描 profileDir）────────────────
@@ -343,9 +378,10 @@ Future<void> _run() async {
     arbiter: arbiter,
     threshold: _cfg.sensorLowThreshold,
   ));
-  if (controller != null) {
+  final initialController = controller;
+  if (initialController is RealController) {
     _subs.add(startControllerMonitoring(
-      controller: controller,
+      controller: initialController,
       arbiter: arbiter,
     ));
   }
@@ -442,14 +478,23 @@ Future<void> _run() async {
       if (minV < lowVoltageThreshold) {
         lowVoltageTriggered = true;
         _log.severe(
-          'LOW VOLTAGE: ${minV.toStringAsFixed(1)}V < ${lowVoltageThreshold}V — emergency sitDown',
+          'LOW VOLTAGE: ${minV.toStringAsFixed(1)}V < ${lowVoltageThreshold}V — graceful sitDown',
         );
+        // 先发 SitDown，等到 Grounded 再 disable（优雅着陆）
         m.add(const A.sitDown());
-        Future<void>.delayed(const Duration(seconds: 4), () {
+        () async {
+          try {
+            await m.stream
+                .firstWhere((s) => s is Grounded)
+                .timeout(const Duration(seconds: 8));
+            _log.info('Low voltage: reached Grounded, disabling motors');
+          } on TimeoutException {
+            _log.severe('Low voltage: Grounded timeout 8s, force disabling');
+          }
           joint.disable();
           motorOutputEnabled = false;
           _log.severe('Motors disabled due to low voltage');
-        });
+        }();
       }
     } catch (_) {}
   });
@@ -571,7 +616,7 @@ void _registerShutdown({
   required ControlArbiter arbiter,
   required grpc.Server grpcServer,
   required RealControlDog? controlDog,
-  required RealController? controller,
+  required Gamepad? controller,
   required RealImu imu,
   required Brain brain,
   required MotorHealthManager motorHealth,
@@ -634,6 +679,7 @@ void _registerShutdown({
     _subs.clear();
     getClockTimer()?.cancel();
     _profileReloadTimer?.cancel();
+    _controllerHotplugTimer?.cancel();
     for (final disposable in [motorHealth, arbiter, controlDog, controller, imu, joint, brain]) {
       try { (disposable as dynamic).dispose(); } catch (_) {}
     }

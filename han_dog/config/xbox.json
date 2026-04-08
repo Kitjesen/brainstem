@@ -6,9 +6,9 @@
   "axes": {
     "left_stick_x": 0,
     "left_stick_y": 1,
-    "right_stick_x": 2,
-    "right_stick_y": 3,
-    "lt": 4,
+    "right_stick_x": 3,
+    "right_stick_y": 4,
+    "lt": 2,
     "rt": 5
   },
 

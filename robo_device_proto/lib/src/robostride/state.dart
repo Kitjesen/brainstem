@@ -98,7 +98,7 @@ sealed class RSState with _$RSState {
       hostId: frame.canId,
       canId: frame.data2 & 0xFF,
       getter: ((frame.data2 >> 8) & 0xFF) == 0x00
-          ? .fromByteData(frame.bytes)
+          ? RSGetter.tryFromByteData(frame.bytes)
           : null,
     ),
     0x15 => .error(

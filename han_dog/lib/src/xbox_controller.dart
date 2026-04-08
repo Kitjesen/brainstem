@@ -20,6 +20,7 @@ import 'package:rxdart/rxdart.dart';
 import 'package:vector_math/vector_math.dart';
 
 import 'gamepad.dart';
+import 'linux_joystick.dart';
 
 final _log = Logger('han_dog.xbox');
 
@@ -127,20 +128,6 @@ class XboxConfig {
   }
 }
 
-/// Linux joystick 事件。
-class JsEvent {
-  final int time;
-  final int value;
-  final int type;
-  final int number;
-
-  JsEvent(this.time, this.value, this.type, this.number);
-
-  bool get isButton => type & 0x01 != 0;
-  bool get isAxis => type & 0x02 != 0;
-  bool get isInit => type & 0x80 != 0;
-}
-
 /// Xbox 手柄控制器 — 读取 /dev/input/js* 提供和 RealController 兼容的流接口。
 ///
 /// 使用方式和 RealController 一样：
@@ -153,8 +140,9 @@ class XboxController implements Gamepad {
   final String devicePath;
   final XboxConfig config;
 
-  RandomAccessFile? _file;
-  Timer? _pollTimer;
+  LinuxJoystick? _joystick;
+  StreamSubscription<JsEvent>? _eventSub;
+  Timer? _tickTimer;
   bool _disposed = false;
 
   // 内部状态
@@ -169,45 +157,27 @@ class XboxController implements Gamepad {
   // ── 打开/关闭 ─────────────────────────────────────────────
 
   bool open() {
-    try {
-      _file = File(devicePath).openSync(mode: FileMode.read);
-    } catch (e) {
-      _log.severe('Xbox controller open failed: $devicePath — $e');
+    _joystick = LinuxJoystick(devicePath);
+    if (!_joystick!.open()) {
+      _joystick = null;
       return false;
     }
-    _log.info('Xbox controller opened: $devicePath');
-    // 10ms 轮询（100Hz 读事件，50Hz 输出流）
-    _pollTimer = Timer.periodic(const Duration(milliseconds: 10), (_) => _poll());
-    return true;
-  }
-
-  void _poll() {
-    if (_file == null || _disposed) return;
-    try {
-      // 非阻塞读：一次读多个事件
-      while (true) {
-        final buf = Uint8List(8);
-        final n = _file!.readIntoSync(buf);
-        if (n < 8) break;
-
-        final bd = ByteData.sublistView(buf);
-        final event = JsEvent(
-          bd.getUint32(0, Endian.little),
-          bd.getInt16(4, Endian.little),
-          bd.getUint8(6),
-          bd.getUint8(7),
-        );
-
-        if (event.isAxis) {
-          _axes[event.number] = event.value / 32767.0;
-        } else if (event.isButton) {
-          _buttons[event.number] = event.value != 0;
-        }
+    // 监听 joystick 事件，更新内部状态
+    _eventSub = _joystick!.eventStream.listen((event) {
+      if (event.isAxis) {
+        _axes[event.number] = event.value / 32767.0;
+      } else if (event.isButton) {
+        _buttons[event.number] = event.value != 0;
       }
-    } catch (_) {
-      // 非阻塞读无数据时可能抛异常，正常
-    }
-    _stateController.add(null);
+      // 收到事件立即发 tick（按钮不漏掉）
+      if (!_disposed) _stateController.add(null);
+    });
+    _log.info('Xbox controller opened: $devicePath');
+    // 50Hz tick 驱动 direction 流（无事件时也保持输出）
+    _tickTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
+      if (!_disposed) _stateController.add(null);
+    });
+    return true;
   }
 
   double _axis(int idx) => _axes[idx] ?? 0.0;
@@ -309,9 +279,10 @@ class XboxController implements Gamepad {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
-    _pollTimer?.cancel();
+    _tickTimer?.cancel();
+    _eventSub?.cancel();
+    _joystick?.dispose();
     _stateController.close();
-    _file?.closeSync();
     _log.info('Xbox controller disposed: $devicePath');
   }
 }
