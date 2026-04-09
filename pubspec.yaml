@@ -16,4 +16,8 @@ workspace:
   - robo_device_proto
   - robo_device
   - han_dog
-  - sirius
+  # sirius is a Flutter package; keeping it out of the Dart workspace so
+  # `dart pub get` works on environments without the Flutter SDK installed
+  # (e.g. the S100P robot runtime). For local Flutter development do
+  # `cd sirius && flutter pub get` directly.
+  # - sirius

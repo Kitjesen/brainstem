@@ -6,14 +6,17 @@ version: 1.1.1
 environment:
   sdk: ^3.10.0
 
-resolution: workspace
+# Not a workspace member — sirius is Flutter-only and the brainstem
+# monorepo workspace is plain Dart (no Flutter SDK on the robot runtime).
+# For local development: `cd sirius && flutter pub get`.
 
 dependencies:
   flutter:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  brainstem_api: ^2.0.0
+  brainstem_api:
+    path: ../brainstem_api/dart
   grpc: ^5.1.0
   protobuf: ^6.0.0
   fl_chart: ^0.70.2
