@@ -35,16 +35,16 @@ jobs:
         working-directory: robo_device_proto
 
       - name: Analyze han_dog_brain
-        run: dart analyze --no-fatal-warningshan_dog_brain/
+        run: dart analyze --no-fatal-warnings han_dog_brain/
 
       - name: Analyze han_dog
-        run: dart analyze --no-fatal-warningshan_dog/
+        run: dart analyze --no-fatal-warnings han_dog/
 
       - name: Analyze frequency_watch
-        run: dart analyze --no-fatal-warningsfrequency_watch/
+        run: dart analyze --no-fatal-warnings frequency_watch/
 
       - name: Analyze skinny_dog_algebra
-        run: dart analyze --no-fatal-warningsskinny_dog_algebra/
+        run: dart analyze --no-fatal-warnings skinny_dog_algebra/
 
       - name: Test han_dog_brain
         run: dart test han_dog_brain/
