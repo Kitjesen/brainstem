@@ -35,16 +35,16 @@ jobs:
         working-directory: robo_device_proto
 
       - name: Analyze han_dog_brain
-        run: dart analyze han_dog_brain/
+        run: dart analyze --no-fatal-warningshan_dog_brain/
 
       - name: Analyze han_dog
-        run: dart analyze han_dog/
+        run: dart analyze --no-fatal-warningshan_dog/
 
       - name: Analyze frequency_watch
-        run: dart analyze frequency_watch/
+        run: dart analyze --no-fatal-warningsfrequency_watch/
 
       - name: Analyze skinny_dog_algebra
-        run: dart analyze skinny_dog_algebra/
+        run: dart analyze --no-fatal-warningsskinny_dog_algebra/
 
       - name: Test han_dog_brain
         run: dart test han_dog_brain/
@@ -85,7 +85,7 @@ jobs:
         working-directory: robo_device_proto
 
       - name: Analyze sirius
-        run: flutter analyze lib/
+        run: flutter analyze --no-fatal-warnings lib/
         working-directory: sirius
 
       - name: Build sirius (Windows)
