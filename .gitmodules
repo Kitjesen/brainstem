@@ -1,0 +1,3 @@
+[submodule "brainstem_api"]
+	path = brainstem_api
+	url = https://github.com/Kitjesen/brainstem_api.git
