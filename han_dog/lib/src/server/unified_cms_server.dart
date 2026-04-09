@@ -512,4 +512,36 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     }
     return proto.Empty();
   }
+
+  // ═══════════════════════════════════════════════════════════
+  //  未实现的 RPC — pre-existing gap
+  //  cms.proto 里声明了这些 RPC 但 server 一直没实现。
+  //  Stub 返回 UNIMPLEMENTED 错误，让 dart analyze 通过且客户端能拿到
+  //  明确的"未支持"信号，不是静默的 abstract error。
+  //  TODO: 实现实际业务逻辑或从 proto 里移除这些 RPC。
+  // ═══════════════════════════════════════════════════════════
+
+  @override
+  Future<proto.Empty> setSpeedMode(
+      ServiceCall call, proto.SpeedModeRequest request) async {
+    throw GrpcError.unimplemented('SetSpeedMode not yet implemented');
+  }
+
+  @override
+  Future<proto.SpeedModeRequest> getSpeedMode(
+      ServiceCall call, proto.Empty request) async {
+    throw GrpcError.unimplemented('GetSpeedMode not yet implemented');
+  }
+
+  @override
+  Future<proto.Empty> playGesture(
+      ServiceCall call, proto.GestureRequest request) async {
+    throw GrpcError.unimplemented('PlayGesture not yet implemented');
+  }
+
+  @override
+  Future<proto.GestureList> listGestures(
+      ServiceCall call, proto.Empty request) async {
+    throw GrpcError.unimplemented('ListGestures not yet implemented');
+  }
 }
