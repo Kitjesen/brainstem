@@ -2,7 +2,7 @@ import 'dart:async' show TimeoutException;
 
 import 'package:grpc/grpc.dart';
 import 'package:han_dog_brain/han_dog_brain.dart';
-import 'package:han_dog_message/han_dog_message.dart' as proto;
+import 'package:brainstem_api/brainstem_api.dart' as proto;
 import 'package:logging/logging.dart';
 import 'package:vector_math/vector_math.dart' show Quaternion;
 
@@ -35,7 +35,7 @@ enum CmsMode {
 /// | [gains] | 推荐 | 推荐 |
 /// | [imuStreamFactory] | null (clock 驱动) | 必须 |
 /// | [jointStreamFactory] | null (clock 驱动) | 必须 |
-class UnifiedCmsServer extends proto.CmsServiceBase {
+class UnifiedCmsServer extends proto.RobotControlServiceBase {
   final Brain _brain;
   final M _m;
   final CmsMode mode;

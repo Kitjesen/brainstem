@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:han_dog_message/han_dog_message.dart' hide Duration;
+import 'package:brainstem_api/brainstem_api.dart' hide Duration;
 
 enum RecordState { idle, recording, saving }
 

@@ -154,7 +154,7 @@ class OrixClient:
         self._target = f"{host}:{port}"
         self._timeout = timeout
         self._channel = grpc.insecure_channel(self._target)
-        self._stub = cms_pb2_grpc.CmsStub(self._channel)
+        self._stub = cms_pb2_grpc.RobotControlStub(self._channel)
 
     def close(self):
         """Close the gRPC channel."""

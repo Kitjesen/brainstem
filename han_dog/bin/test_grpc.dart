@@ -11,12 +11,12 @@ import 'dart:core';
 import 'dart:io';
 
 import 'package:grpc/grpc.dart';
-import 'package:han_dog_message/han_dog_message.dart' hide Duration;
+import 'package:brainstem_api/brainstem_api.dart' hide Duration;
 
 const host = 'localhost';
 const port = 13145;
 
-late CmsClient client;
+late RobotControlClient client;
 int _pass = 0;
 int _fail = 0;
 
@@ -26,7 +26,7 @@ void main() async {
     port: port,
     options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
   );
-  client = CmsClient(channel);
+  client = RobotControlClient(channel);
 
   print('');
   print('╔══════════════════════════════════════════╗');

@@ -1,6 +1,6 @@
 import 'package:han_dog_brain/han_dog_brain.dart';
 import 'package:han_dog/src/server/proto_convert.dart';
-import 'package:han_dog_message/han_dog_message.dart' as proto;
+import 'package:brainstem_api/brainstem_api.dart' as proto;
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 import 'package:test/test.dart';
 import 'package:vector_math/vector_math.dart' as vm;

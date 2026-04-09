@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:grpc/grpc.dart';
-import 'package:han_dog_message/han_dog_message.dart' hide Duration;
+import 'package:brainstem_api/brainstem_api.dart' hide Duration;
 import 'package:protobuf/well_known_types/google/protobuf/duration.pb.dart'
     as pb;
 import 'package:sirius/services/grpc_service.dart';
 
-class _FakeCmsService extends CmsServiceBase {
+class _FakeCmsService extends RobotControlServiceBase {
   _FakeCmsService({required this.initialState});
 
   final CmsState initialState;

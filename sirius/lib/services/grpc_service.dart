@@ -4,7 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:grpc/grpc.dart';
-import 'package:han_dog_message/han_dog_message.dart' hide Duration;
+import 'package:brainstem_api/brainstem_api.dart' hide Duration;
 
 /// Describes a single logged gRPC message.
 class ProtocolLogEntry {
@@ -28,7 +28,7 @@ class ProtocolLogEntry {
 /// - Proper gRPC error code handling
 class GrpcService extends ChangeNotifier {
   ClientChannel? _channel;
-  CmsClient? _client;
+  RobotControlClient? _client;
 
   String _host = '192.168.66.192';
   int _port = 13145;
@@ -134,7 +134,7 @@ class GrpcService extends ChangeNotifier {
   List<String> get profileDescriptions =>
       List.unmodifiable(_profileDescriptions);
   bool get hasProfiles => _availableProfiles.isNotEmpty;
-  CmsClient? get client => _client;
+  RobotControlClient? get client => _client;
   DateTime? get serverStartTime => _serverStartTime;
   DateTime? get connectTime => _connectTime;
   int get uptimeSeconds => _connectTime != null
@@ -287,7 +287,7 @@ class GrpcService extends ChangeNotifier {
           ),
         ),
       );
-      _client = CmsClient(_channel!);
+      _client = RobotControlClient(_channel!);
 
       // Test connection by getting start time
       _log('→', 'GetStartTime');
@@ -470,7 +470,7 @@ class GrpcService extends ChangeNotifier {
           ),
         ),
       );
-      _client = CmsClient(_channel!);
+      _client = RobotControlClient(_channel!);
 
       // Verify connection
       final ts = await _client!.getStartTime(Empty());

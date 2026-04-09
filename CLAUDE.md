@@ -42,7 +42,7 @@ dart run build_runner build --delete-conflicting-outputs  # 重新生成 Freezed
 
 | 包 | 文件数 | 说明 |
 |----|--------|------|
-| `han_dog_message` | 50 | protoc 生成的 gRPC 消息，**不可手动编辑** |
+| `brainstem_api` | 50 | protoc 生成的 gRPC 消息（v2.0.0，原 `han_dog_message`），**不可手动编辑** |
 | `robo_device_proto` | 37 | robo_device 的 protobuf 定义 |
 | `protoframe` | 9 | 协议帧序列化/反序列化 |
 
@@ -59,7 +59,7 @@ dart run build_runner build --delete-conflicting-outputs  # 重新生成 Freezed
 ```
                     han_dog (主程序)
                    /    |     \      \
-        han_dog_brain  freq_watch  robo_device  han_dog_message
+        han_dog_brain  freq_watch  robo_device  brainstem_api
            /    \                   /   |   \
   skinny_dog  onnx_runtime     pcan serial protoframe
    _algebra                         _port
@@ -158,7 +158,7 @@ dart test han_dog/ han_dog_brain/ frequency_watch/ skinny_dog_algebra/
 # 6. 阅读以下文档
 #    README.md（根目录）  — 完整项目文档
 #    SDK_DESIGN.md        — 高层架构设计
-#    han_dog_message/README.md — gRPC 协议规范
+#    brainstem_api/README.md — gRPC 协议规范 (v2.0.0, package brainstem.api.v1, service RobotControl)
 ```
 
 > sim/ 目录：MuJoCo 物理仿真资源（URDF/XML/STL 模型、动作预览视频、verify_gestures.py）。

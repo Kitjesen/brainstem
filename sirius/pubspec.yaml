@@ -13,7 +13,7 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  han_dog_message: ^1.0.0
+  brainstem_api: ^2.0.0
   grpc: ^5.1.0
   protobuf: ^6.0.0
   fl_chart: ^0.70.2

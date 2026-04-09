@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:grpc/grpc.dart';
-import 'package:han_dog_message/han_dog_message.dart' hide Duration;
+import 'package:brainstem_api/brainstem_api.dart' hide Duration;
 
 class LanScanResult {
   final String ip;
@@ -109,7 +109,7 @@ class LanScanner {
           port: port,
           options: const ChannelOptions(
               credentials: ChannelCredentials.insecure()));
-      final stub = CmsClient(ch);
+      final stub = RobotControlClient(ch);
       await stub.getStartTime(Empty(),
           options: CallOptions(timeout: const Duration(seconds: 1)));
       return true;

@@ -5,7 +5,7 @@ import 'package:frequency_watch/frequency_watch.dart';
 import 'package:grpc/grpc.dart' as grpc;
 import 'package:han_dog/han_dog.dart';
 import 'package:han_dog_brain/han_dog_brain.dart';
-import 'package:han_dog_message/han_dog_message.dart' as msg;
+import 'package:brainstem_api/brainstem_api.dart' as msg;
 import 'package:logging/logging.dart';
 import 'package:cms/cms.dart';
 import 'package:han_dog/src/app/config.dart';

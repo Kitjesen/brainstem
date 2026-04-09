@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:han_dog_message/han_dog_message.dart' hide Duration, Matrix4, Matrix4Int32;
+import 'package:brainstem_api/brainstem_api.dart' hide Duration, Matrix4, Matrix4Int32;
 import '../services/grpc_service.dart';
 import '../services/preset_service.dart';
 import '../services/model_service.dart';

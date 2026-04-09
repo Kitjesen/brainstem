@@ -21,7 +21,7 @@ from brainstem_sdk._proto import cms_pb2, cms_pb2_grpc, common_pb2
 
 # ── Mock gRPC server ────────────────────────────────────────
 
-class MockCmsServicer(cms_pb2_grpc.CmsServicer):
+class MockCmsServicer(cms_pb2_grpc.RobotControlServicer):
     """Fake CMS server that returns predictable responses."""
 
     def __init__(self):
@@ -121,7 +121,7 @@ def mock_server():
     """Start a mock gRPC server on a random port."""
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
     servicer = MockCmsServicer()
-    cms_pb2_grpc.add_CmsServicer_to_server(servicer, server)
+    cms_pb2_grpc.add_RobotControlServicer_to_server(servicer, server)
     port = server.add_insecure_port("[::]:0")
     server.start()
     yield port, servicer

@@ -13,7 +13,7 @@ dependencies:
   skinny_dog_algebra: ^1.0.0
   frequency_watch: ^1.0.0
   han_dog_brain: ^1.0.0
-  han_dog_message: ^1.0.0
+  brainstem_api: ^2.0.0
   robo_device: ^1.0.0
   robo_device_proto: ^1.0.0
 

@@ -4,7 +4,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:grpc/grpc.dart';
-import 'package:han_dog_message/han_dog_message.dart' hide Duration;
+import 'package:brainstem_api/brainstem_api.dart' hide Duration;
 
 const _defaultHost = '127.0.0.1';
 const _defaultPort = 13145;
@@ -23,7 +23,7 @@ Future<void> main(List<String> args) async {
     port: config.port,
     options: const ChannelOptions(credentials: ChannelCredentials.insecure()),
   );
-  final client = CmsClient(channel);
+  final client = RobotControlClient(channel);
 
   try {
     await CmsStateSmoke(client: client, config: config).run();
@@ -138,7 +138,7 @@ class SmokeConfig {
 class CmsStateSmoke {
   CmsStateSmoke({required this.client, required this.config});
 
-  final CmsClient client;
+  final RobotControlClient client;
   final SmokeConfig config;
 
   Future<void> run() async {

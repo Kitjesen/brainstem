@@ -8,7 +8,7 @@ workspace:
   - frequency_watch
   - skinny_dog_algebra
   - onnx_runtime
-  - han_dog_message/dart
+  - brainstem_api/dart
   - han_dog_brain
   - protoframe
   - pcan
