@@ -46,6 +46,6 @@
   "stick": {
     "left_y_invert": true,
     "right_x_invert": true,
-    "vy_from_lx_negate": false
+    "vy_from_lx_negate": true
   }
 }
