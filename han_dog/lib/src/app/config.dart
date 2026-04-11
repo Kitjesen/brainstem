@@ -107,8 +107,8 @@ class HanDogConfig {
     if (grpcPort < 1 || grpcPort > 65535) {
       errors.add('HAN_DOG_PORT=$grpcPort 超出范围 [1-65535]');
     }
-    if (arbiterTimeoutSec < 1 || arbiterTimeoutSec > 60) {
-      errors.add('HAN_DOG_ARBITER_TIMEOUT=${arbiterTimeoutSec}s 需在 [1, 60] 范围内');
+    if (arbiterTimeoutSec < 0 || arbiterTimeoutSec > 3600) {
+      errors.add('HAN_DOG_ARBITER_TIMEOUT=${arbiterTimeoutSec}s 需在 [0, 3600] 范围内（0=永不释放）');
     }
     if (shutdownTimeoutSec < 1 || shutdownTimeoutSec > 300) {
       errors.add('HAN_DOG_SHUTDOWN_TIMEOUT=${shutdownTimeoutSec}s 需在 [1, 300] 范围内');

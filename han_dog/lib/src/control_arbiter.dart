@@ -104,10 +104,12 @@ class ControlArbiter {
       _ownerController.add(source);
     }
     _releaseTimer?.cancel();
-    final versionAtSchedule = _ownerVersion;
-    _releaseTimer = Timer(timeout, () {
-      if (_ownerVersion == versionAtSchedule) _doRelease('timeout');
-    });
+    if (timeout != Duration.zero) {
+      final versionAtSchedule = _ownerVersion;
+      _releaseTimer = Timer(timeout, () {
+        if (_ownerVersion == versionAtSchedule) _doRelease('timeout');
+      });
+    }
   }
 
   void _doRelease(String reason) {
