@@ -110,6 +110,19 @@ class LinuxJoystick {
     return true;
   }
 
+  /// fd 失效时关闭设备并触发 onDone，让上层感知断联。
+  void _handleDisconnect() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (_fd >= 0) {
+      _close(_fd);
+      _fd = -1;
+    }
+    if (!_eventController.isClosed) {
+      _eventController.close();
+    }
+  }
+
   void _poll() {
     if (_fd < 0 || _disposed) return;
 
@@ -119,7 +132,8 @@ class LinuxJoystick {
       if (n < _JS_EVENT_SIZE) {
         // EAGAIN = 没有新数据，正常
         if (n < 0 && _errno != _EAGAIN && _errno != _EWOULDBLOCK) {
-          _log.warning('read error: errno=$_errno');
+          _log.warning('read error: errno=$_errno — device disconnected');
+          _handleDisconnect();
         }
         break;
       }
@@ -148,10 +162,12 @@ class LinuxJoystick {
     if (_disposed) return;
     _disposed = true;
     _pollTimer?.cancel();
-    _eventController.close();
     if (_fd >= 0) {
       _close(_fd);
       _fd = -1;
+    }
+    if (!_eventController.isClosed) {
+      _eventController.close();
     }
     calloc.free(_buf);
     _log.info('LinuxJoystick disposed: $devicePath');
