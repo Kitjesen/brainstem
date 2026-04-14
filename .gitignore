@@ -67,3 +67,16 @@ sim/model/
 
 # Python build artifacts
 *.egg-info/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Zip archives (tracked separately)
+sdk/cpp.zip
+*.zip
