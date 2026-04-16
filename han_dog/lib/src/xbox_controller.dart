@@ -142,6 +142,7 @@ class XboxController implements Gamepad {
   LinuxJoystick? _joystick;
   StreamSubscription<JsEvent>? _eventSub;
   Timer? _tickTimer;
+  Timer? _reconnectTimer;
   bool _disposed = false;
 
   // 内部状态
@@ -156,27 +157,68 @@ class XboxController implements Gamepad {
   // ── 打开/关闭 ─────────────────────────────────────────────
 
   bool open() {
-    _joystick = LinuxJoystick(devicePath);
-    if (!_joystick!.open()) {
-      _joystick = null;
-      return false;
-    }
-    // 监听 joystick 事件，更新内部状态
-    _eventSub = _joystick!.eventStream.listen((event) {
-      if (event.isAxis) {
-        _axes[event.number] = event.value / 32767.0;
-      } else if (event.isButton) {
-        _buttons[event.number] = event.value != 0;
-      }
-      // 收到事件立即发 tick（按钮不漏掉）
-      if (!_disposed) _stateController.add(null);
-    });
-    _log.info('Xbox controller opened: $devicePath');
+    final ok = _attach();
+    if (!ok) return false;
     // 50Hz tick 驱动 direction 流（无事件时也保持输出）
     _tickTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
       if (!_disposed) _stateController.add(null);
     });
     return true;
+  }
+
+  /// 创建 LinuxJoystick 并挂载事件订阅。断联时触发重连计时器。
+  bool _attach() {
+    _eventSub?.cancel();
+    _joystick?.dispose();
+    _joystick = LinuxJoystick(devicePath);
+    if (!_joystick!.open()) {
+      _joystick!.dispose();
+      _joystick = null;
+      return false;
+    }
+    _eventSub = _joystick!.eventStream.listen(
+      (event) {
+        if (event.isAxis) {
+          _axes[event.number] = event.value / 32767.0;
+        } else if (event.isButton) {
+          _buttons[event.number] = event.value != 0;
+        }
+        // 收到事件立即发 tick（按钮不漏掉）
+        if (!_disposed) _stateController.add(null);
+      },
+      onDone: () {
+        // LinuxJoystick 检测到 fd 失效后关闭流，在此触发重连
+        _log.warning('Xbox joystick disconnected: $devicePath');
+        _joystick?.dispose(); // 释放 FFI buffer，dispose 内部有幂等保护
+        _joystick = null;
+        _axes.clear();
+        _buttons.clear();
+        _scheduleReconnect();
+      },
+      onError: (Object e, StackTrace st) {
+        _log.warning('Xbox joystick stream error', e, st);
+      },
+    );
+    _log.info('Xbox controller opened: $devicePath');
+    return true;
+  }
+
+  /// 每 3 秒检测设备节点是否重新出现，出现后自动重连。
+  void _scheduleReconnect() {
+    if (_disposed) return;
+    _log.info('Xbox: scheduling reconnect (polling every 3s)...');
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (_disposed) {
+        _reconnectTimer?.cancel();
+        return;
+      }
+      if (!File(devicePath).existsSync()) return;
+      _log.info('Xbox: device reappeared, reconnecting...');
+      _reconnectTimer?.cancel();
+      _reconnectTimer = null;
+      _attach();
+    });
   }
 
   double _axis(int idx) => _axes[idx] ?? 0.0;
@@ -288,6 +330,7 @@ class XboxController implements Gamepad {
     if (_disposed) return;
     _disposed = true;
     _tickTimer?.cancel();
+    _reconnectTimer?.cancel();
     _eventSub?.cancel();
     _joystick?.dispose();
     _stateController.close();

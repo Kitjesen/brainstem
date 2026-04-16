@@ -1,6 +1,6 @@
 {
   "name": "default",
-  "modelPath": "model/policy_1119.onnx",
+  "modelPath": "model/policy_251119.onnx",
   "standingPose": [
     -0.1,
     -0.8,
@@ -40,16 +40,16 @@
   "standUpCounts": 150,
   "sitDownCounts": 150,
   "inferKp": [
-    70,
+    85,
     100,
     120,
-    70,
+    85,
     100,
     120,
-    70,
+    85,
     100,
     120,
-    70,
+    85,
     100,
     120,
     0,
