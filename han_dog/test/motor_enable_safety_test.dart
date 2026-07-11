@@ -17,12 +17,14 @@ void main() {
     JointsMatrix? position,
     JointsMatrix? velocity,
     bool hasFreshJointTelemetry = true,
+    bool hasUnrecoveredMotorFaults = false,
   }) => MotorEnableSafety.blockReason(
     state: state,
     position: position ?? JointsMatrix.zero(),
     velocity: velocity ?? JointsMatrix.zero(),
     jointLimitRad: 3.14,
     hasFreshJointTelemetry: hasFreshJointTelemetry,
+    hasUnrecoveredMotorFaults: hasUnrecoveredMotorFaults,
   );
 
   group('MotorEnableSafety', () {
@@ -39,7 +41,10 @@ void main() {
       positions[11] = 3.2;
 
       expect(
-        check(state: groundedState(), position: JointsMatrix.fromList(positions)),
+        check(
+          state: groundedState(),
+          position: JointsMatrix.fromList(positions),
+        ),
         contains('leg joint 11'),
       );
     });
@@ -49,7 +54,10 @@ void main() {
       positions[12] = 99;
 
       expect(
-        check(state: groundedState(), position: JointsMatrix.fromList(positions)),
+        check(
+          state: groundedState(),
+          position: JointsMatrix.fromList(positions),
+        ),
         isNull,
       );
     });
@@ -59,12 +67,40 @@ void main() {
       velocity[0] = 0.6;
 
       expect(
-        check(state: groundedState(), velocity: JointsMatrix.fromList(velocity)),
+        check(
+          state: groundedState(),
+          velocity: JointsMatrix.fromList(velocity),
+        ),
         contains('moving too fast'),
       );
       expect(
         check(state: groundedState(), hasFreshJointTelemetry: false),
         contains('not fresh enough'),
+      );
+    });
+
+    test('rejects Enable while motor fault recovery is pending', () {
+      expect(
+        check(state: groundedState(), hasUnrecoveredMotorFaults: true),
+        'motor fault recovery is pending',
+      );
+    });
+
+    test('rejects a pose outside the grounded reference window', () {
+      final position = List<double>.filled(16, 0.0);
+      position[4] = 0.6;
+
+      expect(
+        MotorEnableSafety.blockReason(
+          state: groundedState(),
+          position: JointsMatrix.fromList(position),
+          velocity: JointsMatrix.zero(),
+          jointLimitRad: 3.14,
+          hasFreshJointTelemetry: true,
+          safePose: JointsMatrix.zero(),
+          maxSafePoseErrorRad: 0.5,
+        ),
+        contains('safe grounded pose'),
       );
     });
   });

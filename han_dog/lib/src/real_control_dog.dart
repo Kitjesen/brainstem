@@ -8,9 +8,7 @@ import 'package:logging/logging.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 import 'package:vector_math/vector_math.dart';
 
-
 final _log = Logger('han_dog.control');
-
 
 class RealControlDog {
   final Brain brain;
@@ -18,7 +16,7 @@ class RealControlDog {
   final RealImu imu;
   final RealJoint joint;
   final Gamepad controller;
-  final String? Function()? motorEnableBlockReason;
+  final MotorOutputController motorOutput;
   JointsMatrix inferKp;
   JointsMatrix inferKd;
   JointsMatrix standUpKp;
@@ -30,8 +28,6 @@ class RealControlDog {
   void Function()? onProfileSwitch;
 
   /// 电机使能状态变化回调（由外部设置，用于同步 motorOutputEnabled 标志）。
-  void Function(bool enabled)? onMotorEnableChanged;
-
   final List<StreamSubscription<Object?>> _subscriptions = [];
 
   RealControlDog({
@@ -46,34 +42,36 @@ class RealControlDog {
     required this.sitDownKp,
     required this.sitDownKd,
     required this.controller,
-    this.motorEnableBlockReason,
+    required this.motorOutput,
   }) {
     // 监听 CMS 状态变化，自动设置对应的 kp/kd
-    _subscriptions.add(arbiter.stateStream.listen(
-      (state) {
-        switch (state) {
-          case Walking():
-            joint.kpExt = inferKp;
-            joint.kdExt = inferKd;
-          case Transitioning(:final target):
-            if (target is StandUpCommand) {
-              joint.kpExt = standUpKp;
-              joint.kdExt = standUpKd;
-            } else {
-              joint.kpExt = sitDownKp;
-              joint.kdExt = sitDownKd;
-            }
-          case Standing() || Grounded() || Zero():
-            break;
-        }
-      },
-      onError: (Object error, StackTrace st) {
-        _log.severe('State stream error', error, st);
-      },
-      onDone: () {
-        _log.warning('State stream closed — kp/kd auto-switching disabled');
-      },
-    ));
+    _subscriptions.add(
+      arbiter.stateStream.listen(
+        (state) {
+          switch (state) {
+            case Walking():
+              joint.kpExt = inferKp;
+              joint.kdExt = inferKd;
+            case Transitioning(:final target):
+              if (target is StandUpCommand) {
+                joint.kpExt = standUpKp;
+                joint.kdExt = standUpKd;
+              } else {
+                joint.kpExt = sitDownKp;
+                joint.kdExt = sitDownKd;
+              }
+            case Standing() || Grounded() || Zero():
+              break;
+          }
+        },
+        onError: (Object error, StackTrace st) {
+          _log.severe('State stream error', error, st);
+        },
+        onDone: () {
+          _log.warning('State stream closed — kp/kd auto-switching disabled');
+        },
+      ),
+    );
 
     // 遥控器事件 → 通过仲裁器发送（ControlSource.yunzhuo）
     void onStreamError(Object error, StackTrace st, String name) {
@@ -85,105 +83,122 @@ class RealControlDog {
 
     void sendCommand(A action, String label) {
       if (!arbiter.command(action, ControlSource.yunzhuo)) {
-        _log.warning('YUNZHUO $label rejected — arbiter owner: ${arbiter.owner}');
+        _log.warning(
+          'YUNZHUO $label rejected — arbiter owner: ${arbiter.owner}',
+        );
       }
     }
 
-    _subscriptions.add(controller.direction.listen(
-      (direction) {
-        // 摇杆死区：中位附近的微小值归零（SBUS ±1/720 ≈ 0.0014）
-        const deadzone = 0.02;
-        final vx = direction.x.abs() < deadzone ? 0.0 : direction.x;
-        final vy = direction.y.abs() < deadzone ? 0.0 : direction.y;
-        final yaw = direction.z.abs() < deadzone ? 0.0 : direction.z;
+    _subscriptions.add(
+      controller.direction.listen(
+        (direction) {
+          // 摇杆死区：中位附近的微小值归零（SBUS ±1/720 ≈ 0.0014）
+          const deadzone = 0.02;
+          final vx = direction.x.abs() < deadzone ? 0.0 : direction.x;
+          final vy = direction.y.abs() < deadzone ? 0.0 : direction.y;
+          final yaw = direction.z.abs() < deadzone ? 0.0 : direction.z;
 
-        if (vx == 0 && vy == 0 && yaw == 0) {
-          // 摇杆归零：发 walk(0,0,0) 让策略减速，保持 Walking 状态。
-          if (arbiter.state is Walking) {
-            sendCommand(A.walk(Vector3.zero()), 'walk(zero)');
+          if (vx == 0 && vy == 0 && yaw == 0) {
+            // 摇杆归零：发 walk(0,0,0) 让策略减速，保持 Walking 状态。
+            if (arbiter.state is Walking) {
+              sendCommand(A.walk(Vector3.zero()), 'walk(zero)');
+            }
+            return;
           }
-          return;
-        }
-        // 控制器已在 Walk 约定下输出 (x=前后, y=左右, z=旋转)，直接透传
-        final cmd = Vector3(vx, vy, yaw);
-        _log.info('WALK fwd=${vx.toStringAsFixed(2)} '
+          // 控制器已在 Walk 约定下输出 (x=前后, y=左右, z=旋转)，直接透传
+          final cmd = Vector3(vx, vy, yaw);
+          _log.info(
+            'WALK fwd=${vx.toStringAsFixed(2)} '
             'lat=${vy.toStringAsFixed(2)} '
-            'yaw=${yaw.toStringAsFixed(2)}');
-        sendCommand(A.walk(cmd), 'walk');
-      },
-      onError: (Object e, StackTrace st) => onStreamError(e, st, 'direction'),
-      onDone: () => _log.warning('Controller direction stream closed'),
-    ));
-    _subscriptions.add(controller.standup.listen(
-      (_) {
-        _log.info('L1 → standUp');
-        sendCommand(const A.standUp(), 'standUp');
-      },
-      onError: (Object e, StackTrace st) => onStreamError(e, st, 'standup'),
-      onDone: () => _log.warning('Controller standup stream closed'),
-    ));
-    _subscriptions.add(controller.sitdown.listen(
-      (_) {
-        _log.info('L2 → sitDown');
-        sendCommand(const A.sitDown(), 'sitDown');
-      },
-      onError: (Object e, StackTrace st) => onStreamError(e, st, 'sitdown'),
-      onDone: () => _log.warning('Controller sitdown stream closed'),
-    ));
-    _subscriptions.add(controller.enabled.listen(
-      (enabled) {
-        _log.info('H enable=$enabled');
-        unawaited(_setMotorEnabled(enabled));
-      },
-      onError: (Object e, StackTrace st) => onStreamError(e, st, 'enabled'),
-      onDone: () => _log.warning('Controller enabled stream closed'),
-    ));
-    _subscriptions.add(controller.red.listen(
-      (_) {
-        _log.info('红键 → disable motors + clear errors');
-        joint.disable(clearErrors: true);
-      },
-      onError: (Object e, StackTrace st) => onStreamError(e, st, 'red'),
-      onDone: () => _log.warning('Controller red stream closed'),
-    ));
-    _subscriptions.add(controller.idle.listen(
-      (_) {
-        _log.info('R1 → standUp');
-        sendCommand(const A.standUp(), 'standUp(R1)');
-      },
-      onError: (Object e, StackTrace st) => onStreamError(e, st, 'idle(R1)'),
-      onDone: () => _log.warning('Controller idle(R1) stream closed'),
-    ));
-    _subscriptions.add(controller.calibrate.listen(
-      (_) {
-        if (arbiter.state is! Grounded) return;
-        _log.info('标零组合键 → setZero+save');
-        joint
-          ..setZeroPosition()
-          ..setZeroSigned()
-          ..saveParameters();
-      },
-      onError: (Object e, StackTrace st) => onStreamError(e, st, 'calibrate'),
-      onDone: () => _log.warning('Controller calibrate stream closed'),
-    ));
-    _subscriptions.add(controller.switchProfile.listen(
-      (_) {
-        if (arbiter.state is! Grounded && arbiter.state is! Standing) {
-          _log.warning('R2 profile switch rejected: must be grounded or standing (${arbiter.state})');
-          return;
-        }
-        _log.info('R2 → switchProfile');
-        try {
-          onProfileSwitch?.call();
-        } catch (e, st) {
-          _log.severe('onProfileSwitch callback error', e, st);
-          arbiter.fault('Profile switch error: $e');
-        }
-      },
-      onError: (Object e, StackTrace st) =>
-          onStreamError(e, st, 'switchProfile'),
-      onDone: () => _log.warning('Controller switchProfile stream closed'),
-    ));
+            'yaw=${yaw.toStringAsFixed(2)}',
+          );
+          sendCommand(A.walk(cmd), 'walk');
+        },
+        onError: (Object e, StackTrace st) => onStreamError(e, st, 'direction'),
+        onDone: () => _log.warning('Controller direction stream closed'),
+      ),
+    );
+    _subscriptions.add(
+      controller.standup.listen(
+        (_) {
+          _log.info('L1 → standUp');
+          sendCommand(const A.standUp(), 'standUp');
+        },
+        onError: (Object e, StackTrace st) => onStreamError(e, st, 'standup'),
+        onDone: () => _log.warning('Controller standup stream closed'),
+      ),
+    );
+    _subscriptions.add(
+      controller.sitdown.listen(
+        (_) {
+          _log.info('L2 → sitDown');
+          sendCommand(const A.sitDown(), 'sitDown');
+        },
+        onError: (Object e, StackTrace st) => onStreamError(e, st, 'sitdown'),
+        onDone: () => _log.warning('Controller sitdown stream closed'),
+      ),
+    );
+    _subscriptions.add(
+      controller.enabled.listen(
+        (enabled) {
+          _log.info('H enable=$enabled');
+          unawaited(_setMotorEnabled(enabled));
+        },
+        onError: (Object e, StackTrace st) => onStreamError(e, st, 'enabled'),
+        onDone: () => _log.warning('Controller enabled stream closed'),
+      ),
+    );
+    _subscriptions.add(
+      controller.red.listen(
+        (_) {
+          _log.info('红键 → disable motors + clear errors');
+          unawaited(_disableMotors(clearErrors: true));
+        },
+        onError: (Object e, StackTrace st) => onStreamError(e, st, 'red'),
+        onDone: () => _log.warning('Controller red stream closed'),
+      ),
+    );
+    _subscriptions.add(
+      controller.idle.listen(
+        (_) {
+          _log.info('R1 → standUp');
+          sendCommand(const A.standUp(), 'standUp(R1)');
+        },
+        onError: (Object e, StackTrace st) => onStreamError(e, st, 'idle(R1)'),
+        onDone: () => _log.warning('Controller idle(R1) stream closed'),
+      ),
+    );
+    _subscriptions.add(
+      controller.calibrate.listen(
+        (_) {
+          unawaited(_setZero());
+        },
+        onError: (Object e, StackTrace st) => onStreamError(e, st, 'calibrate'),
+        onDone: () => _log.warning('Controller calibrate stream closed'),
+      ),
+    );
+    _subscriptions.add(
+      controller.switchProfile.listen(
+        (_) {
+          if (arbiter.state is! Grounded) {
+            _log.warning(
+              'R2 profile switch rejected: must be grounded (${arbiter.state})',
+            );
+            return;
+          }
+          _log.info('R2 → switchProfile');
+          try {
+            onProfileSwitch?.call();
+          } catch (e, st) {
+            _log.severe('onProfileSwitch callback error', e, st);
+            arbiter.fault('Profile switch error: $e');
+          }
+        },
+        onError: (Object e, StackTrace st) =>
+            onStreamError(e, st, 'switchProfile'),
+        onDone: () => _log.warning('Controller switchProfile stream closed'),
+      ),
+    );
   }
 
   /// 切换策略时更新全部增益参数。
@@ -207,34 +222,62 @@ class RealControlDog {
   }
 
   Future<void> _setMotorEnabled(bool enabled) async {
-    if (enabled) {
-      if (arbiter.state is! Grounded) {
-        final reason = 'CMS must be Grounded before enabling motors '
-            '(current: ${arbiter.state.runtimeType})';
-        _log.warning('Motor enable blocked: $reason');
-        onMotorEnableChanged?.call(false);
-        return;
+    try {
+      if (enabled) {
+        final rejection = await motorOutput.enable(ControlSource.yunzhuo);
+        if (rejection != null) {
+          _log.warning('Motor enable blocked: $rejection');
+          return;
+        }
+      } else {
+        await motorOutput.disable();
       }
+      controller.syncMotorOutputEnabled(motorOutput.isEnabled);
+    } catch (error, stackTrace) {
+      _log.severe(
+        'Motor ${enabled ? 'enable' : 'disable'} failed',
+        error,
+        stackTrace,
+      );
+      arbiter.fault('Motor ${enabled ? 'enable' : 'disable'} failed: $error');
+    }
+  }
 
-      final rejection = motorEnableBlockReason?.call();
-      if (rejection != null) {
-        _log.warning('Motor enable blocked: $rejection');
-        onMotorEnableChanged?.call(false);
-        return;
-      }
+  Future<void> _disableMotors({bool clearErrors = false}) async {
+    try {
+      await motorOutput.disable(clearErrors: clearErrors);
+      controller.syncMotorOutputEnabled(motorOutput.isEnabled);
+    } catch (error, stackTrace) {
+      _log.severe('Motor emergency disable failed', error, stackTrace);
+      arbiter.fault('Motor emergency disable failed: $error');
+    }
+  }
+
+  Future<void> _setZero() async {
+    if (arbiter.state is! Grounded) {
+      return;
+    }
+    if (motorOutput.isEnabled) {
+      _log.warning('SetZero rejected: motor output is enabled');
+      return;
     }
 
     try {
-      if (enabled) {
-        await joint.enable();
-      } else {
-        await joint.disable();
+      Future<void> writeZero() {
+        _log.info('标零组合键 → setZero+save');
+        joint
+          ..setZeroPosition()
+          ..setZeroSigned()
+          ..saveParameters();
+        return Future<void>.value();
       }
-      onMotorEnableChanged?.call(enabled);
+
+      await motorOutput.runWhileDisabled(writeZero);
+    } on StateError catch (error) {
+      _log.warning('SetZero rejected: ${error.message}');
     } catch (error, stackTrace) {
-      _log.severe('Motor ${enabled ? 'enable' : 'disable'} failed', error, stackTrace);
-      arbiter.fault('Motor ${enabled ? 'enable' : 'disable'} failed: $error');
-      onMotorEnableChanged?.call(false);
+      _log.severe('SetZero failed', error, stackTrace);
+      arbiter.fault('SetZero failed: $error');
     }
   }
 

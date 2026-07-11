@@ -17,6 +17,9 @@ abstract final class MotorEnableSafety {
     required JointsMatrix velocity,
     required double jointLimitRad,
     required bool hasFreshJointTelemetry,
+    bool hasUnrecoveredMotorFaults = false,
+    JointsMatrix? safePose,
+    double? maxSafePoseErrorRad,
   }) {
     if (state is! Grounded) {
       return 'CMS must be Grounded before enabling motors '
@@ -25,17 +28,36 @@ abstract final class MotorEnableSafety {
     if (!hasFreshJointTelemetry) {
       return 'joint telemetry is not fresh enough';
     }
+    if (hasUnrecoveredMotorFaults) {
+      return 'motor fault recovery is pending';
+    }
     if (!jointLimitRad.isFinite || jointLimitRad <= 0) {
       return 'configured joint limit is invalid';
     }
     if (position.hasNonFinite || velocity.hasNonFinite) {
       return 'joint position or velocity contains a non-finite value';
     }
+    if ((safePose == null) != (maxSafePoseErrorRad == null)) {
+      return 'safe grounded pose configuration is incomplete';
+    }
+    if (safePose != null) {
+      if (safePose.hasNonFinite ||
+          !maxSafePoseErrorRad!.isFinite ||
+          maxSafePoseErrorRad <= 0) {
+        return 'safe grounded pose configuration is invalid';
+      }
+    }
 
     for (var index = 0; index < legJointCount; index++) {
       final angle = position.values[index];
       if (angle.abs() > jointLimitRad) {
         return 'leg joint $index is outside the safe angle limit '
+            '(${angle.toStringAsFixed(3)} rad)';
+      }
+
+      if (safePose != null &&
+          (angle - safePose.values[index]).abs() > maxSafePoseErrorRad!) {
+        return 'leg joint $index is outside the safe grounded pose window '
             '(${angle.toStringAsFixed(3)} rad)';
       }
 

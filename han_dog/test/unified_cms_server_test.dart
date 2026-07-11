@@ -18,6 +18,8 @@ class _MockServiceCall extends Mock implements ServiceCall {}
 
 class _MockMotor extends Mock implements MotorService {}
 
+class _MockRealJoint extends Mock implements RealJoint {}
+
 // ─── 测试工具函数 ──────────────────────────────────────────────────────
 
 final _zeros16 = JointsMatrix.fromList(List.filled(16, 0.0));
@@ -73,21 +75,24 @@ void main() {
     test('NaN 方向向量 → 静默忽略', () async {
       final server = _simServer(brain, m);
       final result = await server.walk(
-        call, proto.Vector3(x: double.nan, y: 0, z: 0));
+        call,
+        proto.Vector3(x: double.nan, y: 0, z: 0),
+      );
       expect(result, isA<proto.Empty>());
     });
 
     test('Inf 方向向量 → 静默忽略', () async {
       final server = _simServer(brain, m);
       final result = await server.walk(
-        call, proto.Vector3(x: double.infinity, y: 0, z: 0));
+        call,
+        proto.Vector3(x: double.infinity, y: 0, z: 0),
+      );
       expect(result, isA<proto.Empty>());
     });
 
     test('幅值超过 3.0 → clamp 后执行', () async {
       final server = _simServer(brain, m);
-      final result = await server.walk(
-        call, proto.Vector3(x: 3.1, y: 0, z: 0));
+      final result = await server.walk(call, proto.Vector3(x: 3.1, y: 0, z: 0));
       expect(result, isA<proto.Empty>());
     });
 
@@ -269,8 +274,7 @@ void main() {
       when(() => m.state).thenReturn(Grounded(sub));
 
       final server = _simServer(brain, m);
-      final result = await server.walk(
-        call, proto.Vector3(x: 0.5, y: 0, z: 0));
+      final result = await server.walk(call, proto.Vector3(x: 0.5, y: 0, z: 0));
       expect(result, isA<proto.Empty>());
 
       await sub.cancel();
@@ -328,28 +332,222 @@ void main() {
   });
 
   group('motor feedback safety', () {
-    test('unsafe joint feedback blocks Enable before touching motors', () async {
+    test(
+      'unsafe joint feedback blocks Enable before touching motors',
+      () async {
+        final historyCtrl = StreamController<History>();
+        final sub = historyCtrl.stream.listen((_) {});
+        when(() => m.state).thenReturn(Grounded(sub));
+
+        final motor = _MockMotor();
+        when(() => motor.enable()).thenAnswer((_) async {});
+        var outputEnabled = false;
+        final server = UnifiedCmsServer(
+          brain: brain,
+          m: m,
+          mode: CmsMode.hardware,
+          motor: motor,
+          motorEnableBlockReason: () => 'unsafe joint position',
+        )..onMotorEnableChanged = (enabled) => outputEnabled = enabled;
+
+        await expectLater(
+          server.enable(call, proto.Empty()),
+          throwsA(isA<GrpcError>()),
+        );
+        verifyNever(() => motor.enable());
+        expect(outputEnabled, isFalse);
+
+        await sub.cancel();
+        await historyCtrl.close();
+      },
+    );
+  });
+
+  group('motor output ownership', () {
+    test(
+      'hardware Enable rejects when no shared output controller is wired',
+      () async {
+        final historyCtrl = StreamController<History>();
+        final sub = historyCtrl.stream.listen((_) {});
+        when(() => m.state).thenReturn(Grounded(sub));
+
+        final motor = _MockMotor();
+        when(() => motor.enable()).thenAnswer((_) async {});
+        final server = UnifiedCmsServer(
+          brain: brain,
+          m: m,
+          mode: CmsMode.hardware,
+          motor: motor,
+        );
+
+        await expectLater(
+          server.enable(call, proto.Empty()),
+          throwsA(
+            isA<GrpcError>().having(
+              (error) => error.code,
+              'code',
+              StatusCode.failedPrecondition,
+            ),
+          ),
+        );
+        verifyNever(() => motor.enable());
+
+        await sub.cancel();
+        await historyCtrl.close();
+      },
+    );
+
+    test(
+      'gRPC Enable cannot interrupt a YUNZHUO-owned enabled output',
+      () async {
+        final historyCtrl = StreamController<History>();
+        final sub = historyCtrl.stream.listen((_) {});
+        when(() => m.state).thenReturn(Grounded(sub));
+
+        final motor = _MockMotor();
+        when(() => motor.enable()).thenAnswer((_) async {});
+        when(
+          () => motor.disable(clearErrors: any(named: 'clearErrors')),
+        ).thenAnswer((_) async {});
+        final arbiter = ControlArbiter(m, timeout: Duration.zero);
+        expect(
+          arbiter.command(const A.standUp(), ControlSource.yunzhuo),
+          isTrue,
+        );
+        final output = MotorOutputController(motor: motor, arbiter: arbiter);
+        expect(await output.enable(ControlSource.yunzhuo), isNull);
+
+        final server = UnifiedCmsServer(
+          brain: brain,
+          m: m,
+          mode: CmsMode.hardware,
+          arbiter: arbiter,
+          motorOutput: output,
+        );
+
+        await expectLater(
+          server.enable(call, proto.Empty()),
+          throwsA(
+            isA<GrpcError>().having(
+              (error) => error.code,
+              'code',
+              StatusCode.failedPrecondition,
+            ),
+          ),
+        );
+        expect(output.isEnabled, isTrue);
+        verify(() => motor.enable()).called(1);
+
+        arbiter.dispose();
+        await sub.cancel();
+        await historyCtrl.close();
+      },
+    );
+  });
+
+  group('motor output maintenance safety', () {
+    test('SetZero rejects while the shared motor output is enabled', () async {
       final historyCtrl = StreamController<History>();
       final sub = historyCtrl.stream.listen((_) {});
       when(() => m.state).thenReturn(Grounded(sub));
 
-      final motor = _MockMotor();
-      when(() => motor.enable()).thenAnswer((_) async {});
-      var outputEnabled = false;
+      final joint = _MockRealJoint();
+      when(() => joint.enable()).thenAnswer((_) async {});
+      when(
+        () => joint.disable(clearErrors: any(named: 'clearErrors')),
+      ).thenAnswer((_) async {});
+      when(() => joint.setZero()).thenAnswer((_) async => true);
+      final output = MotorOutputController(motor: joint);
+      expect(await output.enable(ControlSource.grpc), isNull);
+
       final server = UnifiedCmsServer(
         brain: brain,
         m: m,
         mode: CmsMode.hardware,
-        motor: motor,
-        motorEnableBlockReason: () => 'unsafe joint position',
-      )..onMotorEnableChanged = (enabled) => outputEnabled = enabled;
+        motorOutput: output,
+      )..joint = joint;
 
       await expectLater(
-        server.enable(call, proto.Empty()),
+        server.setZero(call, proto.Empty()),
         throwsA(isA<GrpcError>()),
       );
-      verifyNever(() => motor.enable());
-      expect(outputEnabled, isFalse);
+      verifyNever(() => joint.setZero());
+
+      await sub.cancel();
+      await historyCtrl.close();
+    });
+
+    test('clearing all motor faults closes the shared output gate', () async {
+      final joint = _MockRealJoint();
+      when(() => joint.enable()).thenAnswer((_) async {});
+      when(
+        () => joint.disable(clearErrors: any(named: 'clearErrors')),
+      ).thenAnswer((_) async {});
+      final output = MotorOutputController(motor: joint);
+      expect(await output.enable(ControlSource.grpc), isNull);
+
+      final server = UnifiedCmsServer(
+        brain: brain,
+        m: m,
+        mode: CmsMode.hardware,
+        motorOutput: output,
+      )..joint = joint;
+
+      await server.clearMotorFault(call, proto.ClearFaultRequest());
+
+      expect(output.isEnabled, isFalse);
+      verify(() => joint.disable(clearErrors: true)).called(1);
+    });
+
+    test(
+      'clearing selected motor faults first disables the shared output',
+      () async {
+        final joint = _MockRealJoint();
+        when(() => joint.enable()).thenAnswer((_) async {});
+        when(
+          () => joint.disable(clearErrors: any(named: 'clearErrors')),
+        ).thenAnswer((_) async {});
+        final output = MotorOutputController(motor: joint);
+        expect(await output.enable(ControlSource.grpc), isNull);
+
+        final server = UnifiedCmsServer(
+          brain: brain,
+          m: m,
+          mode: CmsMode.hardware,
+          motorOutput: output,
+        )..joint = joint;
+
+        await server.clearMotorFault(
+          call,
+          proto.ClearFaultRequest(jointIds: [3]),
+        );
+
+        expect(output.isEnabled, isFalse);
+        verify(() => joint.disable(clearErrors: false)).called(1);
+        verify(() => joint.clearFaultSingle(3)).called(1);
+      },
+    );
+  });
+
+  group('profile switching safety', () {
+    test('Standing state cannot switch profiles', () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(() => m.state).thenReturn(Standing(sub));
+
+      final server = _simServer(brain, m);
+      final manager = ProfileManager(
+        profiles: {'mini': _profile('mini'), 'fast': _profile('fast')},
+        brain: brain,
+        initial: 'mini',
+      );
+      server.profileManager = manager;
+
+      await expectLater(
+        server.switchProfile(call, proto.ProfileRequest(name: 'fast')),
+        throwsA(isA<GrpcError>()),
+      );
+      expect(manager.currentName, 'mini');
 
       await sub.cancel();
       await historyCtrl.close();

@@ -148,6 +148,7 @@ class XboxController implements Gamepad {
   // 内部状态
   final Map<int, double> _axes = {};
   final Map<int, bool> _buttons = {};
+  bool _motorOutputEnabled = false;
 
   // 广播流
   final _stateController = StreamController<void>.broadcast();
@@ -277,16 +278,20 @@ class XboxController implements Gamepad {
   /// Enable/Disable: Y 按钮切换
   @override
   Stream<bool> get enabled {
-    var isEnabled = false;
     return _stateController.stream
         .map((_) => _btn(config.btnY))
         .distinct()
         .pairwise()
         .where((p) => !p[0] && p[1])
         .map((_) {
-      isEnabled = !isEnabled;
-      return isEnabled;
+      _motorOutputEnabled = !_motorOutputEnabled;
+      return _motorOutputEnabled;
     });
+  }
+
+  @override
+  void syncMotorOutputEnabled(bool enabled) {
+    _motorOutputEnabled = enabled;
   }
 
   /// Idle (StandUp): RB 按钮

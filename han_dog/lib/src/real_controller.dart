@@ -35,6 +35,7 @@ class RealController implements Gamepad {
   /// 速度缩放规则：LT=精确(0.5×)，RT=冲刺(1.5×)，默认 1.0×。
   /// rightStick.x 以 0.5 权重叠加到旋转轴，实现双手协同偏航控制。
   /// 行走方向流，强关联遥控器：有数据就输出，150ms 无数据直接归零。
+  @override
   Stream<Vector3> get direction => watchdogDecay(
     stateStream.map((data) {
       final scale = data.LT ? 0.5 : (data.RT ? 1.5 : 1.0);
@@ -51,31 +52,37 @@ class RealController implements Gamepad {
     decayCurve: (s0, t) => s0 * 0.0,  // 直接到 0
   );
 
+  @override
   Stream<bool> get standup => stateStream
       .map((data) => data.L1)
       .distinct()
       .pairwise()
       .map((p) => p[0] != p[1]);
+  @override
   Stream<bool> get sitdown => stateStream
       .map((data) => data.L2)
       .distinct()
       .pairwise()
       .map((p) => p[0] != p[1]);
+  @override
   Stream<bool> get idle => stateStream
       .map((data) => data.R1)
       .distinct()
       .pairwise()
       .map((p) => p[0] != p[1]);
 
+  @override
   Stream<bool> get red => stateStream
       .map((data) => data.red)
       .distinct()
       .pairwise()
       .map((p) => p[0] != p[1]);
 
+  @override
   Stream<bool> get enabled => stateStream.map((data) => data.H).distinct();
 
   /// 策略切换：R2 (CH16) 状态变更触发
+  @override
   Stream<void> get switchProfile => stateStream
       .map((data) => data.rawChannels[15])
       .distinct()
@@ -85,6 +92,7 @@ class RealController implements Gamepad {
 
   /// 标零组合键：CH5(channels[4]) 高档 + CH9(channels[8]) 状态切换 + CH10(channels[9]) 状态切换
   /// CH9/CH10 发生切换的瞬间触发一次（不要求高/低，只要求变更）
+  @override
   Stream<void> get calibrate => stateStream
       .pairwise()
       .where((p) {
@@ -96,6 +104,9 @@ class RealController implements Gamepad {
         return ch5High && ch9Changed && ch10Changed;
       })
       .map((_) {});
+
+  @override
+  void syncMotorOutputEnabled(bool enabled) {}
 
   RealController([this.portName = '/dev/ttyUSB0']) {
     port = SerialPortController<Never, YunZhuoState>(portName);
@@ -156,6 +167,7 @@ class RealController implements Gamepad {
 
   bool _disposed = false;
 
+  @override
   void dispose() {
     if (_disposed) return;
     _disposed = true;

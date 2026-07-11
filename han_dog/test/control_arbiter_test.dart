@@ -105,6 +105,19 @@ void main() {
     });
   });
 
+  group('actuation permission', () {
+    test('gRPC is denied by YUNZHUO ownership without changing ownership', () {
+      fakeAsync((async) {
+        final arbiter = ControlArbiter(mockM);
+        arbiter.command(const A.standUp(), ControlSource.yunzhuo);
+
+        expect(arbiter.canActuate(ControlSource.grpc), isFalse);
+        expect(arbiter.canActuate(ControlSource.yunzhuo), isTrue);
+        expect(arbiter.owner, ControlSource.yunzhuo);
+      });
+    });
+  });
+
   group('timeout', () {
     test('auto-release after 3 seconds → owner null', () {
       fakeAsync((async) {

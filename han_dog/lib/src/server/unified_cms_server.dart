@@ -8,6 +8,7 @@ import 'package:vector_math/vector_math.dart' show Quaternion;
 
 import '../app/profile_manager.dart';
 import '../control_arbiter.dart';
+import '../motor_output_controller.dart';
 import '../real_joint.dart';
 import 'gain_manager.dart';
 import 'proto_convert.dart';
@@ -42,6 +43,7 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   final ControlArbiter? arbiter;
   final SimStateInjector? simInjector;
   final MotorService? motor;
+  final MotorOutputController? motorOutput;
   final String? Function()? motorEnableBlockReason;
   final GainManager? gains;
   final proto.RobotType robotType;
@@ -84,13 +86,14 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     this.arbiter,
     this.simInjector,
     this.motor,
+    this.motorOutput,
     this.motorEnableBlockReason,
     this.gains,
     this.robotType = proto.RobotType.MINI,
     this.imuStreamFactory,
     this.jointStreamFactory,
-  })  : _brain = brain,
-        _m = m;
+  }) : _brain = brain,
+       _m = m;
 
   proto.Duration _elapsed() =>
       proto.Duration.fromDart(DateTime.now().difference(_startTime));
@@ -101,6 +104,7 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   /// gRPC Enable/Disable 时的回调（无遥控器时用于设置 motorOutputEnabled）。
   void Function(bool enabled)? onMotorEnableChanged;
+  bool _legacyMotorOutputEnabled = false;
 
   String? _motorEnableRejection() {
     if (mode == CmsMode.hardware && _m.state is! Grounded) {
@@ -112,24 +116,50 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.Empty> enable(ServiceCall call, proto.Empty request) async {
+    final output = motorOutput;
+    if (output != null) {
+      final rejection = await output.enable(ControlSource.grpc);
+      if (rejection != null) {
+        _log.warning('Motor enable blocked: $rejection');
+        throw GrpcError.failedPrecondition('Motor enable blocked: $rejection');
+      }
+      _log.info('Motors enabled');
+      return proto.Empty();
+    }
+
+    if (mode == CmsMode.hardware) {
+      throw GrpcError.failedPrecondition(
+        'Hardware Enable requires the shared MotorOutputController',
+      );
+    }
+
     final rejection = _motorEnableRejection();
     if (rejection != null) {
-      onMotorEnableChanged?.call(false);
       _log.warning('Motor enable blocked: $rejection');
       throw GrpcError.failedPrecondition('Motor enable blocked: $rejection');
     }
     await motor?.enable();
-    onMotorEnableChanged?.call(true);
+    _setLegacyMotorOutputEnabled(true);
     _log.info('Motors enabled');
     return proto.Empty();
   }
 
   @override
   Future<proto.Empty> disable(ServiceCall call, proto.Empty request) async {
-    await motor?.disable();
-    onMotorEnableChanged?.call(false);
+    final output = motorOutput;
+    if (output != null) {
+      await output.disable();
+    } else {
+      await motor?.disable();
+      _setLegacyMotorOutputEnabled(false);
+    }
     _log.info('Motors disabled');
     return proto.Empty();
+  }
+
+  void _setLegacyMotorOutputEnabled(bool enabled) {
+    _legacyMotorOutputEnabled = enabled;
+    onMotorEnableChanged?.call(enabled);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -146,15 +176,19 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     final a = arbiter;
     if (a != null) {
       if (!a.command(action, ControlSource.grpc)) {
-        _log.warning('${action.runtimeType} rejected: ${a.owner} has priority'
-            '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
+        _log.warning(
+          '${action.runtimeType} rejected: ${a.owner} has priority'
+          '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}',
+        );
         return; // 静默忽略，不抛异常
       }
     } else {
       _m.add(action);
     }
-    _log.finest('${action.runtimeType} dispatched'
-        '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
+    _log.finest(
+      '${action.runtimeType} dispatched'
+      '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}',
+    );
     gains?.applyCommand(action);
   }
 
@@ -165,7 +199,8 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   @override
   Future<proto.Empty> walk(ServiceCall call, proto.Vector3 request) async {
     final now = DateTime.now();
-    if (_lastWalkAt != null && now.difference(_lastWalkAt!) < _minWalkInterval) {
+    if (_lastWalkAt != null &&
+        now.difference(_lastWalkAt!) < _minWalkInterval) {
       // 频率过高：静默忽略而非报错，避免客户端崩溃
       return proto.Empty();
     }
@@ -228,8 +263,7 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   }
 
   /// 获取可用动作列表。
-  List<String> get gestureNames =>
-      _brain.gestureLibrary?.names ?? const [];
+  List<String> get gestureNames => _brain.gestureLibrary?.names ?? const [];
 
   // ═══════════════════════════════════════════════════════════
   //  策略切换
@@ -237,7 +271,9 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.ProfileInfo> getProfile(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     final pm = profileManager;
     if (pm == null) throw GrpcError.unimplemented('Profiles not configured');
     return proto.ProfileInfo(
@@ -250,14 +286,13 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.ProfileInfo> switchProfile(
-      ServiceCall call, proto.ProfileRequest request) async {
+    ServiceCall call,
+    proto.ProfileRequest request,
+  ) async {
     final pm = profileManager;
     if (pm == null) throw GrpcError.unimplemented('Profiles not configured');
-    final wasStanding = _m.state is Standing;
-    if (_m.state is! Grounded && !wasStanding) {
-      throw GrpcError.failedPrecondition(
-        'Must be in Grounded or Standing state',
-      );
+    if (_m.state is! Grounded) {
+      throw GrpcError.failedPrecondition('Must be in Grounded state');
     }
     try {
       await pm.switchTo(request.name);
@@ -266,13 +301,7 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     } on StateError catch (e) {
       throw GrpcError.failedPrecondition(e.message);
     }
-    // Standing 时切换后，触发 StandUp 过渡到新 standingPose
-    if (wasStanding) {
-      _dispatch(const A.standUp());
-      _log.info('Profile switched to ${pm.currentName} — transitioning to new pose');
-    } else {
-      _log.info('Profile switched to: ${pm.currentName}');
-    }
+    _log.info('Profile switched to: ${pm.currentName}');
     return proto.ProfileInfo(
       current: pm.currentName,
       available: pm.names,
@@ -332,18 +361,18 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.Timestamp> getStartTime(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     return proto.Timestamp.fromDateTime(_startTime.toUtc());
   }
 
   @override
-  Future<proto.Params> getParams(
-      ServiceCall call, proto.Empty request) async {
+  Future<proto.Params> getParams(ServiceCall call, proto.Empty request) async {
     return proto.Params(
       robot: proto.RobotModel(
         type: robotType,
-        initialJointPosition:
-            proto.Matrix4(values: _brain.standingPose.values),
+        initialJointPosition: proto.Matrix4(values: _brain.standingPose.values),
       ),
     );
   }
@@ -354,14 +383,22 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   proto.CmsState _toCmsState(S s) => switch (s) {
     Zero() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_ZERO),
-    Grounded() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_GROUNDED),
-    Standing() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_STANDING),
-    Walking() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_WALKING),
+    Grounded() => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_GROUNDED,
+    ),
+    Standing() => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_STANDING,
+    ),
+    Walking() => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_WALKING,
+    ),
     Transitioning(:final target) => proto.CmsState(
       kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
       transition: switch (target) {
-        StandUpCommand() => proto.CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP,
-        SitDownCommand() => proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
+        StandUpCommand() =>
+          proto.CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP,
+        SitDownCommand() =>
+          proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
         GestureCommand() => proto.CmsTransitionKind.CMS_TRANSITION_KIND_GESTURE,
         _ => proto.CmsTransitionKind.CMS_TRANSITION_KIND_NONE,
       },
@@ -371,13 +408,17 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.CmsState> getCmsState(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     return _toCmsState(_m.state);
   }
 
   @override
   Stream<proto.CmsState> listenCmsState(
-      ServiceCall call, proto.Empty request) async* {
+    ServiceCall call,
+    proto.Empty request,
+  ) async* {
     yield _toCmsState(_m.state);
     yield* _m.stream.map(_toCmsState);
   }
@@ -389,21 +430,40 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   /// 电机清零：把当前位置标记为零点并保存。
   /// 机器人必须处于 Grounded 状态（趴地/放平后再清零）。
   @override
-  Future<proto.Empty> setZero(
-      ServiceCall call, proto.Empty request) async {
+  Future<proto.Empty> setZero(ServiceCall call, proto.Empty request) async {
     if (_m.state is! Grounded) {
       throw GrpcError.failedPrecondition('Must be in Grounded state');
     }
+    final output = motorOutput;
+    if (mode == CmsMode.hardware && output == null) {
+      throw GrpcError.failedPrecondition(
+        'Hardware SetZero requires the shared MotorOutputController',
+      );
+    }
+    if (output?.isEnabled ?? _legacyMotorOutputEnabled) {
+      throw GrpcError.failedPrecondition(
+        'Motors must be disabled before SetZero',
+      );
+    }
     final j = joint;
     if (j == null) {
-      throw GrpcError.unimplemented('SetZero not available (no joint controller)');
+      throw GrpcError.unimplemented(
+        'SetZero not available (no joint controller)',
+      );
     }
     if (_zeroing) {
       throw GrpcError.resourceExhausted('SetZero already in progress');
     }
     _zeroing = true;
     try {
-      final ok = await j.setZero();
+      final bool ok;
+      try {
+        ok = output != null
+            ? await output.runWhileDisabled(j.setZero)
+            : await j.setZero();
+      } on StateError catch (error) {
+        throw GrpcError.failedPrecondition(error.message);
+      }
       if (!ok) {
         _log.warning('SetZero completed with suspicious results');
       }
@@ -419,44 +479,38 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   // ═══════════════════════════════════════════════════════════
 
   @override
-  Stream<proto.History> listenHistory(
-      ServiceCall call, proto.Empty request) {
+  Stream<proto.History> listenHistory(ServiceCall call, proto.Empty request) {
     return _historyBroadcast.map(
-      (h) => h.toProto(
-        timestamp: _elapsed(),
-        kp: gains?.kp,
-        kd: gains?.kd,
-      ),
+      (h) => h.toProto(timestamp: _elapsed(), kp: gains?.kp, kd: gains?.kd),
     );
   }
 
   @override
-  Stream<proto.Imu> listenImu(
-      ServiceCall call, proto.Empty request) {
+  Stream<proto.Imu> listenImu(ServiceCall call, proto.Empty request) {
     // 硬件模式：使用外部注入的硬件数据流
     final factory = imuStreamFactory;
     if (factory != null) return factory();
 
     // 仿真模式：时钟驱动，读取 ImuService 当前状态
-    return _brain.ts.map((_) => imuSnapshot(
-          _brain.imu,
-          quaternion: simInjector?.quaternion ?? _identityQ,
-          timestamp: _elapsed(),
-        ));
+    return _brain.ts.map(
+      (_) => imuSnapshot(
+        _brain.imu,
+        quaternion: simInjector?.quaternion ?? _identityQ,
+        timestamp: _elapsed(),
+      ),
+    );
   }
 
   @override
-  Stream<proto.Joint> listenJoint(
-      ServiceCall call, proto.Empty request) {
+  Stream<proto.Joint> listenJoint(ServiceCall call, proto.Empty request) {
     // 硬件模式：使用外部注入的硬件数据流
     final factory = jointStreamFactory;
     if (factory != null) return factory();
 
     // 仿真模式：时钟驱动，读取 JointService 当前状态
-    return _brain.ts.map((_) => jointSnapshot(
-          _brain.joint,
-          timestamp: _elapsed(),
-        ));
+    return _brain.ts.map(
+      (_) => jointSnapshot(_brain.joint, timestamp: _elapsed()),
+    );
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -465,7 +519,9 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.Voltage> getVoltage(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     final j = joint;
     if (j == null) {
       throw GrpcError.failedPrecondition(
@@ -478,7 +534,9 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.MotorStatusResponse> getMotorStatus(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     final j = joint;
     if (j == null) {
       throw GrpcError.failedPrecondition(
@@ -489,24 +547,28 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     for (int i = 0; i < 16; i++) {
       final online = j.isOnline(i);
       final report = j.getReport(i);
-      motors.add(proto.MotorState(
-        id: i,
-        online: online,
-        statusCode: report?.status.value ?? 0,
-        temperature: report?.temperature ?? 0.0,
-        voltage: 0.0, // voltage requires async getter, use GetVoltage RPC
-        position: report?.position ?? 0.0,
-        velocity: report?.velocity ?? 0.0,
-        torque: report?.torque ?? 0.0,
-        errors: report?.errors.errors.map((e) => e.index).toList() ?? [],
-      ));
+      motors.add(
+        proto.MotorState(
+          id: i,
+          online: online,
+          statusCode: report?.status.value ?? 0,
+          temperature: report?.temperature ?? 0.0,
+          voltage: 0.0, // voltage requires async getter, use GetVoltage RPC
+          position: report?.position ?? 0.0,
+          velocity: report?.velocity ?? 0.0,
+          torque: report?.torque ?? 0.0,
+          errors: report?.errors.errors.map((e) => e.index).toList() ?? [],
+        ),
+      );
     }
     return proto.MotorStatusResponse(motors: motors);
   }
 
   @override
   Future<proto.Empty> clearMotorFault(
-      ServiceCall call, proto.ClearFaultRequest request) async {
+    ServiceCall call,
+    proto.ClearFaultRequest request,
+  ) async {
     final j = joint;
     if (j == null) {
       throw GrpcError.failedPrecondition(
@@ -515,14 +577,33 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     }
     if (request.jointIds.isEmpty) {
       // 清除全部
-      await j.disable(clearErrors: true);
+      final output = motorOutput;
+      if (output != null) {
+        await output.disable(clearErrors: true);
+      } else {
+        await j.disable(clearErrors: true);
+        _setLegacyMotorOutputEnabled(false);
+      }
       _log.info('ClearMotorFault: all 16 joints cleared');
     } else {
-      // 清除指定关节
-      for (final id in request.jointIds) {
-        if (id >= 0 && id < 16) {
-          j.clearFaultSingle(id);
+      Future<void> clearRequestedJoints() {
+        for (final id in request.jointIds) {
+          if (id >= 0 && id < 16) {
+            j.clearFaultSingle(id);
+          }
         }
+        return Future<void>.value();
+      }
+
+      // Targeted recovery is still a maintenance action: close the global
+      // output gate and confirm every motor is physically disabled first.
+      final output = motorOutput;
+      if (output != null) {
+        await output.disableThenRun(clearRequestedJoints);
+      } else {
+        await j.disable();
+        _setLegacyMotorOutputEnabled(false);
+        await clearRequestedJoints();
       }
       _log.info('ClearMotorFault: joints ${request.jointIds} cleared');
     }
@@ -539,25 +620,33 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.Empty> setSpeedMode(
-      ServiceCall call, proto.SpeedModeRequest request) async {
+    ServiceCall call,
+    proto.SpeedModeRequest request,
+  ) async {
     throw GrpcError.unimplemented('SetSpeedMode not yet implemented');
   }
 
   @override
   Future<proto.SpeedModeRequest> getSpeedMode(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     throw GrpcError.unimplemented('GetSpeedMode not yet implemented');
   }
 
   @override
   Future<proto.Empty> playGesture(
-      ServiceCall call, proto.GestureRequest request) async {
+    ServiceCall call,
+    proto.GestureRequest request,
+  ) async {
     throw GrpcError.unimplemented('PlayGesture not yet implemented');
   }
 
   @override
   Future<proto.GestureList> listGestures(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     throw GrpcError.unimplemented('ListGestures not yet implemented');
   }
 }
