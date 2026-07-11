@@ -266,6 +266,18 @@ Future<void> _run() async {
 
   var motorOutputEnabled = false;
 
+  String? motorEnableBlockReason() => MotorEnableSafety.blockReason(
+    state: arbiter.state,
+    position: joint.position,
+    velocity: joint.velocity,
+    jointLimitRad: _cfg.jointLimitRad,
+    hasFreshJointTelemetry: joint.frequencyWatches
+        .take(MotorEnableSafety.legJointCount)
+        .every(
+          (watch) => watch.value >= MotorEnableSafety.minimumJointTelemetryHz,
+        ),
+  );
+
   // 推理输出 → 电机动作 (gated through MotorHealthManager)
   _subs.add(brain.nextActionStream.listen(
     (action) {
@@ -305,6 +317,7 @@ Future<void> _run() async {
       sitDownKd: defaultProfile.sitDownKd,
       sitDownKp: defaultProfile.sitDownKp,
       controller: controller,
+      motorEnableBlockReason: motorEnableBlockReason,
     );
 
     // ──── 4b. 策略管理 ───────────────────────────────────────────
@@ -343,6 +356,7 @@ Future<void> _run() async {
         sitDownKd: defaultProfile.sitDownKd,
         sitDownKp: defaultProfile.sitDownKp,
         controller: xbox,
+        motorEnableBlockReason: motorEnableBlockReason,
       );
       final pm = ProfileManager(
         profiles: profiles,
@@ -405,6 +419,7 @@ Future<void> _run() async {
     mode: CmsMode.hardware,
     arbiter: arbiter,
     motor: joint,
+    motorEnableBlockReason: motorEnableBlockReason,
     robotType: msg.RobotType.MINI,
     imuStreamFactory: () => imuBroadcast.expand((s) => s).map(
           (s) => msg.Imu(

@@ -16,6 +16,8 @@ class _MockM extends Mock implements M {}
 
 class _MockServiceCall extends Mock implements ServiceCall {}
 
+class _MockMotor extends Mock implements MotorService {}
+
 // ─── 测试工具函数 ──────────────────────────────────────────────────────
 
 final _zeros16 = JointsMatrix.fromList(List.filled(16, 0.0));
@@ -285,6 +287,69 @@ void main() {
       final server = _simServer(brain, m);
       final result = await server.standUp(call, proto.Empty());
       expect(result, isA<proto.Empty>());
+
+      await sub.cancel();
+      await historyCtrl.close();
+    });
+  });
+
+  group('motor enable safety', () {
+    test('standing state blocks Enable before touching motors', () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(() => m.state).thenReturn(Standing(sub));
+
+      final motor = _MockMotor();
+      when(() => motor.enable()).thenAnswer((_) async {});
+      var outputEnabled = false;
+      final server = UnifiedCmsServer(
+        brain: brain,
+        m: m,
+        mode: CmsMode.hardware,
+        motor: motor,
+      )..onMotorEnableChanged = (enabled) => outputEnabled = enabled;
+
+      await expectLater(
+        server.enable(call, proto.Empty()),
+        throwsA(
+          isA<GrpcError>().having(
+            (error) => error.code,
+            'code',
+            StatusCode.failedPrecondition,
+          ),
+        ),
+      );
+      verifyNever(() => motor.enable());
+      expect(outputEnabled, isFalse);
+
+      await sub.cancel();
+      await historyCtrl.close();
+    });
+  });
+
+  group('motor feedback safety', () {
+    test('unsafe joint feedback blocks Enable before touching motors', () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(() => m.state).thenReturn(Grounded(sub));
+
+      final motor = _MockMotor();
+      when(() => motor.enable()).thenAnswer((_) async {});
+      var outputEnabled = false;
+      final server = UnifiedCmsServer(
+        brain: brain,
+        m: m,
+        mode: CmsMode.hardware,
+        motor: motor,
+        motorEnableBlockReason: () => 'unsafe joint position',
+      )..onMotorEnableChanged = (enabled) => outputEnabled = enabled;
+
+      await expectLater(
+        server.enable(call, proto.Empty()),
+        throwsA(isA<GrpcError>()),
+      );
+      verifyNever(() => motor.enable());
+      expect(outputEnabled, isFalse);
 
       await sub.cancel();
       await historyCtrl.close();
