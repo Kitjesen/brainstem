@@ -148,6 +148,7 @@ class XboxController implements Gamepad {
   // 内部状态
   final Map<int, double> _axes = {};
   final Map<int, bool> _buttons = {};
+  bool _motorOutputEnabled = false;
 
   // 广播流
   final _stateController = StreamController<void>.broadcast();
@@ -245,22 +246,22 @@ class XboxController implements Gamepad {
   /// 行走方向流：(x=前后, y=左右, z=旋转)
   @override
   Stream<Vector3> get direction => _stateController.stream.map((_) {
-        var ly = _dz(_axis(config.axisLeftY));
-        if (config.leftYInvert) ly = -ly;
+    var ly = _dz(_axis(config.axisLeftY));
+    if (config.leftYInvert) ly = -ly;
 
-        var lx = _dz(_axis(config.axisLeftX));
-        if (config.vyNegate) lx = -lx;
+    var lx = _dz(_axis(config.axisLeftX));
+    if (config.vyNegate) lx = -lx;
 
-        var rx = _dz(_axis(config.axisRightX));
-        if (config.rightXInvert) rx = -rx;
+    var rx = _dz(_axis(config.axisRightX));
+    if (config.rightXInvert) rx = -rx;
 
-        final scale = _speedScale;
-        return Vector3(
-          (ly * scale * config.vxScale).clamp(-1.0, 1.0),
-          (lx * scale * config.vyScale).clamp(-1.0, 1.0),
-          (rx * scale * config.vyawScale).clamp(-1.0, 1.0),
-        );
-      });
+    final scale = _speedScale;
+    return Vector3(
+      (ly * scale * config.vxScale).clamp(-1.0, 1.0),
+      (lx * scale * config.vyScale).clamp(-1.0, 1.0),
+      (rx * scale * config.vyawScale).clamp(-1.0, 1.0),
+    );
+  });
 
   /// StandUp: A 按钮按下
   @override
@@ -283,16 +284,20 @@ class XboxController implements Gamepad {
   /// Enable/Disable: Y 按钮切换
   @override
   Stream<bool> get enabled {
-    var isEnabled = false;
     return _stateController.stream
         .map((_) => _btn(config.btnY))
         .distinct()
         .pairwise()
         .where((p) => !p[0] && p[1])
         .map((_) {
-      isEnabled = !isEnabled;
-      return isEnabled;
-    });
+          _motorOutputEnabled = !_motorOutputEnabled;
+          return _motorOutputEnabled;
+        });
+  }
+
+  @override
+  void syncMotorOutputEnabled(bool enabled) {
+    _motorOutputEnabled = enabled;
   }
 
   /// Idle (StandUp): RB 按钮

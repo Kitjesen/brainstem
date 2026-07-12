@@ -37,7 +37,10 @@ void main() {
       fakeAsync((async) {
         final arbiter = ControlArbiter(mockM);
 
-        final result = arbiter.command(const A.standUp(), ControlSource.yunzhuo);
+        final result = arbiter.command(
+          const A.standUp(),
+          ControlSource.yunzhuo,
+        );
 
         expect(result, isTrue);
         expect(arbiter.owner, ControlSource.yunzhuo);
@@ -62,7 +65,10 @@ void main() {
         final arbiter = ControlArbiter(mockM);
 
         arbiter.command(const A.standUp(), ControlSource.yunzhuo);
-        final result = arbiter.command(const A.sitDown(), ControlSource.yunzhuo);
+        final result = arbiter.command(
+          const A.sitDown(),
+          ControlSource.yunzhuo,
+        );
 
         expect(result, isTrue);
         expect(arbiter.owner, ControlSource.yunzhuo);
@@ -101,6 +107,19 @@ void main() {
         expect(result, isFalse);
         expect(arbiter.owner, ControlSource.yunzhuo);
         verifyNever(() => mockM.add(any()));
+      });
+    });
+  });
+
+  group('actuation permission', () {
+    test('gRPC is denied by YUNZHUO ownership without changing ownership', () {
+      fakeAsync((async) {
+        final arbiter = ControlArbiter(mockM);
+        arbiter.command(const A.standUp(), ControlSource.yunzhuo);
+
+        expect(arbiter.canActuate(ControlSource.grpc), isFalse);
+        expect(arbiter.canActuate(ControlSource.yunzhuo), isTrue);
+        expect(arbiter.owner, ControlSource.yunzhuo);
       });
     });
   });
@@ -225,11 +244,11 @@ void main() {
         async.elapse(const Duration(seconds: 3));
 
         expect(events, [
-          ControlSource.grpc,   // 1. acquired
+          ControlSource.grpc, // 1. acquired
           ControlSource.yunzhuo, // 2. preempted
-          null,                  // 3. released
-          ControlSource.grpc,   // 4. acquired
-          null,                  // 5. timeout
+          null, // 3. released
+          ControlSource.grpc, // 4. acquired
+          null, // 5. timeout
         ]);
       });
     });
@@ -238,7 +257,10 @@ void main() {
   group('version tracking', () {
     test('stale timeout does not release new owner', () {
       fakeAsync((async) {
-        final arbiter = ControlArbiter(mockM, timeout: const Duration(seconds: 3));
+        final arbiter = ControlArbiter(
+          mockM,
+          timeout: const Duration(seconds: 3),
+        );
 
         // 1. gRPC acquires → timer scheduled (version 1)
         arbiter.command(const A.standUp(), ControlSource.grpc);
@@ -262,7 +284,10 @@ void main() {
 
     test('same source command does not bump version', () {
       fakeAsync((async) {
-        final arbiter = ControlArbiter(mockM, timeout: const Duration(seconds: 3));
+        final arbiter = ControlArbiter(
+          mockM,
+          timeout: const Duration(seconds: 3),
+        );
         final events = <ControlSource?>[];
         arbiter.ownerStream.listen(events.add);
 

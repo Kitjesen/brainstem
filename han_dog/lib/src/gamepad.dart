@@ -30,5 +30,9 @@ abstract class Gamepad {
   /// 策略切换
   Stream<void> get switchProfile;
 
+  /// Synchronizes a controller-local enable latch with the authoritative
+  /// motor-output state. Controllers without a local latch may ignore it.
+  void syncMotorOutputEnabled(bool enabled) {}
+
   void dispose();
 }

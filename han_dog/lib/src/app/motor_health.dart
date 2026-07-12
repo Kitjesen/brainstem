@@ -4,6 +4,7 @@ import 'package:logging/logging.dart';
 import 'package:robo_device_proto/robo_device_proto.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 
+import '../motor_output_controller.dart';
 import 'package:han_dog/src/real_joint.dart';
 
 final _log = Logger('han_dog.motor_health');
@@ -14,14 +15,23 @@ const jointCount = 16;
 const footJointIndices = {12, 13, 14, 15};
 
 const jointNames = [
-  'FR Hip', 'FR Thigh', 'FR Calf',
-  'FL Hip', 'FL Thigh', 'FL Calf',
-  'RR Hip', 'RR Thigh', 'RR Calf',
-  'RL Hip', 'RL Thigh', 'RL Calf',
-  'FR Foot', 'FL Foot', 'RR Foot', 'RL Foot',
+  'FR Hip',
+  'FR Thigh',
+  'FR Calf',
+  'FL Hip',
+  'FL Thigh',
+  'FL Calf',
+  'RR Hip',
+  'RR Thigh',
+  'RR Calf',
+  'RL Hip',
+  'RL Thigh',
+  'RL Calf',
+  'FR Foot',
+  'FL Foot',
+  'RR Foot',
+  'RL Foot',
 ];
-
-
 
 // ─── Severity classification ────────────────────────────────────────────────
 
@@ -36,10 +46,7 @@ const _criticalErrors = {
 };
 
 /// Errors that start as transient and escalate to degraded after streak.
-const _degradableErrors = {
-  RSError.overTemperature,
-  RSError.stallOverload,
-};
+const _degradableErrors = {RSError.overTemperature, RSError.stallOverload};
 
 const _degradedStreakThreshold = 3;
 const _criticalStreakThreshold = 3;
@@ -101,24 +108,37 @@ class MotorHealthEvent {
 
 // ??? MotorHealthManager ?????????????????????????????????????????????????????
 
-
 class MotorHealthManager {
   final RealJoint _joint;
   final void Function(String reason) _requestFault;
+  MotorOutputController? _motorOutput;
 
   final _joints = List.generate(jointCount, (_) => _JointHealth());
   final _healthController = StreamController<MotorHealthEvent>.broadcast();
   StreamSubscription<MotorFaultEvent>? _faultSub;
+  bool _recoveryInProgress = false;
+  bool _criticalDisableRequested = false;
 
   MotorHealthManager({
     required RealJoint joint,
     required void Function(String reason) requestFault,
-  })  : _joint = joint,
-        _requestFault = requestFault {
+    MotorOutputController? motorOutput,
+  }) : _joint = joint,
+       _requestFault = requestFault,
+       _motorOutput = motorOutput {
     _faultSub = joint.motorFaultStream.listen(_onFaultEvent);
   }
 
   Stream<MotorHealthEvent> get healthStream => _healthController.stream;
+
+  /// Connects the shared output controller after application startup wiring
+  /// has completed. No torque can be enabled before that wiring is finished.
+  void attachMotorOutput(MotorOutputController motorOutput) {
+    _motorOutput = motorOutput;
+    if (criticalJoints.isNotEmpty) {
+      unawaited(_disableForCriticalFault(motorOutput));
+    }
+  }
 
   Set<int> get degradedJoints => {
     for (var i = 0; i < jointCount; i++)
@@ -145,6 +165,9 @@ class MotorHealthManager {
         jh.lastErrors = {};
         _emit(event.jointIndex, jh, event.temperature, raw: event);
       }
+      if (criticalJoints.isEmpty) {
+        _criticalDisableRequested = false;
+      }
       return;
     }
 
@@ -166,14 +189,14 @@ class MotorHealthManager {
       newSeverity = jh.severity;
     }
 
-    if (newSeverity != jh.severity || jh.streak == 1) {
-      jh.severity = newSeverity;
-      _emit(event.jointIndex, jh, event.temperature, raw: event);
-    }
-
     if (newSeverity == MotorSeverity.degraded ||
         newSeverity == MotorSeverity.critical) {
       jh.needsRecovery = true;
+    }
+
+    if (newSeverity != jh.severity || jh.streak == 1) {
+      jh.severity = newSeverity;
+      _emit(event.jointIndex, jh, event.temperature, raw: event);
     }
 
     // Escalate: 2+ degraded motors simultaneously → critical for all of them
@@ -190,8 +213,29 @@ class MotorHealthManager {
 
     // Trigger CMS Fault if any joint reached critical
     if (criticalJoints.isNotEmpty) {
-      final names = criticalJoints.map((i) => jointNames[i]).join(', ');
-      _requestFault('Motor critical fault: $names');
+      if (!_criticalDisableRequested) {
+        _criticalDisableRequested = true;
+        final names = criticalJoints.map((i) => jointNames[i]).join(', ');
+        _requestFault('Motor critical fault: $names');
+        final output = _motorOutput;
+        if (output != null) {
+          unawaited(_disableForCriticalFault(output));
+        }
+      }
+    } else {
+      _criticalDisableRequested = false;
+    }
+  }
+
+  Future<void> _disableForCriticalFault(MotorOutputController output) async {
+    try {
+      await output.disable();
+    } catch (error, stackTrace) {
+      _log.severe(
+        'Critical motor fault: Disable CAN request failed',
+        error,
+        stackTrace,
+      );
     }
   }
 
@@ -240,6 +284,29 @@ class MotorHealthManager {
   // ─── Recovery (call only when Grounded) ─────────────────────────────────
 
   Future<void> recoverFaults() async {
+    if (_recoveryInProgress || !hasFaults) return;
+    _recoveryInProgress = true;
+    try {
+      final output = _motorOutput;
+      if (output == null) {
+        _log.severe(
+          'Motor recovery rejected: shared MotorOutputController is unavailable',
+        );
+        return;
+      }
+      await output.disableThenRun(_recoverFaultsUnprotected);
+    } catch (error, stackTrace) {
+      _log.severe(
+        'Motor recovery aborted: Disable CAN request did not complete',
+        error,
+        stackTrace,
+      );
+    } finally {
+      _recoveryInProgress = false;
+    }
+  }
+
+  Future<void> _recoverFaultsUnprotected() async {
     final toRecover = <int>[
       for (var i = 0; i < jointCount; i++)
         if (_joints[i].needsRecovery) i,
@@ -293,6 +360,7 @@ class MotorHealthManager {
         );
       }
     }
+    _criticalDisableRequested = criticalJoints.isNotEmpty;
   }
 
   void dispose() {

@@ -14,15 +14,19 @@ void main() async {
   final sub = xbox.direction.listen((dir) {
     count++;
     if (count % 10 == 0) {
-      print('  direction: vx=${dir.x.toStringAsFixed(2)} vy=${dir.y.toStringAsFixed(2)} vyaw=${dir.z.toStringAsFixed(2)}');
+      print(
+        '  direction: vx=${dir.x.toStringAsFixed(2)} vy=${dir.y.toStringAsFixed(2)} vyaw=${dir.z.toStringAsFixed(2)}',
+      );
     }
   });
 
   final btnSub = xbox.standup.listen((_) => print('  >> A pressed (standup)'));
   final btn2Sub = xbox.sitdown.listen((_) => print('  >> X pressed (sitdown)'));
-  final btn3Sub = xbox.enabled.listen((e) => print('  >> Y pressed (enable=$e)'));
+  final btn3Sub = xbox.enabled.listen(
+    (e) => print('  >> Y pressed (enable=$e)'),
+  );
 
-  await Future.delayed(Duration(seconds: 5));
+  await Future<void>.delayed(const Duration(seconds: 5));
   await sub.cancel();
   await btnSub.cancel();
   await btn2Sub.cancel();

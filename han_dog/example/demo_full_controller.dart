@@ -34,6 +34,7 @@ final standingPose = JointsMatrix(
   0, 0, 0, 0,         // foot joints
 );
 // dart format on
+final sittingPose = JointsMatrix.zero();
 
 void main() async {
   Bloc.observer = SimpleBlocObserver();
@@ -61,12 +62,8 @@ void main() async {
     joint: joint,
     clock: timeController,
     standingPose: standingPose,
-    sittingPose: .zero(),
+    sittingPose: sittingPose,
   )..loadModel('model/mini_policy6.onnx');
-  brain.nextActionStream.listen((action) {
-    joint.realActionExt(action);
-  });
-
   // YUNZHUO 遥控器（通过 udev 规则固定为 /dev/yunzhuo）
   final controller = RealController('/dev/yunzhuo');
   if (!controller.open()) {
@@ -81,6 +78,33 @@ void main() async {
 
   // 使用 YUNZHUO 控制器控制机器狗
   final arbiter = ControlArbiter(m);
+  final motorOutput = MotorOutputController(
+    motor: joint,
+    arbiter: arbiter,
+    enableBlockReason: () => MotorEnableSafety.blockReason(
+      state: arbiter.state,
+      position: joint.position,
+      velocity: joint.velocity,
+      jointLimitRad: 3.14,
+      hasFreshJointTelemetry: MotorEnableSafety.hasFreshLegCanTelemetry(<num>[
+        for (final watch in joint.frequencyWatches) watch.value,
+      ]),
+      safePose: sittingPose,
+      maxSafePoseErrorRad: 0.35,
+    ),
+    prepareForEnable: () {
+      joint.realActionExt(joint.position.discardFoot());
+      return Future<void>.value();
+    },
+  );
+  brain.nextActionStream.listen((action) {
+    if (!motorOutput.isEnabled) return;
+    if (arbiter.state is Grounded) {
+      joint.realActionExt(joint.position.discardFoot());
+      return;
+    }
+    joint.realActionExt(action);
+  });
   RealControlDog(
     brain: brain,
     imu: imu,
@@ -93,6 +117,7 @@ void main() async {
     sitDownKd: .fromList(.generate(16, (_) => 8.0)),
     sitDownKp: .fromList(.generate(16, (_) => 200.0)),
     controller: controller,
+    motorOutput: motorOutput,
   );
 
   // ── gRPC 远程控制服务器 ──
@@ -110,32 +135,40 @@ void main() async {
         m: m,
         mode: CmsMode.hardware,
         arbiter: arbiter,
+        motor: joint,
+        motorOutput: motorOutput,
         robotType: msg.RobotType.MINI,
-        imuStreamFactory: () => imuBroadcast.expand((s) => s).map(
+        imuStreamFactory: () => imuBroadcast
+            .expand((s) => s)
+            .map(
               (s) => msg.Imu(
                 gyroscope: msg.Vector3(
-                    x: s.gyroscope.x, y: s.gyroscope.y, z: s.gyroscope.z),
+                  x: s.gyroscope.x,
+                  y: s.gyroscope.y,
+                  z: s.gyroscope.z,
+                ),
                 quaternion: msg.Quaternion(
-                    w: s.quaternion.w,
-                    x: s.quaternion.x,
-                    y: s.quaternion.y,
-                    z: s.quaternion.z),
-                timestamp: elapsed(),
-              ),
-            ),
-        jointStreamFactory: () => jointBroadcast.map(
-              (r) => msg.Joint(
-                singleJoint: msg.SingleJoint(
-                  id: r.$1,
-                  position: r.$2.position,
-                  velocity: r.$2.velocity,
-                  torque: r.$2.torque,
-                  status: r.$2.status.value,
+                  w: s.quaternion.w,
+                  x: s.quaternion.x,
+                  y: s.quaternion.y,
+                  z: s.quaternion.z,
                 ),
                 timestamp: elapsed(),
               ),
             ),
-      ),
+        jointStreamFactory: () => jointBroadcast.map(
+          (r) => msg.Joint(
+            singleJoint: msg.SingleJoint(
+              id: r.$1,
+              position: r.$2.position,
+              velocity: r.$2.velocity,
+              torque: r.$2.torque,
+              status: r.$2.status.value,
+            ),
+            timestamp: elapsed(),
+          ),
+        ),
+      )..joint = joint,
     ],
     errorHandler: (error, trace) => print('gRPC server error: $error\n$trace'),
   );
@@ -146,14 +179,22 @@ void main() async {
   // 频率监控：如果 IMU 或关节频率过低，自动切换到 idle
   RealFrequency.manager.onTick.listen((_) {
     if (imu.hz.value < 50 || joint.frequencyWatches.any((e) => e.value < 50)) {
-      m.add(.fault('Sensor frequency too low '
+      m.add(
+        .fault(
+          'Sensor frequency too low '
           '(IMU: ${imu.hz.value} Hz, '
-          'Joints: ${joint.frequencyWatches.map((e) => e.value).toList()})'));
+          'Joints: ${joint.frequencyWatches.map((e) => e.value).toList()})',
+        ),
+      );
     }
   });
 
-  print('YUNZHUO controller ready. Use L1=standup, L2=sitdown, R1=idle, H=enable, red=disable');
-  print('App remote control ready. Connect from 穹佩控制面板 to <robot-ip>:$grpcPort');
+  print(
+    'YUNZHUO controller ready. Use L1=standup, L2=sitdown, R1=idle, H=enable, red=disable',
+  );
+  print(
+    'App remote control ready. Connect from 穹佩控制面板 to <robot-ip>:$grpcPort',
+  );
 
   Timer.periodic(const .new(milliseconds: 20), (_) {
     timeController.add(null);

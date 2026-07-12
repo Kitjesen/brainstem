@@ -28,8 +28,8 @@ class ProfileManager {
     this.controlDog,
     this.onFault,
     required String initial,
-  })  : _profiles = Map.of(profiles),
-        _current = initial;
+  }) : _profiles = Map.of(profiles),
+       _current = initial;
 
   /// 当前策略名称。
   String get currentName => _current;
@@ -37,11 +37,15 @@ class ProfileManager {
   /// 当前策略说明。
   String get currentDescription => _profiles[_current]?.description ?? '';
 
+  /// Current profile, used by hardware safety checks that depend on pose.
+  RobotProfile get currentProfile => _profiles[_current]!;
+
   /// 所有可用策略名称。
   List<String> get names => _profiles.keys.toList();
 
   /// 所有策略说明（与 names 按索引对应）。
-  List<String> get descriptions => _profiles.values.map((p) => p.description).toList();
+  List<String> get descriptions =>
+      _profiles.values.map((p) => p.description).toList();
 
   /// 切换到指定策略。机器人必须在 Grounded 状态（由调用方保证）。
   ///
@@ -49,7 +53,9 @@ class ProfileManager {
   /// 若上一次切换尚未完成，抛出 [StateError]。
   Future<void> switchTo(String name) async {
     if (_switching) {
-      throw StateError('Profile switch already in progress (current: $_current)');
+      throw StateError(
+        'Profile switch already in progress (current: $_current)',
+      );
     }
     if (name == _current) {
       _log.fine('Already on profile: $name');
@@ -57,8 +63,10 @@ class ProfileManager {
     }
     final p = _profiles[name];
     if (p == null) {
-      throw ArgumentError('Unknown profile: $name '
-          '(available: ${_profiles.keys.join(", ")})');
+      throw ArgumentError(
+        'Unknown profile: $name '
+        '(available: ${_profiles.keys.join(", ")})',
+      );
     }
 
     final prevName = _current;
@@ -95,13 +103,15 @@ class ProfileManager {
       _log.info('Switched to profile: $name (model=${p.modelPath})');
     } catch (e, st) {
       _log.warning(
-          'Profile switch failed ($prevName → $name): $e; attempting rollback',
-          e, st);
+        'Profile switch failed ($prevName → $name): $e; attempting rollback',
+        e,
+        st,
+      );
       try {
         _switchGains(prevProfile);
         brain.gestureLibrary = GestureLibrary(
-            standingPose: prevProfile.standingPose)
-          ..registerDefaults();
+          standingPose: prevProfile.standingPose,
+        )..registerDefaults();
         _log.info('Rollback to "$prevName" succeeded');
       } catch (rollbackE, rollbackSt) {
         // Rollback failed: gains and gestureLibrary may be in an
@@ -185,7 +195,8 @@ class ProfileManager {
     final removed = toRemove.length;
     if (added > 0 || updated > 0 || removed > 0) {
       _log.info(
-          'Profile hot-reload: +$added 新, ~$updated 更新, -$removed 移除 (current=$_current)');
+        'Profile hot-reload: +$added 新, ~$updated 更新, -$removed 移除 (current=$_current)',
+      );
     }
   }
 }

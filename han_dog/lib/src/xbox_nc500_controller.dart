@@ -77,6 +77,11 @@ class XboxNc500Controller implements Gamepad {
   Stream<bool> get enabled => _delegate?.enabled ?? Stream<bool>.empty();
 
   @override
+  void syncMotorOutputEnabled(bool enabled) {
+    _delegate?.syncMotorOutputEnabled(enabled);
+  }
+
+  @override
   Stream<bool> get idle => _delegate?.idle ?? Stream<bool>.empty();
 
   @override

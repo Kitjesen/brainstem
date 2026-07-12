@@ -50,7 +50,16 @@ void main() {
     registerFallbackValue(JointsMatrix.zero());
   });
 
-  RealControlDog buildDog({String? Function()? motorEnableBlockReason}) {
+  RealControlDog buildDog({
+    String? Function()? motorEnableBlockReason,
+    MotorOutputController? motorOutput,
+  }) {
+    final output =
+        motorOutput ??
+        MotorOutputController(
+          motor: joint,
+          enableBlockReason: motorEnableBlockReason,
+        );
     return RealControlDog(
       brain: brain,
       arbiter: arbiter,
@@ -63,7 +72,7 @@ void main() {
       standUpKd: standUpKd,
       sitDownKp: sitDownKp,
       sitDownKd: sitDownKd,
-      motorEnableBlockReason: motorEnableBlockReason,
+      motorOutput: output,
     );
   }
 
@@ -91,12 +100,14 @@ void main() {
     when(() => controller.red).thenAnswer((_) => redCtrl.stream);
     when(() => controller.enabled).thenAnswer((_) => enabledCtrl.stream);
     when(() => controller.calibrate).thenAnswer((_) => calibrateCtrl.stream);
-    when(() => controller.switchProfile)
-        .thenAnswer((_) => switchProfileCtrl.stream);
+    when(
+      () => controller.switchProfile,
+    ).thenAnswer((_) => switchProfileCtrl.stream);
 
     when(() => joint.enable()).thenAnswer((_) async {});
-    when(() => joint.disable()).thenAnswer((_) async {});
-    when(() => joint.disable(clearErrors: true)).thenAnswer((_) async {});
+    when(
+      () => joint.disable(clearErrors: any(named: 'clearErrors')),
+    ).thenAnswer((_) async {});
 
     when(() => arbiter.stateStream).thenAnswer((_) => stateCtrl.stream);
     when(() => arbiter.state).thenReturn(const Zero());
@@ -128,11 +139,13 @@ void main() {
 
     test('Transitioning(StandUp) → standUpKp/standUpKd', () async {
       buildDog();
-      stateCtrl.add(Transitioning(
-        const Command.standUp(),
-        Stream<History>.empty().listen((_) {}),
-        null,
-      ));
+      stateCtrl.add(
+        Transitioning(
+          const Command.standUp(),
+          Stream<History>.empty().listen((_) {}),
+          null,
+        ),
+      );
       await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.kpExt = standUpKp).called(1);
@@ -141,11 +154,13 @@ void main() {
 
     test('Transitioning(SitDown) → sitDownKp/sitDownKd', () async {
       buildDog();
-      stateCtrl.add(Transitioning(
-        const Command.sitDown(),
-        Stream<History>.empty().listen((_) {}),
-        null,
-      ));
+      stateCtrl.add(
+        Transitioning(
+          const Command.sitDown(),
+          Stream<History>.empty().listen((_) {}),
+          null,
+        ),
+      );
       await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.kpExt = sitDownKp).called(1);
@@ -169,10 +184,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       verify(
-        () => arbiter.command(
-          any(that: isA<CmdWalk>()),
-          ControlSource.yunzhuo,
-        ),
+        () => arbiter.command(any(that: isA<CmdWalk>()), ControlSource.yunzhuo),
       ).called(1);
     });
   });
@@ -225,10 +237,23 @@ void main() {
       verify(() => joint.disable(clearErrors: true)).called(1);
     });
 
+    test('red closes the shared motor output gate', () async {
+      final motorOutput = MotorOutputController(motor: joint);
+      expect(await motorOutput.enable(ControlSource.yunzhuo), isNull);
+      expect(motorOutput.isEnabled, isTrue);
+
+      buildDog(motorOutput: motorOutput);
+      redCtrl.add(true);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(motorOutput.isEnabled, isFalse);
+      verify(() => joint.disable(clearErrors: true)).called(1);
+    });
+
     test('enabled true → joint.enable()', () async {
-      when(() => arbiter.state).thenReturn(
-        Grounded(Stream<History>.empty().listen((_) {})),
-      );
+      when(
+        () => arbiter.state,
+      ).thenReturn(Grounded(Stream<History>.empty().listen((_) {})));
       buildDog();
       enabledCtrl.add(true);
       await Future<void>.delayed(Duration.zero);
@@ -236,20 +261,26 @@ void main() {
       verify(() => joint.enable()).called(1);
     });
 
-    test('unsafe position blocks enabled true before joint.enable()', () async {
-      when(() => arbiter.state).thenReturn(
-        Grounded(Stream<History>.empty().listen((_) {})),
-      );
-      var outputEnabled = false;
-      final dog = buildDog(motorEnableBlockReason: () => 'unsafe position')
-        ..onMotorEnableChanged = (enabled) => outputEnabled = enabled;
-      enabledCtrl.add(true);
-      await Future<void>.delayed(Duration.zero);
+    test(
+      'unsafe position blocks Enable and resynchronizes the controller',
+      () async {
+        when(
+          () => arbiter.state,
+        ).thenReturn(Grounded(Stream<History>.empty().listen((_) {})));
+        final motorOutput = MotorOutputController(
+          motor: joint,
+          enableBlockReason: () => 'unsafe position',
+        );
+        final dog = buildDog(motorOutput: motorOutput);
+        enabledCtrl.add(true);
+        await Future<void>.delayed(Duration.zero);
 
-      verifyNever(() => joint.enable());
-      expect(outputEnabled, isFalse);
-      dog.dispose();
-    });
+        verifyNever(() => joint.enable());
+        expect(motorOutput.isEnabled, isFalse);
+        verify(() => controller.syncMotorOutputEnabled(false)).called(1);
+        dog.dispose();
+      },
+    );
 
     test('enabled false → joint.disable()', () async {
       buildDog();
@@ -262,9 +293,9 @@ void main() {
 
   group('calibrate', () {
     test('in Grounded → setZero + save', () async {
-      when(() => arbiter.state).thenReturn(
-        Grounded(Stream<History>.empty().listen((_) {})),
-      );
+      when(
+        () => arbiter.state,
+      ).thenReturn(Grounded(Stream<History>.empty().listen((_) {})));
 
       buildDog();
       calibrateCtrl.add(null);
@@ -276,9 +307,9 @@ void main() {
     });
 
     test('not in Grounded → ignored', () async {
-      when(() => arbiter.state).thenReturn(
-        Standing(Stream<History>.empty().listen((_) {})),
-      );
+      when(
+        () => arbiter.state,
+      ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
 
       buildDog();
       calibrateCtrl.add(null);
@@ -287,6 +318,38 @@ void main() {
       verifyNever(() => joint.setZeroPosition());
       verifyNever(() => joint.setZeroSigned());
       verifyNever(() => joint.saveParameters());
+    });
+
+    test('in Grounded with output enabled → ignored', () async {
+      when(
+        () => arbiter.state,
+      ).thenReturn(Grounded(Stream<History>.empty().listen((_) {})));
+      final motorOutput = MotorOutputController(motor: joint);
+      expect(await motorOutput.enable(ControlSource.yunzhuo), isNull);
+
+      buildDog(motorOutput: motorOutput);
+      calibrateCtrl.add(null);
+      await Future<void>.delayed(Duration.zero);
+
+      verifyNever(() => joint.setZeroPosition());
+      verifyNever(() => joint.setZeroSigned());
+      verifyNever(() => joint.saveParameters());
+    });
+  });
+
+  group('profile switching safety', () {
+    test('Standing → profile switch is ignored', () async {
+      when(
+        () => arbiter.state,
+      ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+      var switches = 0;
+      final dog = buildDog()..onProfileSwitch = () => switches++;
+
+      switchProfileCtrl.add(null);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(switches, 0);
+      dog.dispose();
     });
   });
 

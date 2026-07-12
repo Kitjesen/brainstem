@@ -12,7 +12,7 @@ void main() async {
     return;
   }
   joint.setReporting(true);
-  await Future.delayed(Duration(milliseconds: 500));
+  await Future<void>.delayed(const Duration(milliseconds: 500));
 
   try {
     final voltages = await joint.readVoltage();
@@ -22,8 +22,12 @@ void main() async {
     }
     final valid = voltages.where((v) => v > 0).toList();
     if (valid.isNotEmpty) {
-      print('Min: ${valid.reduce((a, b) => a < b ? a : b).toStringAsFixed(1)}V');
-      print('Max: ${valid.reduce((a, b) => a > b ? a : b).toStringAsFixed(1)}V');
+      print(
+        'Min: ${valid.reduce((a, b) => a < b ? a : b).toStringAsFixed(1)}V',
+      );
+      print(
+        'Max: ${valid.reduce((a, b) => a > b ? a : b).toStringAsFixed(1)}V',
+      );
     }
   } catch (e) {
     print('Error: $e');
