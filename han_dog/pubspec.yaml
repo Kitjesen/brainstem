@@ -16,6 +16,7 @@ dependencies:
   brainstem_api: ^2.0.0
   robo_device: ^1.0.0
   robo_device_proto: ^1.0.0
+  onnx_runtime: ^0.3.1
 
   # ── 第三方包 ──────────────────────────────────────────────────
   grpc: ^5.1.0

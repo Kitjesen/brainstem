@@ -65,6 +65,8 @@ class HanDogConfig {
       Platform.environment['HAN_DOG_YUNZHUO_PORT'] ?? '/dev/yunzhuo';
   String get xboxDevice =>
       Platform.environment['HAN_DOG_XBOX_DEVICE'] ?? '/dev/input/js0';
+  String get nc500HidrawDevice =>
+      Platform.environment['HAN_DOG_NC500_HIDRAW_DEVICE'] ?? '/dev/hidraw0';
   String get xboxConfigPath =>
       Platform.environment['HAN_DOG_XBOX_CONFIG'] ?? 'han_dog/config/xbox.json';
 
@@ -88,6 +90,15 @@ class HanDogConfig {
   double get jointLimitRad =>
       double.tryParse(Platform.environment['HAN_DOG_JOINT_LIMIT_RAD'] ?? '') ??
       3.14;
+
+  /// Maximum leg-joint error from the configured grounded (sitting) pose when
+  /// arming motor torque. This is intentionally separate from the hard joint
+  /// limit: a mechanically valid angle is not necessarily a safe arming pose.
+  double get enablePoseToleranceRad =>
+      double.tryParse(
+        Platform.environment['HAN_DOG_ENABLE_POSE_TOLERANCE_RAD'] ?? '',
+      ) ??
+      0.35;
   String get profileDir => resolveProfileDir(
     primaryEnvVar: 'HAN_DOG_PROFILE_DIR',
     legacyEnvVars: const ['HAN_DOG_PROFILES_DIR'],
@@ -108,16 +119,28 @@ class HanDogConfig {
       errors.add('HAN_DOG_PORT=$grpcPort 超出范围 [1-65535]');
     }
     if (arbiterTimeoutSec < 0 || arbiterTimeoutSec > 3600) {
-      errors.add('HAN_DOG_ARBITER_TIMEOUT=${arbiterTimeoutSec}s 需在 [0, 3600] 范围内（0=永不释放）');
+      errors.add(
+        'HAN_DOG_ARBITER_TIMEOUT=${arbiterTimeoutSec}s 需在 [0, 3600] 范围内（0=永不释放）',
+      );
     }
     if (shutdownTimeoutSec < 1 || shutdownTimeoutSec > 300) {
-      errors.add('HAN_DOG_SHUTDOWN_TIMEOUT=${shutdownTimeoutSec}s 需在 [1, 300] 范围内');
+      errors.add(
+        'HAN_DOG_SHUTDOWN_TIMEOUT=${shutdownTimeoutSec}s 需在 [1, 300] 范围内',
+      );
     }
     if (startupTimeoutSec < 1 || startupTimeoutSec > 300) {
-      errors.add('HAN_DOG_STARTUP_TIMEOUT=${startupTimeoutSec}s 需在 [1, 300] 范围内');
+      errors.add(
+        'HAN_DOG_STARTUP_TIMEOUT=${startupTimeoutSec}s 需在 [1, 300] 范围内',
+      );
     }
     if (jointLimitRad <= 0 || !jointLimitRad.isFinite) {
       errors.add('HAN_DOG_JOINT_LIMIT_RAD=$jointLimitRad 必须为有限正数');
+    }
+    if (enablePoseToleranceRad <= 0 || !enablePoseToleranceRad.isFinite) {
+      errors.add(
+        'HAN_DOG_ENABLE_POSE_TOLERANCE_RAD=$enablePoseToleranceRad '
+        '必须为有限正数',
+      );
     }
     if (sensorLowThreshold < 1) {
       errors.add('HAN_DOG_SENSOR_LOW_THRESHOLD=$sensorLowThreshold 至少需 1');
@@ -141,6 +164,7 @@ class HanDogConfig {
       'shutdownTimeout=${shutdownTimeoutSec}s '
       'startupTimeout=${startupTimeoutSec}s '
       'jointLimitRad=$jointLimitRad '
+      'enablePoseToleranceRad=$enablePoseToleranceRad '
       'logDir=$logDir debugTui=$debugTui';
 }
 

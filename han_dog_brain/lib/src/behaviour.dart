@@ -243,7 +243,13 @@ class Walk extends Behaviour {
     _env.dispose();
   }
 
-  JointsMatrix clampAction(JointsMatrix action) => action; // no-op，和 legacy 一致
+  JointsMatrix clampAction(JointsMatrix action) {
+    final values = List<double>.from(action.values);
+    for (final i in [12, 13, 14, 15]) {
+      values[i] = values[i].clamp(-35.0, 35.0).toDouble();
+    }
+    return JointsMatrix.fromList(values);
+  }
 
   JointsMatrix toRealAction(JointsMatrix action) =>
       action * observationBuilder.actionScale + observationBuilder.standingPose;

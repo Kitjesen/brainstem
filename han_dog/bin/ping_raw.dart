@@ -11,10 +11,10 @@ import 'package:robo_device_proto/robo_device_proto.dart';
 
 void main() async {
   final channels = {
-    'can0 (usbbus1/FL)': PcanChannel.usbbus1,
-    'can1 (usbbus2/RL)': PcanChannel.usbbus2,
-    'can2 (usbbus3/FR)': PcanChannel.usbbus3,
-    'can3 (usbbus4/RR)': PcanChannel.usbbus4,
+    'can0 (usbbus1/RL)': PcanChannel.usbbus1,
+    'can1 (usbbus2/RR)': PcanChannel.usbbus2,
+    'can2 (usbbus3/FL)': PcanChannel.usbbus3,
+    'can3 (usbbus4/FR)': PcanChannel.usbbus4,
   };
 
   final controllers = <String, PcanController<RSEvent, RSState>>{};

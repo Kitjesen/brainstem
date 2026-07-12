@@ -14,16 +14,16 @@ final _log = Logger('han_dog.linux_joystick');
 
 // ── Linux syscall 常量 ──────────────────────────────────────
 
-const int _O_RDONLY = 0;
-const int _O_NONBLOCK = 2048; // 0x800
-const int _EAGAIN = 11;
-const int _EWOULDBLOCK = 11;
+const int _oRdOnly = 0;
+const int _oNonblock = 2048; // 0x800
+const int _eagain = 11;
+const int _ewouldblock = 11;
 
 // struct js_event { uint32 time; int16 value; uint8 type; uint8 number; }
-const int _JS_EVENT_SIZE = 8;
-const int _JS_EVENT_BUTTON = 0x01;
-const int _JS_EVENT_AXIS = 0x02;
-const int _JS_EVENT_INIT = 0x80;
+const int _jsEventSize = 8;
+const int _jsEventButton = 0x01;
+const int _jsEventAxis = 0x02;
+const int _jsEventInit = 0x80;
 
 // ── FFI bindings ────────────────────────────────────────────
 
@@ -43,7 +43,10 @@ final _libc = DynamicLibrary.open('libc.so.6');
 final _open = _libc.lookupFunction<_OpenNative, _OpenDart>('open');
 final _read = _libc.lookupFunction<_ReadNative, _ReadDart>('read');
 final _close = _libc.lookupFunction<_CloseNative, _CloseDart>('close');
-final _errnoLocation = _libc.lookupFunction<_ErrnoLocationNative, _ErrnoLocationDart>('__errno_location');
+final _errnoLocation = _libc
+    .lookupFunction<_ErrnoLocationNative, _ErrnoLocationDart>(
+      '__errno_location',
+    );
 
 int get _errno => _errnoLocation().value;
 
@@ -57,13 +60,17 @@ class JsEvent {
 
   JsEvent(this.time, this.value, this.type, this.number);
 
-  bool get isButton => type & _JS_EVENT_BUTTON != 0;
-  bool get isAxis => type & _JS_EVENT_AXIS != 0;
-  bool get isInit => type & _JS_EVENT_INIT != 0;
+  bool get isButton => type & _jsEventButton != 0;
+  bool get isAxis => type & _jsEventAxis != 0;
+  bool get isInit => type & _jsEventInit != 0;
 
   @override
   String toString() =>
-      'JsEvent(type=${isButton ? "BTN" : isAxis ? "AXIS" : "?"}${isInit ? "+INIT" : ""}, '
+      'JsEvent(type=${isButton
+          ? "BTN"
+          : isAxis
+          ? "AXIS"
+          : "?"}${isInit ? "+INIT" : ""}, '
       'num=$number, val=$value)';
 }
 
@@ -86,7 +93,7 @@ class LinuxJoystick {
   bool _disposed = false;
 
   final _eventController = StreamController<JsEvent>.broadcast();
-  final Pointer<Uint8> _buf = calloc<Uint8>(_JS_EVENT_SIZE * 32); // 一次最多读 32 个事件
+  final Pointer<Uint8> _buf = calloc<Uint8>(_jsEventSize * 32); // 一次最多读 32 个事件
 
   LinuxJoystick(this.devicePath);
 
@@ -96,7 +103,7 @@ class LinuxJoystick {
   /// 打开设备（非阻塞模式）。
   bool open() {
     final pathPtr = devicePath.toNativeUtf8();
-    _fd = _open(pathPtr, _O_RDONLY | _O_NONBLOCK);
+    _fd = _open(pathPtr, _oRdOnly | _oNonblock);
     calloc.free(pathPtr);
 
     if (_fd < 0) {
@@ -106,7 +113,10 @@ class LinuxJoystick {
     _log.info('LinuxJoystick opened: $devicePath (fd=$_fd)');
 
     // 5ms 轮询（200Hz）— 足够捕捉所有按钮事件
-    _pollTimer = Timer.periodic(const Duration(milliseconds: 5), (_) => _poll());
+    _pollTimer = Timer.periodic(
+      const Duration(milliseconds: 5),
+      (_) => _poll(),
+    );
     return true;
   }
 
@@ -128,21 +138,21 @@ class LinuxJoystick {
 
     // 非阻塞读：一次尽量多读
     while (true) {
-      final n = _read(_fd, _buf, _JS_EVENT_SIZE * 32);
-      if (n < _JS_EVENT_SIZE) {
+      final n = _read(_fd, _buf, _jsEventSize * 32);
+      if (n < _jsEventSize) {
         // EAGAIN = 没有新数据，正常
-        if (n < 0 && _errno != _EAGAIN && _errno != _EWOULDBLOCK) {
+        if (n < 0 && _errno != _eagain && _errno != _ewouldblock) {
           _log.warning('read error: errno=$_errno — device disconnected');
           _handleDisconnect();
         }
         break;
       }
 
-      final count = n ~/ _JS_EVENT_SIZE;
+      final count = n ~/ _jsEventSize;
       final bd = ByteData.sublistView(_buf.asTypedList(n));
 
       for (var i = 0; i < count; i++) {
-        final offset = i * _JS_EVENT_SIZE;
+        final offset = i * _jsEventSize;
         final event = JsEvent(
           bd.getUint32(offset, Endian.little),
           bd.getInt16(offset + 4, Endian.little),

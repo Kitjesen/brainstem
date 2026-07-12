@@ -33,7 +33,7 @@ void main() async {
     print('  [$count] $msg');
   });
 
-  await Future.delayed(Duration(seconds: 15));
+  await Future<void>.delayed(const Duration(seconds: 15));
   await sub.cancel();
   recv.close();
   print('\nTotal events: $count');

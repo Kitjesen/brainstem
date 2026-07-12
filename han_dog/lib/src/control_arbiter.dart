@@ -52,6 +52,13 @@ class ControlArbiter {
   /// CMS 当前状态（透传）
   S get state => _m.state;
 
+  /// Returns whether [source] may change motor torque at this instant.
+  ///
+  /// This uses the same priority rule as motion commands but does not acquire
+  /// ownership or refresh its timeout. Torque enable must not bypass the
+  /// physical controller's priority.
+  bool canActuate(ControlSource source) => _canAcquire(source);
+
   /// CMS 状态流（透传），用于 kp/kd 监听等
   Stream<S> get stateStream => _m.stream;
 

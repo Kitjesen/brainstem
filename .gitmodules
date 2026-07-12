@@ -1,3 +1,6 @@
 [submodule "brainstem_api"]
 	path = brainstem_api
 	url = https://github.com/Kitjesen/brainstem_api.git
+[submodule "CSerialPort"]
+	path = serial_port/src/CSerialPort
+	url = https://gitee.com/itas109/CSerialPort.git

@@ -90,6 +90,7 @@ dart run han_dog/bin/server.dart
 | `HAN_DOG_STARTUP_TIMEOUT` | `10` (秒) | FSM 等待 Grounded 超时 |
 | `HAN_DOG_SHUTDOWN_TIMEOUT` | `8` (秒) | 关机等待超时 |
 | `HAN_DOG_JOINT_LIMIT_RAD` | `3.14` | 关节安全限位（rad） |
+| `HAN_DOG_ENABLE_POSE_TOLERANCE_RAD` | `0.35` | Enable 时相对当前 Profile 趴地姿态的最大腿关节误差（rad） |
 | `HAN_DOG_SENSOR_LOW_THRESHOLD` | `3` | 传感器降频容忍次数 |
 | `HAN_DOG_LOG_DIR` | `logs` | 日志目录（空字符串禁用） |
 | `HAN_DOG_DEBUG_TUI` | `false` | 启用 ANSI 调试 TUI |
