@@ -8,7 +8,6 @@ import 'package:logging/logging.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 import 'package:vector_math/vector_math.dart';
 
-import 'gamepad.dart';
 
 final _log = Logger('han_dog.control');
 
@@ -19,6 +18,7 @@ class RealControlDog {
   final RealImu imu;
   final RealJoint joint;
   final Gamepad controller;
+  final String? Function()? motorEnableBlockReason;
   JointsMatrix inferKp;
   JointsMatrix inferKd;
   JointsMatrix standUpKp;
@@ -45,7 +45,8 @@ class RealControlDog {
     required this.standUpKd,
     required this.sitDownKp,
     required this.sitDownKd,
-    required Gamepad this.controller,
+    required this.controller,
+    this.motorEnableBlockReason,
   }) {
     // 监听 CMS 状态变化，自动设置对应的 kp/kd
     _subscriptions.add(arbiter.stateStream.listen(
@@ -132,12 +133,7 @@ class RealControlDog {
     _subscriptions.add(controller.enabled.listen(
       (enabled) {
         _log.info('H enable=$enabled');
-        if (enabled) {
-          joint.enable();
-        } else {
-          joint.disable();
-        }
-        onMotorEnableChanged?.call(enabled);
+        unawaited(_setMotorEnabled(enabled));
       },
       onError: (Object e, StackTrace st) => onStreamError(e, st, 'enabled'),
       onDone: () => _log.warning('Controller enabled stream closed'),
@@ -208,6 +204,38 @@ class RealControlDog {
     this.standUpKd = standUpKd;
     this.sitDownKp = sitDownKp;
     this.sitDownKd = sitDownKd;
+  }
+
+  Future<void> _setMotorEnabled(bool enabled) async {
+    if (enabled) {
+      if (arbiter.state is! Grounded) {
+        final reason = 'CMS must be Grounded before enabling motors '
+            '(current: ${arbiter.state.runtimeType})';
+        _log.warning('Motor enable blocked: $reason');
+        onMotorEnableChanged?.call(false);
+        return;
+      }
+
+      final rejection = motorEnableBlockReason?.call();
+      if (rejection != null) {
+        _log.warning('Motor enable blocked: $rejection');
+        onMotorEnableChanged?.call(false);
+        return;
+      }
+    }
+
+    try {
+      if (enabled) {
+        await joint.enable();
+      } else {
+        await joint.disable();
+      }
+      onMotorEnableChanged?.call(enabled);
+    } catch (error, stackTrace) {
+      _log.severe('Motor ${enabled ? 'enable' : 'disable'} failed', error, stackTrace);
+      arbiter.fault('Motor ${enabled ? 'enable' : 'disable'} failed: $error');
+      onMotorEnableChanged?.call(false);
+    }
   }
 
   bool _disposed = false;

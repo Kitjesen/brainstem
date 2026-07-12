@@ -42,6 +42,7 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   final ControlArbiter? arbiter;
   final SimStateInjector? simInjector;
   final MotorService? motor;
+  final String? Function()? motorEnableBlockReason;
   final GainManager? gains;
   final proto.RobotType robotType;
 
@@ -106,6 +107,7 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     this.arbiter,
     this.simInjector,
     this.motor,
+    this.motorEnableBlockReason,
     this.gains,
     this.robotType = proto.RobotType.MINI,
     this.imuStreamFactory,
@@ -123,12 +125,21 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   /// gRPC Enable/Disable 时的回调（无遥控器时用于设置 motorOutputEnabled）。
   void Function(bool enabled)? onMotorEnableChanged;
 
+  String? _motorEnableRejection() {
+    if (mode == CmsMode.hardware && _m.state is! Grounded) {
+      return 'CMS must be Grounded before enabling motors '
+          '(current: ${_m.state.runtimeType})';
+    }
+    return motorEnableBlockReason?.call() ?? _enableBlockReason();
+  }
+
   @override
   Future<proto.Empty> enable(ServiceCall call, proto.Empty request) async {
-    final blockReason = _enableBlockReason();
-    if (blockReason != null) {
-      _log.warning('Motors enable blocked: $blockReason');
-      throw GrpcError.failedPrecondition('Motors enable blocked: $blockReason');
+    final rejection = _motorEnableRejection();
+    if (rejection != null) {
+      onMotorEnableChanged?.call(false);
+      _log.warning('Motor enable blocked: $rejection');
+      throw GrpcError.failedPrecondition('Motor enable blocked: $rejection');
     }
     await motor?.enable();
     onMotorEnableChanged?.call(true);

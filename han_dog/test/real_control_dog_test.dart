@@ -50,7 +50,7 @@ void main() {
     registerFallbackValue(JointsMatrix.zero());
   });
 
-  RealControlDog buildDog() {
+  RealControlDog buildDog({String? Function()? motorEnableBlockReason}) {
     return RealControlDog(
       brain: brain,
       arbiter: arbiter,
@@ -63,6 +63,7 @@ void main() {
       standUpKd: standUpKd,
       sitDownKp: sitDownKp,
       sitDownKd: sitDownKd,
+      motorEnableBlockReason: motorEnableBlockReason,
     );
   }
 
@@ -225,11 +226,29 @@ void main() {
     });
 
     test('enabled true → joint.enable()', () async {
+      when(() => arbiter.state).thenReturn(
+        Grounded(Stream<History>.empty().listen((_) {})),
+      );
       buildDog();
       enabledCtrl.add(true);
       await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.enable()).called(1);
+    });
+
+    test('unsafe position blocks enabled true before joint.enable()', () async {
+      when(() => arbiter.state).thenReturn(
+        Grounded(Stream<History>.empty().listen((_) {})),
+      );
+      var outputEnabled = false;
+      final dog = buildDog(motorEnableBlockReason: () => 'unsafe position')
+        ..onMotorEnableChanged = (enabled) => outputEnabled = enabled;
+      enabledCtrl.add(true);
+      await Future<void>.delayed(Duration.zero);
+
+      verifyNever(() => joint.enable());
+      expect(outputEnabled, isFalse);
+      dog.dispose();
     });
 
     test('enabled false → joint.disable()', () async {

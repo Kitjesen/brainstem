@@ -5,9 +5,6 @@ import 'package:hooks/hooks.dart';
 import 'package:logging/logging.dart';
 import 'package:native_toolchain_cmake/native_toolchain_cmake.dart';
 
-const hash =
-    '89ea8de9db688a4615efcf40b26a30eb97602467 dart/serial_port/src/CSerialPort (v4.3.3-4-g89ea8de)';
-
 final Logger logger = Logger('serial_port hook');
 
 Future<void> main(List<String> args) async {
@@ -21,19 +18,17 @@ Future<void> main(List<String> args) async {
 
   await build(args, (input, output) async {
     final cserialPortDir = Directory.fromUri(
-      input.packageRoot.resolveUri(.file('src/CSerialPort/')),
+      input.packageRoot.resolve('src/CSerialPort/'),
     );
     if (!cserialPortDir.existsSync() &&
-        !await fetchSubmodule(input.packageRoot.resolveUri(.file('..')))) {
+        !await fetchSubmodule(input.packageRoot.resolve('../'))) {
       throw Exception('Failed to fetch CSerialPort submodule.');
     }
 
     final dllPath = input.outputDirectory.resolve('bin').toFilePath();
     final builder = CMakeBuilder.create(
       name: input.packageName,
-      sourceDir: input.packageRoot.resolveUri(
-        .file('src/CSerialPort/bindings/c/'),
-      ),
+      sourceDir: input.packageRoot.resolve('src/CSerialPort/bindings/c/'),
       defines: {
         'CSERIALPORT_ENABLE_UTF8': 'ON',
         'CMAKE_BINARY_DIR': input.outputDirectory.toFilePath(),
@@ -123,5 +118,8 @@ Future<bool> submoduleExists(String path) async {
   final output = result.stdout.toString().trim();
   if (output.isEmpty) return false;
 
-  return output == hash;
+  return output.split('\n').any((line) {
+    final fields = line.trimLeft().split(RegExp(r'\s+'));
+    return fields.length > 1 && fields[1] == 'serial_port/src/CSerialPort';
+  });
 }
