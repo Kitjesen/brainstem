@@ -13,10 +13,10 @@ const _refreshPeriod = Duration(milliseconds: 200);
 
 void main() async {
   final joint = RealJoint(
-    fr: .usbbus1,
-    fl: .usbbus2,
-    rr: .usbbus3,
-    rl: .usbbus4,
+    fr: .usbbus4,
+    fl: .usbbus3,
+    rr: .usbbus2,
+    rl: .usbbus1,
   );
 
   if (!joint.open()) {

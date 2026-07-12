@@ -176,6 +176,8 @@ class XboxController implements Gamepad {
       _joystick = null;
       return false;
     }
+    _axes[config.axisLT] = -1.0;
+    _axes[config.axisRT] = -1.0;
     _eventSub = _joystick!.eventStream.listen(
       (event) {
         if (event.isAxis) {
@@ -193,6 +195,10 @@ class XboxController implements Gamepad {
         _joystick = null;
         _axes.clear();
         _buttons.clear();
+        if (!_disposed && !_stateController.isClosed) {
+          // ponytail: push one zero-speed tick immediately on disconnect.
+          _stateController.add(null);
+        }
         _scheduleReconnect();
       },
       onError: (Object e, StackTrace st) {
@@ -250,9 +256,9 @@ class XboxController implements Gamepad {
 
         final scale = _speedScale;
         return Vector3(
-          ly * scale * config.vxScale,
-          lx * scale * config.vyScale,
-          rx * scale * config.vyawScale,
+          (ly * scale * config.vxScale).clamp(-1.0, 1.0),
+          (lx * scale * config.vyScale).clamp(-1.0, 1.0),
+          (rx * scale * config.vyawScale).clamp(-1.0, 1.0),
         );
       });
 

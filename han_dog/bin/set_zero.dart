@@ -2,14 +2,14 @@ import 'package:han_dog/han_dog.dart';
 
 void main() async {
   final joint = RealJoint(
-    fr: .usbbus1,
-    fl: .usbbus2,
-    rr: .usbbus3,
-    rl: .usbbus4,
+    fr: .usbbus4,
+    fl: .usbbus3,
+    rr: .usbbus2,
+    rl: .usbbus1,
   );
   if (!joint.open()) { print('PCAN open failed'); return; }
   joint.setReporting(true);
-  await Future.delayed(Duration(milliseconds: 500));
+  await Future<void>.delayed(Duration(milliseconds: 500));
 
   print('Current positions before zero:');
   final pos = joint.position;
@@ -21,7 +21,7 @@ void main() async {
   final ok = await joint.setZero();
   print('SetZero: $ok');
 
-  await Future.delayed(Duration(milliseconds: 500));
+  await Future<void>.delayed(Duration(milliseconds: 500));
   print('Positions after zero:');
   final pos2 = joint.position;
   for (var i = 0; i < 16; i++) {

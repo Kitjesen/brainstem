@@ -29,6 +29,15 @@ Timer? _profileReloadTimer;
 /// Xbox 热插检测定时器（关机时取消）
 Timer? _controllerHotplugTimer;
 
+bool _hasJoystickNode(String preferredDevice) {
+  if (File(preferredDevice).existsSync()) return true;
+  final inputDir = Directory('/dev/input');
+  if (!inputDir.existsSync()) return false;
+  return inputDir
+      .listSync()
+      .any((entity) => entity.path.split('/').last.startsWith('js'));
+}
+
 void main() {
   setupLogging(logDir: _cfg.logDir);
   runZonedGuarded(
@@ -106,10 +115,10 @@ Future<void> _run() async {
 
   // PCAN USB 通道映射（由硬件接线决定）
   final joint = RealJoint(
-    fr: .usbbus1,
-    fl: .usbbus2,
-    rr: .usbbus3,
-    rl: .usbbus4,
+    fr: .usbbus4,
+    fl: .usbbus3,
+    rr: .usbbus2,
+    rl: .usbbus1,
   );
   if (!joint.open()) {
     _log.severe('Joint PCAN open failed');
@@ -145,6 +154,7 @@ Future<void> _run() async {
     historySize: historySize,
     standUpCounts: defaultProfile.standUpCounts,
     sitDownCounts: defaultProfile.sitDownCounts,
+    observationBuilder: defaultProfile.toObservationBuilder(),
   );
   const modelLoadMaxAttempts = 3;
   bool modelLoaded = false;
@@ -194,14 +204,18 @@ Future<void> _run() async {
       controller = yunzhuo;
       _log.info('YUNZHUO controller opened.');
     } else {
-      _log.info('YUNZHUO not available, trying Xbox...');
-      final xbox = XboxController(_cfg.xboxDevice, config: xboxConfig);
+      _log.info('YUNZHUO not available, trying Xbox/NC500...');
+      final xbox = XboxNc500Controller(
+        _cfg.xboxDevice,
+        nc500HidrawDevice: _cfg.nc500HidrawDevice,
+        config: xboxConfig,
+      );
       if (xbox.open()) {
         controller = xbox;
-        _log.info('Xbox controller opened: ${_cfg.xboxDevice}');
+        _log.info('Xbox/NC500 controller opened.');
       } else {
         _log.warning(
-          'No controller available (YUNZHUO=${_cfg.yunzhuoPort}, Xbox=${_cfg.xboxDevice}) — '
+          'No controller available (YUNZHUO=${_cfg.yunzhuoPort}, Xbox/NC500=${_cfg.xboxDevice}) — '
           'running in gRPC-only mode',
         );
       }
@@ -265,6 +279,7 @@ Future<void> _run() async {
   }));
 
   var motorOutputEnabled = false;
+  var lastWheelActionLog = DateTime.fromMillisecondsSinceEpoch(0);
 
   // 推理输出 → 电机动作 (gated through MotorHealthManager)
   _subs.add(brain.nextActionStream.listen(
@@ -277,6 +292,23 @@ Future<void> _run() async {
       }
 
       final gated = motorHealth.gateAction(action, joint.position);
+      final now = DateTime.now();
+      if (now.difference(lastWheelActionLog).inMilliseconds >= 200) {
+        lastWheelActionLog = now;
+        final v = joint.velocity;
+        _log.info(
+          'ACTION wheel target='
+          'FR=${gated.frFoot.toStringAsFixed(2)} '
+          'FL=${gated.flFoot.toStringAsFixed(2)} '
+          'RR=${gated.rrFoot.toStringAsFixed(2)} '
+          'RL=${gated.rlFoot.toStringAsFixed(2)} '
+          'vel='
+          'FR=${v.frFoot.toStringAsFixed(2)} '
+          'FL=${v.flFoot.toStringAsFixed(2)} '
+          'RR=${v.rrFoot.toStringAsFixed(2)} '
+          'RL=${v.rlFoot.toStringAsFixed(2)}',
+        );
+      }
       joint.sendAction(gated);
     },
     onError: (Object error, StackTrace st) {
@@ -325,12 +357,16 @@ Future<void> _run() async {
     _controllerHotplugTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (controller != null) { _controllerHotplugTimer?.cancel(); return; }
       // 先检查设备节点存在再尝试打开，避免 SEVERE 日志噪音
-      if (!File(_cfg.xboxDevice).existsSync()) return;
-      final xbox = XboxController(_cfg.xboxDevice, config: xboxConfig);
+      if (!_hasJoystickNode(_cfg.xboxDevice)) return;
+      final xbox = XboxNc500Controller(
+        _cfg.xboxDevice,
+        nc500HidrawDevice: _cfg.nc500HidrawDevice,
+        config: xboxConfig,
+      );
       if (!xbox.open()) { xbox.dispose(); return; }
       _controllerHotplugTimer?.cancel();
       controller = xbox;
-      _log.info('Xbox hot-plugged: ${_cfg.xboxDevice}');
+      _log.info('Xbox/NC500 hot-plugged.');
       controlDog = RealControlDog(
         brain: brain,
         imu: imu,

@@ -68,6 +68,11 @@ class MotorHealthEvent {
   final String jointName;
   final MotorSeverity severity;
   final Set<RSError> errors;
+  final int errorBits;
+  final RSStatus status;
+  final double position;
+  final double velocity;
+  final double torque;
   final double temperature;
   final int streak;
 
@@ -76,6 +81,11 @@ class MotorHealthEvent {
     required this.jointName,
     required this.severity,
     required this.errors,
+    required this.errorBits,
+    required this.status,
+    required this.position,
+    required this.velocity,
+    required this.torque,
     required this.temperature,
     required this.streak,
   });
@@ -83,10 +93,14 @@ class MotorHealthEvent {
   @override
   String toString() =>
       'MotorHealthEvent($jointName, $severity, $errors, '
-      'temp=${temperature.toStringAsFixed(1)}°C, streak=$streak)';
+      'errorBits=0x${errorBits.toRadixString(16)}, status=$status, '
+      'pos=${position.toStringAsFixed(3)}, vel=${velocity.toStringAsFixed(3)}, '
+      'torque=${torque.toStringAsFixed(3)}, temp=${temperature.toStringAsFixed(1)}C, '
+      'streak=$streak)';
 }
 
-// ─── MotorHealthManager ─────────────────────────────────────────────────────
+// ??? MotorHealthManager ?????????????????????????????????????????????????????
+
 
 class MotorHealthManager {
   final RealJoint _joint;
@@ -129,7 +143,7 @@ class MotorHealthManager {
         jh.severity = MotorSeverity.healthy;
         jh.streak = 0;
         jh.lastErrors = {};
-        _emit(event.jointIndex, jh, event.temperature);
+        _emit(event.jointIndex, jh, event.temperature, raw: event);
       }
       return;
     }
@@ -154,7 +168,7 @@ class MotorHealthManager {
 
     if (newSeverity != jh.severity || jh.streak == 1) {
       jh.severity = newSeverity;
-      _emit(event.jointIndex, jh, event.temperature);
+      _emit(event.jointIndex, jh, event.temperature, raw: event);
     }
 
     if (newSeverity == MotorSeverity.degraded ||
@@ -181,12 +195,22 @@ class MotorHealthManager {
     }
   }
 
-  void _emit(int jointIndex, _JointHealth jh, double temperature) {
+  void _emit(
+    int jointIndex,
+    _JointHealth jh,
+    double temperature, {
+    MotorFaultEvent? raw,
+  }) {
     final event = MotorHealthEvent(
       jointIndex: jointIndex,
       jointName: jointNames[jointIndex],
       severity: jh.severity,
       errors: jh.lastErrors,
+      errorBits: raw?.errorBits ?? 0,
+      status: raw?.status ?? RSStatus.fromValue(0),
+      position: raw?.position ?? 0,
+      velocity: raw?.velocity ?? 0,
+      torque: raw?.torque ?? 0,
       temperature: temperature,
       streak: jh.streak,
     );

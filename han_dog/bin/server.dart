@@ -109,6 +109,7 @@ Future<void> main() async {
     historySize: historySize,
     standUpCounts: defaultProfile.standUpCounts,
     sitDownCounts: defaultProfile.sitDownCounts,
+    observationBuilder: defaultProfile.toObservationBuilder(),
   );
 
   try {

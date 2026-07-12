@@ -1,7 +1,7 @@
 /// 电机 ping 工具 — 开发 / 调试专用，非生产程序。
 ///
 /// 通过 4 路 PCAN CAN 总线逐条腿 ping 电机，验证硬件连接。
-/// 腿配置：FR=usbbus3, FL=usbbus1, RR=usbbus4, RL=usbbus2。
+/// 腿配置：FR=usbbus4, FL=usbbus3, RR=usbbus2, RL=usbbus1。
 ///
 /// 运行：dart run han_dog/bin/ping.dart
 /// 前置：PCAN 硬件已连接，驱动已加载。
@@ -15,10 +15,10 @@ import 'package:robo_device_proto/robo_device_proto.dart';
 
 /// 四条腿的 PCAN 通道映射（与 han_dog.dart 保持一致）
 const _legConfig = {
-  'FR': PcanChannel.usbbus3,
-  'FL': PcanChannel.usbbus1,
-  'RR': PcanChannel.usbbus4,
-  'RL': PcanChannel.usbbus2,
+  'FR': PcanChannel.usbbus4,
+  'FL': PcanChannel.usbbus3,
+  'RR': PcanChannel.usbbus2,
+  'RL': PcanChannel.usbbus1,
 };
 
 /// 每条腿的电机数量（canId 1~4）

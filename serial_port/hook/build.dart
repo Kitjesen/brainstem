@@ -20,7 +20,11 @@ Future<void> main(List<String> args) async {
     );
 
   await build(args, (input, output) async {
-    if (!await fetchSubmodule(input.packageRoot.resolveUri(.file('../..')))) {
+    final cserialPortDir = Directory.fromUri(
+      input.packageRoot.resolveUri(.file('src/CSerialPort/')),
+    );
+    if (!cserialPortDir.existsSync() &&
+        !await fetchSubmodule(input.packageRoot.resolveUri(.file('..')))) {
       throw Exception('Failed to fetch CSerialPort submodule.');
     }
 
