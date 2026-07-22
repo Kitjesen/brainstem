@@ -37,13 +37,16 @@ HAN_DOG_IMU_PORT=/dev/imu dart run han_dog/bin/han_dog.dart
 
 ```bash
 # 终端 1: Dart server
+ONNXRUNTIME_DLL_PATH=/path/to/libonnxruntime.so \
+MEDULLA_PROFILE_DIR=han_dog/profiles \
+MEDULLA_DEFAULT_PROFILE=thunder_h15 \
 dart run han_dog/bin/server.dart
 
 # 终端 2: MuJoCo 闭环测试
-python sim/walk_test.py --vx 0.5 --duration 5
-python sim/walk_test.py --vx 0.5 --render   # 带可视化
-python sim/walk_test.py --host 192.168.66.190  # 连接远程 Dart server
+python sim/scripts/walk_grpc.py --profile han_dog/profiles/thunder_h15.json --height 0.32 --vx 0.3 --duration 5
 ```
+
+体高策略接口、模型哈希、H15/H18 验证结果和真机安全门详见 [`docs/BODYHEIGHTCTRL.md`](docs/BODYHEIGHTCTRL.md)。
 
 ### 诊断工具
 
@@ -94,9 +97,9 @@ brainstem/
 │   │   ├── brain.dart                ← Brain facade（外层只与它交互）
 │   │   ├── cms/                      ← FSM 状态机（Zero→Grounded→Standing→Walking）
 │   │   ├── behaviour.dart            ← 行为层（Walk/StandUp/SitDown/Idle/Gesture）
-│   │   ├── observation_builder.dart  ← 57 维观测张量构建（与 Isaac Lab 训练对齐）
+│   │   ├── observation_builder.dart  ← 57/58 维观测张量构建（与训练对齐）
 │   │   ├── gesture.dart              ← 动作 SDK（关键帧插值、动作库）
-│   │   ├── memory.dart               ← 历史帧滑动窗口（historySize=5）
+│   │   ├── memory.dart               ← 策略相关长度的历史帧滑动窗口
 │   │   ├── model_info.dart           ← ONNX 模型元数据推断
 │   │   └── sensor.dart               ← 接口定义（ImuService/JointService）
 │   └── test/
@@ -177,7 +180,7 @@ brainstem/
 ```
 传感器 → ImuService/JointService
               ↓
-ObservationBuilder.build(History) → 57 维 float[]
+ObservationBuilder.build(History) → 57/58 维 float[]
               ↓
       ONNX policy 推理 → 16 维 action
               ↓
@@ -186,7 +189,7 @@ ObservationBuilder.build(History) → 57 维 float[]
 MotorService.sendAction() → CAN 总线 / MuJoCo
 ```
 
-### 观测张量布局（57 维，与 Isaac Lab 训练对齐）
+### 观测张量布局（57 维基础接口；体高策略为 58 维）
 
 ```
 obs[0:3]   = gyroscope × 0.25          (body frame 角速度)
@@ -195,6 +198,7 @@ obs[6:9]   = command [vx, vy, vyaw]    (速度命令)
 obs[9:25]  = jointPosition - standing  (关节位置偏差，foot 归零)
 obs[25:41] = jointVelocity × 0.05      (关节速度)
 obs[41:57] = (lastAction - standing) / actionScale  (上一步动作)
+obs[57]    = bodyHeightCommand in metres             (仅体高策略)
 ```
 
 ### FSM 状态转换
@@ -211,13 +215,14 @@ Zero ──Init──> Grounded ──StandUp──> Transitioning ──Done─
 
 ## gRPC 接口
 
-端口 `13145`，proto 定义在 `han_dog_message/han_dog_message/cms.proto`。
+端口 `13145`，proto 定义在子模块 `brainstem_api/brainstem_api/cms.proto`。
 
 ### 运动控制
 
 | RPC | 参数 | 说明 |
 |-----|------|------|
-| `Walk(Vector3)` | x=前后, y=左右, z=旋转 | 行走命令，范围 [-1, 1] |
+| `Walk(Vector3)` | x=前后, y=左右, z=旋转 | 按当前策略的逐轴训练范围截断 |
+| `SetBodyHeight(BodyHeightCommand)` | metres | 按当前策略体高范围截断 |
 | `StandUp()` | - | 从坐姿站起 |
 | `SitDown()` | - | 从站立坐下 |
 | `Enable()` / `Disable()` | - | 电机使能/禁用 |
