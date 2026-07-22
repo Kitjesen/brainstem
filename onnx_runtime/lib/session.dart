@@ -106,20 +106,30 @@ class InferenceSession implements Finalizable {
 
   OnnxInfo getInputInfo(int index) {
     final typeInfo = calloc<Pointer<OrtTypeInfo>>();
+    var ownsTypeInfo = false;
     try {
       ortApi.SessionGetInputTypeInfo(sesPtr, index, typeInfo).guard();
+      ownsTypeInfo = true;
       return OnnxInfo.from(typeInfo.value);
     } finally {
+      if (ownsTypeInfo && typeInfo.value != nullptr) {
+        ortApi.ReleaseTypeInfo(typeInfo.value);
+      }
       calloc.free(typeInfo);
     }
   }
 
   OnnxInfo getOutputInfo(int index) {
     final typeInfo = calloc<Pointer<OrtTypeInfo>>();
+    var ownsTypeInfo = false;
     try {
       ortApi.SessionGetOutputTypeInfo(sesPtr, index, typeInfo).guard();
+      ownsTypeInfo = true;
       return OnnxInfo.from(typeInfo.value);
     } finally {
+      if (ownsTypeInfo && typeInfo.value != nullptr) {
+        ortApi.ReleaseTypeInfo(typeInfo.value);
+      }
       calloc.free(typeInfo);
     }
   }
@@ -256,14 +266,23 @@ class InferenceSession implements Finalizable {
       outputValuesPtr,
     ).guard();
 
-    final List<OnnxValue> outputValues = List.generate(
-      outputLen,
-      (i) => OnnxValue.from(
-        outputValuesPtr[i],
-        outputInfos[i].info.tensorElementType,
-        outputInfos[i].info.dimensions,
-      ),
-    );
+    final List<OnnxValue> outputValues = List.generate(outputLen, (i) {
+      final shapeInfoPtr = calloc<Pointer<OrtTensorTypeAndShapeInfo>>();
+      try {
+        ortApi.GetTensorTypeAndShape(outputValuesPtr[i], shapeInfoPtr).guard();
+        final runtimeInfo = OnnxTensorInfo.from(shapeInfoPtr.value);
+        return OnnxValue.from(
+          outputValuesPtr[i],
+          outputInfos[i].info.tensorElementType,
+          runtimeInfo.dimensions,
+        );
+      } finally {
+        if (shapeInfoPtr.value != nullptr) {
+          ortApi.ReleaseTensorTypeAndShapeInfo(shapeInfoPtr.value);
+        }
+        calloc.free(shapeInfoPtr);
+      }
+    });
 
     ortApi.ReleaseRunOptions(runOptionsPtr);
     {

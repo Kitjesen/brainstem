@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:test/test.dart';
 import 'package:onnx_runtime/onnx_runtime.dart';
+import 'package:onnx_runtime/status.dart';
 
 void main() {
   late OnnxEnv env;
@@ -27,5 +28,19 @@ void main() {
     // You may want to adjust the expected value based on your model
     final result = outputValues[0] as OnnxFloat;
     expect(result.value[0], closeTo(2.0, 1e-5));
+  });
+
+  test('failed type info lookups leave the session usable', () {
+    expect(
+      () => session.getInputInfo(session.inputCounts),
+      throwsA(isA<OnnxStatus>()),
+    );
+    expect(
+      () => session.getOutputInfo(session.outputCounts),
+      throwsA(isA<OnnxStatus>()),
+    );
+
+    expect(session.getInputInfo(0).info.dimensions, [1]);
+    expect(session.getOutputInfo(0).info.dimensions, [1]);
   });
 }

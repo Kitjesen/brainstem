@@ -123,15 +123,22 @@ class OnnxTensorInfo {
         : [];
 
     // 获取张量形状元素总数
-    final totalElementCount = () {
-      final elementCountPtr = calloc<Size>();
-      try {
-        ortApi.GetTensorShapeElementCount(typeInfoPtr, elementCountPtr).guard();
-        return elementCountPtr.value;
-      } finally {
-        calloc.free(elementCountPtr);
-      }
-    }();
+    // Dynamic dimensions (for example [-1, 58]) have no fixed total.
+    // Preserve their shape metadata instead of failing GetInputInfo.
+    final totalElementCount = dimensions.any((dimension) => dimension < 0)
+        ? -1
+        : () {
+            final elementCountPtr = calloc<Size>();
+            try {
+              ortApi.GetTensorShapeElementCount(
+                typeInfoPtr,
+                elementCountPtr,
+              ).guard();
+              return elementCountPtr.value;
+            } finally {
+              calloc.free(elementCountPtr);
+            }
+          }();
 
     return OnnxTensorInfo(
       tensorElementType: tensorType,
