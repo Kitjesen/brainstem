@@ -1,228 +1,273 @@
-"""
-1:1 复刻参考仿真代码，PyTorch -> ONNX, 单帧 -> 5帧 history。
-其余逻辑完全不改。
-"""
+"""Profile-driven headless MuJoCo validation for Brainstem ONNX policies."""
+import argparse
+from collections import deque
+import json
 import math
-import numpy as np
+from pathlib import Path
+import sys
+from typing import NamedTuple
+
 import mujoco
+import numpy as np
 import onnxruntime as ort
 from scipy.spatial.transform import Rotation as R
-from collections import deque
-import argparse, os, sys
-from pathlib import Path
 
-# ── 关节索引 (和参考代码 100% 一致) ──────────────────────────
-dof_ids = [7,8,9, 11,12,13, 15,16,17, 19,20,21, 10,14,18,22]
-dof_vel = [6,7,8, 10,11,12, 14,15,16, 18,19,20, 9,13,17,21]
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DOF_IDS = [7,8,9, 11,12,13, 15,16,17, 19,20,21, 10,14,18,22]
+DOF_VEL = [6,7,8, 10,11,12, 14,15,16, 18,19,20, 9,13,17,21]
 
-# ── 默认角度 (和参考代码 100% 一致) ──────────────────────────
-default_joint_angles = {
-    "FR_hip_joint": -0.1,
-    "FR_thigh_joint": -0.8,
-    "FR_calf_joint": 1.8,
-    "FR_foot_joint": 0.0,
-    "FL_hip_joint": 0.1,
-    "FL_thigh_joint": 0.8,
-    "FL_calf_joint": -1.8,
-    "FL_foot_joint": 0.0,
-    "RR_hip_joint": 0.1,
-    "RR_thigh_joint": 0.8,
-    "RR_calf_joint": -1.8,
-    "RR_foot_joint": 0.0,
-    "RL_hip_joint": -0.1,
-    "RL_thigh_joint": -0.8,
-    "RL_calf_joint": 1.8,
-    "RL_foot_joint": 0.0,
-}
+class Profile(NamedTuple):
+    observation_type: str
+    body_height_command: float | None
+    min_body_height_command: float | None
+    max_body_height_command: float | None
+    velocity_min: np.ndarray
+    velocity_max: np.ndarray
+    standing_pose: np.ndarray
+    action_scale: np.ndarray
+    infer_kp: np.ndarray
+    infer_kd: np.ndarray
+    model_path: Path
+    @property
+    def frame_dim(self):
+        return 58 if self.observation_type == "bodyHeight" else 57
 
-hip_scale = 0.125
-thigh_calf_scale = 0.25
-wheel_scale = 5.0
+def _vector(raw, name, length):
+    value = np.asarray(raw, dtype=np.float64)
+    if value.shape != (length,):
+        raise ValueError(f"{name} must contain exactly {length} numbers")
+    if not np.isfinite(value).all():
+        raise ValueError(f"{name} must contain only finite numbers")
+    return value
 
-default_angle = np.array([
-    default_joint_angles["FR_hip_joint"],
-    default_joint_angles["FR_thigh_joint"],
-    default_joint_angles["FR_calf_joint"],
-    default_joint_angles["FL_hip_joint"],
-    default_joint_angles["FL_thigh_joint"],
-    default_joint_angles["FL_calf_joint"],
-    default_joint_angles["RR_hip_joint"],
-    default_joint_angles["RR_thigh_joint"],
-    default_joint_angles["RR_calf_joint"],
-    default_joint_angles["RL_hip_joint"],
-    default_joint_angles["RL_thigh_joint"],
-    default_joint_angles["RL_calf_joint"],
-    0.0, 0.0, 0.0, 0.0
-], dtype=np.double)
+def _optional_finite(raw, name):
+    if raw is None:
+        return None
+    value = float(raw)
+    if not math.isfinite(value):
+        raise ValueError(f"{name} must be finite")
+    return value
 
+def parse_profile(raw, repo_root=REPO_ROOT):
+    observation_type = raw.get("observationType", "standard")
+    if observation_type not in ("standard", "bodyHeight"):
+        raise ValueError("observationType must be 'standard' or 'bodyHeight'")
+    height = _optional_finite(raw.get("bodyHeightCommand"), "bodyHeightCommand")
+    min_height = _optional_finite(raw.get("minBodyHeightCommand"), "minBodyHeightCommand")
+    max_height = _optional_finite(raw.get("maxBodyHeightCommand"), "maxBodyHeightCommand")
+    if observation_type == "bodyHeight":
+        if height is None or min_height is None or max_height is None:
+            raise ValueError("bodyHeight profiles require command, min, and max height")
+        if min_height > max_height or not min_height <= height <= max_height:
+            raise ValueError("bodyHeightCommand must be within its min/max range")
+    velocity_min = _vector(raw.get("velocityCommandMin", [-0.5,-0.3,-1.0]), "velocityCommandMin", 3)
+    velocity_max = _vector(raw.get("velocityCommandMax", [0.5,0.3,1.0]), "velocityCommandMax", 3)
+    if np.any(velocity_min > velocity_max):
+        raise ValueError("velocityCommandMin must not exceed velocityCommandMax")
+    model_path = Path(raw["modelPath"])
+    if not model_path.is_absolute():
+        model_path = Path(repo_root) / model_path
+    return Profile(observation_type, height, min_height, max_height, velocity_min,
+                   velocity_max, _vector(raw["standingPose"], "standingPose", 16),
+                   _vector(raw["actionScale"], "actionScale", 4),
+                   _vector(raw["inferKp"], "inferKp", 16),
+                   _vector(raw["inferKd"], "inferKd", 16), model_path.resolve())
 
-class Cmd:
-    vx = 0.3
-    vy = 0.0
-    dyaw = 0.0
+def load_profile(path, repo_root=REPO_ROOT):
+    with Path(path).open(encoding="utf-8") as stream:
+        return parse_profile(json.load(stream), repo_root)
 
+def resolve_commands(profile, height=None, vx=None, vy=None, vyaw=None):
+    height_value = profile.body_height_command if height is None else height
+    if height_value is None:
+        height_value = 0.0
+    values = np.asarray([height_value, 0.0 if vx is None else vx,
+                         0.0 if vy is None else vy, 0.0 if vyaw is None else vyaw],
+                        dtype=np.float64)
+    if not np.isfinite(values).all():
+        raise ValueError("height and velocity commands must be finite")
+    velocity = np.clip(values[1:], profile.velocity_min, profile.velocity_max)
+    if profile.observation_type == "bodyHeight":
+        height_value = float(np.clip(values[0], profile.min_body_height_command,
+                                     profile.max_body_height_command))
+    else:
+        height_value = float(values[0])
+    return (height_value, *map(float, velocity))
 
-def get_obs(data, vel_cmd, last_action):
-    """和参考代码 100% 一致的 obs 构建。"""
-    q = data.qpos[dof_ids].astype(np.double)
-    q = q - default_angle
-    dq = data.qvel[dof_vel].astype(np.double) * 0.05
+def compose_observation(gyro, projected_gravity, velocity_command, joint_position,
+                        joint_velocity, last_action, *, height, observation_type):
+    observation = np.concatenate([gyro, projected_gravity, velocity_command,
+                                  joint_position, joint_velocity, last_action]).astype(np.float32)
+    if observation.shape != (57,):
+        raise ValueError(f"standard observation must have 57 values, got {observation.size}")
+    if observation_type == "bodyHeight":
+        return np.append(observation, np.float32(height)).astype(np.float32)
+    if observation_type != "standard":
+        raise ValueError(f"unsupported observation type: {observation_type}")
+    return observation
+
+def infer_history_size(input_dim, frame_dim):
+    if isinstance(input_dim, np.integer):
+        input_dim = int(input_dim)
+    if not isinstance(input_dim, int) or input_dim <= 0:
+        raise ValueError(f"ONNX input dimension must be a positive integer, got {input_dim!r}")
+    if input_dim % frame_dim:
+        raise ValueError(f"ONNX input dimension {input_dim} is not divisible by frame dimension {frame_dim}")
+    return input_dim // frame_dim
+
+def initialize_history(observation, history_size):
+    return deque((observation.copy() for _ in range(history_size)), maxlen=history_size)
+
+def flatten_history(history):
+    return np.concatenate(list(history)).astype(np.float32).reshape(1, -1)
+
+def validate_step(state, action, trunk_height, min_trunk_height):
+    if not np.isfinite(state).all() or not np.isfinite(action).all():
+        raise RuntimeError("non-finite simulation state or policy action")
+    if not math.isfinite(float(trunk_height)):
+        raise RuntimeError("non-finite trunk height")
+    if trunk_height < min_trunk_height:
+        raise RuntimeError(f"robot fallen: trunk height {trunk_height:.3f} < {min_trunk_height:.3f}")
+
+def get_obs(data, velocity_command, last_action, profile, height):
+    q = data.qpos[DOF_IDS].astype(np.float64) - profile.standing_pose
+    dq = data.qvel[DOF_VEL].astype(np.float64) * 0.05
     q[-4:] = 0.0
+    imu_quat = data.sensor("orientation").data[[1,2,3,0]].astype(np.float64)
+    imu_rotation = R.from_quat(imu_quat)
+    gravity = imu_rotation.apply(np.array([0.,0.,-1.]), inverse=True)
+    gyro_local = data.sensor("angular-velocity").data.astype(np.float64)
+    base_rotation = R.from_quat(data.qpos[3:7][[1,2,3,0]].astype(np.float64))
+    gyro = base_rotation.apply(imu_rotation.apply(gyro_local), inverse=True) * 0.25
+    return compose_observation(gyro, gravity, velocity_command, q, dq, last_action,
+                               height=height, observation_type=profile.observation_type)
 
-    imu_quat = data.sensor('orientation').data[[1, 2, 3, 0]].astype(np.double)
-    r_imu = R.from_quat(imu_quat)
-    proj = r_imu.apply(np.array([0., 0., -1.]), inverse=True).astype(np.double)
+def _input_dim(session):
+    shape = session.get_inputs()[0].shape
+    if len(shape) != 2:
+        raise ValueError(f"ONNX input must be rank 2, got {shape}")
+    return shape[1]
 
-    gyro_local = data.sensor('angular-velocity').data.astype(np.double)
-    base_quat = data.qpos[3:7][[1, 2, 3, 0]].astype(np.double)
-    r_base = R.from_quat(base_quat)
-    gyro_world = r_imu.apply(gyro_local)
-    gyro = r_base.apply(gyro_world, inverse=True) * 0.25
-
-    obs = np.concatenate([
-        gyro,
-        proj,
-        np.array([vel_cmd.vx, vel_cmd.vy, vel_cmd.dyaw]),
-        q,
-        dq,
-        last_action
-    ]).astype(np.float32)
-
-    return obs
-
-
-def pd_control(target_q, q, kp, target_dq, dq, kd):
-    return kp * (target_q - q) + kd * (target_dq - dq)
-
+def _scaled_action(action, scales):
+    scaled = np.empty(16, dtype=np.float32)
+    for leg in range(4):
+        index = leg * 3
+        scaled[index:index+3] = action[index:index+3] * scales[:3]
+    scaled[12:] = action[12:] * scales[3]
+    return scaled
 
 def run(args):
-    model = mujoco.MjModel.from_xml_path(args.xml)
-    model.opt.timestep = 0.005  # 和参考代码一致
+    profile = load_profile(args.profile, REPO_ROOT)
+    model_path = Path(args.model) if args.model else profile.model_path
+    if not model_path.is_absolute():
+        model_path = REPO_ROOT / model_path
+    model_path = model_path.resolve()
+    if not model_path.is_file():
+        raise FileNotFoundError(f"ONNX model not found: {model_path}")
+    xml_path = Path(args.xml)
+    if not xml_path.is_absolute():
+        xml_path = REPO_ROOT / xml_path
+    model = mujoco.MjModel.from_xml_path(str(xml_path.resolve()))
+    model.opt.timestep = 0.005
     data = mujoco.MjData(model)
-
-    decimation = 4  # 和参考代码一致
-    dt = 0.005
-
-    # ONNX
-    sess = ort.InferenceSession(args.model)
-    input_name = sess.get_inputs()[0].name
-    obs_dim = 57
-    history_size = sess.get_inputs()[0].shape[1] // obs_dim
-    print(f"ONNX: {input_name}, history={history_size}")
-
-    # Init
-    data.qpos[:3] = [0, 0, 0.5]
-    data.qpos[3:7] = [1, 0, 0, 0]
-    data.qpos[dof_ids] = default_angle.copy()
-    data.qvel[:] = 0.0
-    mujoco.mj_step(model, data)  # 初始化 sensor 数据
-
-    target_q = np.zeros(16, dtype=np.float32)
+    height, vx, vy, vyaw = resolve_commands(profile, args.height, args.vx, args.vy, args.vyaw)
+    velocity_command = np.array([vx,vy,vyaw], dtype=np.float64)
+    session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+    input_info = session.get_inputs()[0]
+    history_size = infer_history_size(_input_dim(session), profile.frame_dim)
+    print(f"ONNX: {input_info.name}, frame={profile.frame_dim}, history={history_size}, model={model_path}")
+    print(f"Command: height={height:.3f}, velocity=({vx:.3f}, {vy:.3f}, {vyaw:.3f})")
+    data.qpos[:3] = [0.,0.,0.5]
+    data.qpos[3:7] = [1.,0.,0.,0.]
+    data.qpos[DOF_IDS] = profile.standing_pose
+    data.qvel[:] = 0.
+    mujoco.mj_forward(model, data)
+    target = profile.standing_pose.copy()
     action = np.zeros(16, dtype=np.float32)
     last_action = np.zeros(16, dtype=np.float32)
-
-    # History buffer
-    obs_history = deque(maxlen=history_size)
-
-    vel_cmd = Cmd()
-    vel_cmd.vx = args.vx
-    vel_cmd.vy = args.vy
-    vel_cmd.dyaw = args.vyaw
-
-    count_lowlevel = 0
-    sim_steps = int(args.duration / dt)
-
-    # 录帧
+    history = initialize_history(get_obs(data, velocity_command, last_action, profile, height), history_size)
     renderer = None
     frames = []
     if args.render:
         renderer = mujoco.Renderer(model, width=640, height=480)
-        cam = mujoco.MjvCamera()
-        cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
-        cam.trackbodyid = model.body('trunk').id
-        cam.distance = 2.5
-        cam.azimuth = 180
-        cam.elevation = -20
-
+        camera = mujoco.MjvCamera()
+        camera.type = mujoco.mjtCamera.mjCAMERA_TRACKING
+        camera.trackbodyid = model.body("trunk").id
+        camera.distance, camera.azimuth, camera.elevation = 2.5, 180, -20
+    dt, decimation = 0.005, 4
+    sim_steps = int(args.duration / dt)
+    min_height_seen = float(data.qpos[2])
+    max_action_seen = 0.0
     print(f"Running {sim_steps} steps ({args.duration}s), decimation={decimation}")
-
-    for i in range(sim_steps):
-        if count_lowlevel % decimation == 0:
-            obs = get_obs(data, vel_cmd, last_action)
-            obs_history.append(obs.copy())
-
-            # 填充 history 如果不够
-            while len(obs_history) < history_size:
-                obs_history.appendleft(obs.copy())
-
-            obs_flat = np.concatenate(list(obs_history)).astype(np.float32).reshape(1, -1)
-            raw_action = sess.run(None, {input_name: obs_flat})[0].squeeze()
-            action[:] = raw_action
-
-            if count_lowlevel > 100:
-                scaled_action = np.zeros(16, dtype=np.float32)
-                for j in range(4):
-                    base_idx = j * 3
-                    scaled_action[base_idx + 0] = action[base_idx + 0] * hip_scale
-                    scaled_action[base_idx + 1] = action[base_idx + 1] * thigh_calf_scale
-                    scaled_action[base_idx + 2] = action[base_idx + 2] * thigh_calf_scale
-                scaled_action[12:] = action[12:] * wheel_scale
-
-                target_q = scaled_action + default_angle
+    try:
+        for step in range(sim_steps):
+            if step % decimation == 0:
+                observation = get_obs(data, velocity_command, last_action, profile, height)
+                if step:
+                    history.append(observation.copy())
+                policy_input = flatten_history(history)
+                action = np.asarray(session.run(None, {input_info.name: policy_input})[0],
+                                    dtype=np.float32).reshape(-1)
+                if action.shape != (16,):
+                    raise RuntimeError(f"policy output must contain 16 actions, got {action.shape}")
+                validate_step(observation, action, float(data.qpos[2]), args.min_trunk_height)
+                max_action_seen = max(max_action_seen, float(np.max(np.abs(action))))
                 last_action = action.copy()
-            else:
-                target_q = default_angle.copy()
-                last_action = action.copy()  # 和参考一样，站立也保存 action
-
-            # PD 控制 (训练增益: hip=70/15, thigh=100/15, calf=120/20)
-        q = data.qpos[dof_ids]
-        dq = data.qvel[dof_vel]
-        kp = np.array([70,100,120, 70,100,120, 70,100,120, 70,100,120], dtype=np.float64)
-        kd = np.array([15, 15, 20, 15, 15, 20, 15, 15, 20, 15, 15, 20], dtype=np.float64)
-        tau_leg = kp * (target_q[:12] - q[:12]) - kd * dq[:12]
-        tau_wheel = 1 * (target_q[12:] - dq[12:])
-        tau = np.concatenate([tau_leg, tau_wheel])
-        tau = np.clip(tau, -120, 120)
-        data.ctrl[:] = tau
-
-        mujoco.mj_step(model, data)
-        count_lowlevel += 1
-
-        if renderer and count_lowlevel % decimation == 0:
-            renderer.update_scene(data, camera=cam)
-            frames.append(renderer.render().copy())
-
-        if count_lowlevel % int(1.0 / dt) == 0:
-            sec = count_lowlevel * dt
-            x, y, z = data.qpos[0], data.qpos[1], data.qpos[2]
-            mode = "WALK" if count_lowlevel > 100 else "STAND"
-            print(f"  [{sec:.1f}s] pos=({x:.3f}, {y:.3f}, {z:.3f}) {mode}")
-
-    x, y = data.qpos[0], data.qpos[1]
-    print(f"\nFinal: x={x:.3f} y={y:.3f} disp={math.sqrt(x**2+y**2):.3f}")
-
-    if renderer and frames:
-        SCRIPT_DIR = Path(__file__).resolve().parent
-        out_dir = SCRIPT_DIR.parent / "output"
-        os.makedirs(out_dir, exist_ok=True)
-        video_path = str(out_dir / "walk_ref.mp4")
+                if step > 100:
+                    target = profile.standing_pose + _scaled_action(action, profile.action_scale)
+            q, dq = data.qpos[DOF_IDS], data.qvel[DOF_VEL]
+            leg_tau = profile.infer_kp[:12] * (target[:12]-q[:12]) - profile.infer_kd[:12]*dq[:12]
+            wheel_tau = profile.infer_kp[12:] * (target[12:]-q[12:]) + profile.infer_kd[12:] * (target[12:]-dq[12:])
+            torque = np.clip(np.concatenate([leg_tau,wheel_tau]), -120., 120.)
+            validate_step(np.concatenate([data.qpos,data.qvel]), torque, float(data.qpos[2]), args.min_trunk_height)
+            data.ctrl[:] = torque
+            mujoco.mj_step(model, data)
+            validate_step(np.concatenate([data.qpos,data.qvel]), action,
+                          float(data.qpos[2]), args.min_trunk_height)
+            min_height_seen = min(min_height_seen, float(data.qpos[2]))
+            if renderer and step % decimation == 0:
+                renderer.update_scene(data, camera=camera)
+                frames.append(renderer.render().copy())
+            if (step+1) % int(1./dt) == 0:
+                print(f"  [{(step+1)*dt:.1f}s] pos=({data.qpos[0]:.3f}, {data.qpos[1]:.3f}, {data.qpos[2]:.3f})")
+    finally:
+        if renderer:
+            renderer.close()
+    x, y = float(data.qpos[0]), float(data.qpos[1])
+    metrics = {"x":x, "y":y, "displacement":math.hypot(x,y),
+               "finalTrunkHeight":float(data.qpos[2]), "minTrunkHeight":min_height_seen,
+               "maxAbsAction":max_action_seen, "historySize":history_size,
+               "frameDim":profile.frame_dim}
+    print("METRICS " + json.dumps(metrics, sort_keys=True))
+    if args.render and frames:
+        output_dir = REPO_ROOT / "sim" / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
         try:
             import imageio
-            imageio.mimsave(video_path, frames, fps=50)
+            video_path = output_dir / "walk_ref.mp4"
+            imageio.mimsave(str(video_path), frames, fps=50)
             print(f"Video: {video_path} ({len(frames)} frames)")
         except ImportError:
             print(f"imageio not installed ({len(frames)} frames)")
-        renderer.close()
+    return metrics
 
-
-if __name__ == '__main__':
+def build_parser():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--profile", required=True, help="RobotProfile JSON")
     parser.add_argument("--xml", default="sim/robot/quadruped_v3.xml")
-    parser.add_argument("--model", default="model/policy_260106.onnx")
-    parser.add_argument("--vx", type=float, default=0.3)
-    parser.add_argument("--vy", type=float, default=0.0)
-    parser.add_argument("--vyaw", type=float, default=0.0)
+    parser.add_argument("--model", help="override profile modelPath")
+    parser.add_argument("--height", type=float)
+    parser.add_argument("--vx", type=float)
+    parser.add_argument("--vy", type=float)
+    parser.add_argument("--vyaw", type=float)
     parser.add_argument("--duration", type=float, default=10.0)
+    parser.add_argument("--min-trunk-height", type=float, default=0.12)
     parser.add_argument("--render", action="store_true")
-    args = parser.parse_args()
-    run(args)
+    return parser
+
+if __name__ == "__main__":
+    try:
+        run(build_parser().parse_args())
+    except Exception as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        sys.exit(2)

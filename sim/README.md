@@ -28,18 +28,43 @@ sim/
 
 ```bash
 cd brainstem
-python sim/scripts/walk_ref.py --vx 0.3 --duration 10 --render
+python sim/scripts/walk_ref.py --profile han_dog/profiles/thunder_h15.json --height 0.32 --vx 0.3 --duration 10
 ```
+
+`walk_ref.py` reads observation type, command limits, standing pose, action
+scale, PD gains, and model path from one RobotProfile JSON. Relative model
+paths resolve from the repository root; `--model` overrides that path.
+Commands are finite-checked and clamped to the profile ranges.
+
+`bodyHeight` uses an exact 58-value frame; legacy `standard` remains 57.
+The ONNX input dimension automatically selects H15 (58) or H18 (580, ten
+oldest-to-newest frames). Headless runs exit nonzero on non-finite state/action
+or a trunk height below `--min-trunk-height` (default: 0.12 m).
 
 ### 2. 验证 brainstem gRPC 链路
 
 ```bash
 # 终端 1: 启动 Dart server
-ONNXRUNTIME_DLL_PATH=... dart run han_dog/bin/server.dart
+export ORT_DIR=/path/to/onnxruntime/capi
+export ONNXRUNTIME_DLL_PATH=$ORT_DIR/libonnxruntime.so.1.22.1
+export LD_LIBRARY_PATH=$ORT_DIR
+export MEDULLA_PROFILE_DIR=han_dog/profiles
+export MEDULLA_DEFAULT_PROFILE=thunder_h15  # or thunder_h18
+dart run han_dog/bin/server.dart
 
 # 终端 2: 跑仿真
-python sim/scripts/walk_grpc.py --vx 0.3 --duration 10 --render
+python sim/scripts/walk_grpc.py \
+  --profile han_dog/profiles/thunder_h15.json \
+  --height 0.32 --vx 0.3 --duration 5
+# Use thunder_h18.json when MEDULLA_DEFAULT_PROFILE=thunder_h18.
 ```
+
+The client validates the complete Dart path: injected SimState, FSM stand-up,
+SetBodyHeight, Walk, Dart observation/history construction, ONNX inference,
+returned targets/gains, and MuJoCo PD control. It exits nonzero for malformed
+History messages, non-finite values, a fall after stand-up, or failure to reach
+Walking. Current generated Python stubs require protobuf >=6.31.1 and grpcio
+>=1.76.0; older Isaac environments with protobuf 3.x cannot import them.
 
 ### 3. Xbox 手柄控制
 
@@ -64,11 +89,11 @@ python sim/scripts/walk_xbox.py
 | timestep | 0.005s | MuJoCo 物理步长 |
 | decimation | 4 | 每 4 步推理一次 (50Hz) |
 | PD 频率 | 200Hz | 每步都算 PD |
-| 腿 KP | 70/100/120 | hip/thigh/calf |
+| 腿 KP | 100/100/120 | hip/thigh/calf |
 | 腿 KD | 15/15/20 | hip/thigh/calf |
 | 轮 KD | 1.0 | 纯速度控制 |
 | action scale | 0.125/0.25/0.25/5.0 | hip/thigh/calf/wheel |
-| standing pose | [-0.1,-0.8,1.8, ...] | 16 DOF 默认角度 |
+| standing pose | [-0.1,-1.1,2.6, ...] | 16 DOF 默认角度 |
 
 ## quadruped_v3.xml
 
