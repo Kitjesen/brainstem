@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:han_dog/src/app/config.dart';
 import 'package:han_dog/src/app/robot_profile.dart';
 import 'package:han_dog/src/control_arbiter.dart';
-import 'package:han_dog_brain/han_dog_brain.dart' show M, A;
+import 'package:han_dog_brain/han_dog_brain.dart'
+    show A, BodyHeightObservationBuilder, M, StandardObservationBuilder;
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
 
@@ -292,6 +293,103 @@ void main() {
       expect(profile.imuGyroscopeScale, closeTo(0.25, 1e-9));
       expect(profile.standUpCounts, 150);
       expect(profile.sitDownCounts, 150);
+    });
+
+    test('legacy profile defaults to the standard 57-dim observation', () {
+      final profile = RobotProfile.fromJson(validJson());
+      final builder = profile.toObservationBuilder();
+
+      expect(profile.observationType, 'standard');
+      expect(builder, isA<StandardObservationBuilder>());
+      expect(builder.tensorSize, 57);
+    });
+
+    test('body-height fields build a 58-dim observation contract', () {
+      final json = validJson()
+        ..addAll({
+          'observationType': 'bodyHeight',
+          'inputName': 'policy_obs',
+          'bodyHeightCommand': 0.42,
+          'minBodyHeightCommand': 0.20,
+          'maxBodyHeightCommand': 0.54,
+          'velocityCommandMin': [-2.5, -1.0, -1.0],
+          'velocityCommandMax': [2.5, 1.0, 1.0],
+        });
+
+      final profile = RobotProfile.fromJson(json);
+      final builder = profile.toObservationBuilder();
+
+      expect(profile.observationType, 'bodyHeight');
+      expect(profile.inputName, 'policy_obs');
+      expect(profile.bodyHeightCommand, 0.42);
+      expect(profile.minBodyHeightCommand, 0.20);
+      expect(profile.maxBodyHeightCommand, 0.54);
+      expect(profile.velocityCommandMin, (-2.5, -1.0, -1.0));
+      expect(profile.velocityCommandMax, (2.5, 1.0, 1.0));
+      expect(builder, isA<BodyHeightObservationBuilder>());
+      expect(builder.tensorSize, 58);
+    });
+
+    test('unknown observationType is rejected', () {
+      final json = validJson()..['observationType'] = 'guessedFromShape';
+
+      expect(
+        () => RobotProfile.fromJson(json),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('observationType'), contains('guessedFromShape')),
+          ),
+        ),
+      );
+    });
+
+    test('body-height minimum greater than maximum is rejected', () {
+      final json = validJson()
+        ..addAll({
+          'observationType': 'bodyHeight',
+          'minBodyHeightCommand': 0.55,
+          'maxBodyHeightCommand': 0.20,
+        });
+
+      expect(() => RobotProfile.fromJson(json), throwsFormatException);
+    });
+
+    test('body-height default outside its range is rejected', () {
+      final json = validJson()
+        ..addAll({
+          'observationType': 'bodyHeight',
+          'bodyHeightCommand': 0.60,
+          'minBodyHeightCommand': 0.20,
+          'maxBodyHeightCommand': 0.54,
+        });
+
+      expect(() => RobotProfile.fromJson(json), throwsFormatException);
+    });
+
+    test('non-finite body-height fields are rejected', () {
+      for (final field in [
+        'bodyHeightCommand',
+        'minBodyHeightCommand',
+        'maxBodyHeightCommand',
+      ]) {
+        final json = validJson()
+          ..addAll({'observationType': 'bodyHeight', field: double.nan});
+        expect(
+          () => RobotProfile.fromJson(json),
+          throwsFormatException,
+          reason: field,
+        );
+      }
+    });
+
+    test('inverted velocity command bounds are rejected', () {
+      final json = validJson()
+        ..['velocityCommandMin'] = [-2.5, 1.1, -1.0]
+        ..['velocityCommandMax'] = [2.5, 1.0, 1.0];
+
+      expect(() => RobotProfile.fromJson(json), throwsFormatException);
     });
 
     test('actionScale defaults to (0.125, 0.25, 0.25, 5.0) when absent', () {

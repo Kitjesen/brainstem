@@ -50,7 +50,10 @@ void main() {
     registerFallbackValue(JointsMatrix.zero());
   });
 
-  RealControlDog buildDog() {
+  RealControlDog buildDog({
+    (double, double, double) velocityCommandMin = (-3.0, -3.0, -3.0),
+    (double, double, double) velocityCommandMax = (3.0, 3.0, 3.0),
+  }) {
     return RealControlDog(
       brain: brain,
       arbiter: arbiter,
@@ -63,6 +66,8 @@ void main() {
       standUpKd: standUpKd,
       sitDownKp: sitDownKp,
       sitDownKd: sitDownKd,
+      velocityCommandMin: velocityCommandMin,
+      velocityCommandMax: velocityCommandMax,
     );
   }
 
@@ -90,8 +95,9 @@ void main() {
     when(() => controller.red).thenAnswer((_) => redCtrl.stream);
     when(() => controller.enabled).thenAnswer((_) => enabledCtrl.stream);
     when(() => controller.calibrate).thenAnswer((_) => calibrateCtrl.stream);
-    when(() => controller.switchProfile)
-        .thenAnswer((_) => switchProfileCtrl.stream);
+    when(
+      () => controller.switchProfile,
+    ).thenAnswer((_) => switchProfileCtrl.stream);
 
     when(() => joint.enable()).thenAnswer((_) async {});
     when(() => joint.disable()).thenAnswer((_) async {});
@@ -127,11 +133,13 @@ void main() {
 
     test('Transitioning(StandUp) → standUpKp/standUpKd', () async {
       buildDog();
-      stateCtrl.add(Transitioning(
-        const Command.standUp(),
-        Stream<History>.empty().listen((_) {}),
-        null,
-      ));
+      stateCtrl.add(
+        Transitioning(
+          const Command.standUp(),
+          Stream<History>.empty().listen((_) {}),
+          null,
+        ),
+      );
       await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.kpExt = standUpKp).called(1);
@@ -140,11 +148,13 @@ void main() {
 
     test('Transitioning(SitDown) → sitDownKp/sitDownKd', () async {
       buildDog();
-      stateCtrl.add(Transitioning(
-        const Command.sitDown(),
-        Stream<History>.empty().listen((_) {}),
-        null,
-      ));
+      stateCtrl.add(
+        Transitioning(
+          const Command.sitDown(),
+          Stream<History>.empty().listen((_) {}),
+          null,
+        ),
+      );
       await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.kpExt = sitDownKp).called(1);
@@ -168,14 +178,39 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       verify(
-        () => arbiter.command(
-          any(that: isA<CmdWalk>()),
-          ControlSource.yunzhuo,
-        ),
+        () => arbiter.command(any(that: isA<CmdWalk>()), ControlSource.yunzhuo),
       ).called(1);
     });
-  });
 
+    test('profile bounds clamp every controller velocity axis', () async {
+      buildDog(
+        velocityCommandMin: (-2.5, -1.0, -1.0),
+        velocityCommandMax: (2.5, 1.0, 1.0),
+      );
+      directionCtrl.add(Vector3(1.5, 1.5, -1.5));
+      await Future<void>.delayed(Duration.zero);
+
+      final command =
+          verify(
+                () => arbiter.command(
+                  captureAny(that: isA<CmdWalk>()),
+                  ControlSource.yunzhuo,
+                ),
+              ).captured.single
+              as CmdWalk;
+      expect(command.direction.x, 1.5);
+      expect(command.direction.y, 1.0);
+      expect(command.direction.z, -1.0);
+    });
+
+    test('non-finite controller direction is ignored', () async {
+      buildDog();
+      directionCtrl.add(Vector3(double.nan, 0, 0));
+      await Future<void>.delayed(Duration.zero);
+
+      verifyNever(() => arbiter.command(any(), ControlSource.yunzhuo));
+    });
+  });
   group('buttons', () {
     test('L1 → standUp', () async {
       buildDog();
@@ -243,9 +278,9 @@ void main() {
 
   group('calibrate', () {
     test('in Grounded → setZero + save', () async {
-      when(() => arbiter.state).thenReturn(
-        Grounded(Stream<History>.empty().listen((_) {})),
-      );
+      when(
+        () => arbiter.state,
+      ).thenReturn(Grounded(Stream<History>.empty().listen((_) {})));
 
       buildDog();
       calibrateCtrl.add(null);
@@ -257,9 +292,9 @@ void main() {
     });
 
     test('not in Grounded → ignored', () async {
-      when(() => arbiter.state).thenReturn(
-        Standing(Stream<History>.empty().listen((_) {})),
-      );
+      when(
+        () => arbiter.state,
+      ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
 
       buildDog();
       calibrateCtrl.add(null);

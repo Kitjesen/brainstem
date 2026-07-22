@@ -20,20 +20,23 @@ final _kd1 = JointsMatrix.fromList(List.filled(16, 20.0));
 final _kp2 = JointsMatrix.fromList(List.filled(16, 30.0));
 final _kd2 = JointsMatrix.fromList(List.filled(16, 40.0));
 
-RobotProfile _profile(String name, JointsMatrix pose, JointsMatrix kp,
-        JointsMatrix kd) =>
-    RobotProfile(
-      name: name,
-      modelPath: 'model/$name.onnx',
-      standingPose: pose,
-      sittingPose: JointsMatrix.zero(),
-      inferKp: kp,
-      inferKd: kd,
-      standUpKp: kp,
-      standUpKd: kd,
-      sitDownKp: kp,
-      sitDownKd: kd,
-    );
+RobotProfile _profile(
+  String name,
+  JointsMatrix pose,
+  JointsMatrix kp,
+  JointsMatrix kd,
+) => RobotProfile(
+  name: name,
+  modelPath: 'model/$name.onnx',
+  standingPose: pose,
+  sittingPose: JointsMatrix.zero(),
+  inferKp: kp,
+  inferKd: kd,
+  standUpKp: kp,
+  standUpKd: kd,
+  sitDownKp: kp,
+  sitDownKd: kd,
+);
 
 void main() {
   late MockBrain brain;
@@ -45,7 +48,8 @@ void main() {
     registerFallbackValue(JointsMatrix.zero());
     registerFallbackValue(GestureLibrary(standingPose: JointsMatrix.zero()));
     registerFallbackValue(
-        StandardObservationBuilder(standingPose: JointsMatrix.zero()));
+      StandardObservationBuilder(standingPose: JointsMatrix.zero()),
+    );
   });
 
   setUp(() {
@@ -58,34 +62,44 @@ void main() {
       'beta': _profile('beta', _pose2, _kp2, _kd2),
     };
 
-    when(() => brain.switchProfile(
-          observationBuilder: any(named: 'observationBuilder'),
-          standingPose: any(named: 'standingPose'),
-          sittingPose: any(named: 'sittingPose'),
-          modelPath: any(named: 'modelPath'),
-          standUpCounts: any(named: 'standUpCounts'),
-          sitDownCounts: any(named: 'sitDownCounts'),
-        )).thenAnswer((_) async {});
+    when(
+      () => brain.switchProfile(
+        observationBuilder: any(named: 'observationBuilder'),
+        standingPose: any(named: 'standingPose'),
+        sittingPose: any(named: 'sittingPose'),
+        modelPath: any(named: 'modelPath'),
+        standUpCounts: any(named: 'standUpCounts'),
+        sitDownCounts: any(named: 'sitDownCounts'),
+        inputName: any(named: 'inputName'),
+        bodyHeightCommand: any(named: 'bodyHeightCommand'),
+        minBodyHeightCommand: any(named: 'minBodyHeightCommand'),
+        maxBodyHeightCommand: any(named: 'maxBodyHeightCommand'),
+      ),
+    ).thenAnswer((_) async {});
 
     when(() => brain.gestureLibrary = any()).thenReturn(null);
 
-    when(() => gains.switchGains(
-          inferKp: any(named: 'inferKp'),
-          inferKd: any(named: 'inferKd'),
-          standUpKp: any(named: 'standUpKp'),
-          standUpKd: any(named: 'standUpKd'),
-          sitDownKp: any(named: 'sitDownKp'),
-          sitDownKd: any(named: 'sitDownKd'),
-        )).thenReturn(null);
+    when(
+      () => gains.switchGains(
+        inferKp: any(named: 'inferKp'),
+        inferKd: any(named: 'inferKd'),
+        standUpKp: any(named: 'standUpKp'),
+        standUpKd: any(named: 'standUpKd'),
+        sitDownKp: any(named: 'sitDownKp'),
+        sitDownKd: any(named: 'sitDownKd'),
+      ),
+    ).thenReturn(null);
 
-    when(() => controlDog.switchGains(
-          inferKp: any(named: 'inferKp'),
-          inferKd: any(named: 'inferKd'),
-          standUpKp: any(named: 'standUpKp'),
-          standUpKd: any(named: 'standUpKd'),
-          sitDownKp: any(named: 'sitDownKp'),
-          sitDownKd: any(named: 'sitDownKd'),
-        )).thenReturn(null);
+    when(
+      () => controlDog.switchGains(
+        inferKp: any(named: 'inferKp'),
+        inferKd: any(named: 'inferKd'),
+        standUpKp: any(named: 'standUpKp'),
+        standUpKd: any(named: 'standUpKd'),
+        sitDownKp: any(named: 'sitDownKp'),
+        sitDownKd: any(named: 'sitDownKd'),
+      ),
+    ).thenReturn(null);
   });
 
   test('initial state', () {
@@ -110,14 +124,20 @@ void main() {
     await pm.switchTo('beta');
 
     expect(pm.currentName, 'beta');
-    verify(() => brain.switchProfile(
-          observationBuilder: any(named: 'observationBuilder'),
-          standingPose: any(named: 'standingPose'),
-          sittingPose: any(named: 'sittingPose'),
-          modelPath: 'model/beta.onnx',
-          standUpCounts: 150,
-          sitDownCounts: 150,
-        )).called(1);
+    verify(
+      () => brain.switchProfile(
+        observationBuilder: any(named: 'observationBuilder'),
+        standingPose: any(named: 'standingPose'),
+        sittingPose: any(named: 'sittingPose'),
+        modelPath: 'model/beta.onnx',
+        standUpCounts: 150,
+        sitDownCounts: 150,
+        inputName: null,
+        bodyHeightCommand: 0.35,
+        minBodyHeightCommand: 0.20,
+        maxBodyHeightCommand: 0.54,
+      ),
+    ).called(1);
   });
 
   test('switchTo updates GainManager gains', () async {
@@ -130,14 +150,16 @@ void main() {
 
     await pm.switchTo('beta');
 
-    verify(() => gains.switchGains(
-          inferKp: _kp2,
-          inferKd: _kd2,
-          standUpKp: _kp2,
-          standUpKd: _kd2,
-          sitDownKp: _kp2,
-          sitDownKd: _kd2,
-        )).called(1);
+    verify(
+      () => gains.switchGains(
+        inferKp: _kp2,
+        inferKd: _kd2,
+        standUpKp: _kp2,
+        standUpKd: _kd2,
+        sitDownKp: _kp2,
+        sitDownKd: _kd2,
+      ),
+    ).called(1);
   });
 
   test('switchTo updates RealControlDog gains', () async {
@@ -150,14 +172,22 @@ void main() {
 
     await pm.switchTo('beta');
 
-    verify(() => controlDog.switchGains(
-          inferKp: _kp2,
-          inferKd: _kd2,
-          standUpKp: _kp2,
-          standUpKd: _kd2,
-          sitDownKp: _kp2,
-          sitDownKd: _kd2,
-        )).called(1);
+    verify(
+      () => controlDog.switchGains(
+        inferKp: _kp2,
+        inferKd: _kd2,
+        standUpKp: _kp2,
+        standUpKd: _kd2,
+        sitDownKp: _kp2,
+        sitDownKd: _kd2,
+      ),
+    ).called(1);
+    verify(
+      () => controlDog.switchVelocityBounds(
+        velocityCommandMin: (-3.0, -3.0, -3.0),
+        velocityCommandMax: (3.0, 3.0, 3.0),
+      ),
+    ).called(1);
   });
 
   test('switchTo same profile is a no-op', () async {
@@ -171,14 +201,20 @@ void main() {
 
     await pm.switchTo('alpha');
 
-    verifyNever(() => brain.switchProfile(
-          observationBuilder: any(named: 'observationBuilder'),
-          standingPose: any(named: 'standingPose'),
-          sittingPose: any(named: 'sittingPose'),
-          modelPath: any(named: 'modelPath'),
-          standUpCounts: any(named: 'standUpCounts'),
-          sitDownCounts: any(named: 'sitDownCounts'),
-        ));
+    verifyNever(
+      () => brain.switchProfile(
+        observationBuilder: any(named: 'observationBuilder'),
+        standingPose: any(named: 'standingPose'),
+        sittingPose: any(named: 'sittingPose'),
+        modelPath: any(named: 'modelPath'),
+        standUpCounts: any(named: 'standUpCounts'),
+        sitDownCounts: any(named: 'sitDownCounts'),
+        inputName: any(named: 'inputName'),
+        bodyHeightCommand: any(named: 'bodyHeightCommand'),
+        minBodyHeightCommand: any(named: 'minBodyHeightCommand'),
+        maxBodyHeightCommand: any(named: 'maxBodyHeightCommand'),
+      ),
+    );
   });
 
   test('switchTo unknown profile throws ArgumentError', () {
@@ -207,51 +243,68 @@ void main() {
     expect(pm.currentName, 'alpha');
   });
 
-  test('switchTo brain failure rolls back gains and keeps currentName', () async {
-    when(() => brain.switchProfile(
+  test(
+    'switchTo brain failure rolls back gains and keeps currentName',
+    () async {
+      when(
+        () => brain.switchProfile(
           observationBuilder: any(named: 'observationBuilder'),
           standingPose: any(named: 'standingPose'),
           sittingPose: any(named: 'sittingPose'),
           modelPath: any(named: 'modelPath'),
           standUpCounts: any(named: 'standUpCounts'),
           sitDownCounts: any(named: 'sitDownCounts'),
-        )).thenThrow(Exception('model file not found'));
+          inputName: any(named: 'inputName'),
+          bodyHeightCommand: any(named: 'bodyHeightCommand'),
+          minBodyHeightCommand: any(named: 'minBodyHeightCommand'),
+          maxBodyHeightCommand: any(named: 'maxBodyHeightCommand'),
+        ),
+      ).thenThrow(Exception('model file not found'));
 
-    final pm = ProfileManager(
-      profiles: profiles,
-      brain: brain,
-      gains: gains,
-      controlDog: controlDog,
-      initial: 'alpha',
-    );
+      final pm = ProfileManager(
+        profiles: profiles,
+        brain: brain,
+        gains: gains,
+        controlDog: controlDog,
+        initial: 'alpha',
+      );
 
-    await expectLater(() => pm.switchTo('beta'), throwsException);
+      await expectLater(() => pm.switchTo('beta'), throwsException);
 
-    // Name must not change — partial switch was rolled back
-    expect(pm.currentName, 'alpha');
+      // Name must not change — partial switch was rolled back
+      expect(pm.currentName, 'alpha');
 
-    // Gains must be rolled back to alpha
-    verify(() => gains.switchGains(
+      // Gains must be rolled back to alpha
+      verify(
+        () => gains.switchGains(
           inferKp: _kp1,
           inferKd: _kd1,
           standUpKp: _kp1,
           standUpKd: _kd1,
           sitDownKp: _kp1,
           sitDownKd: _kd1,
-        )).called(1);
-  });
+        ),
+      ).called(1);
+    },
+  );
 
   test('switchTo while already switching throws StateError', () async {
     // brain.switchProfile hangs until we release the completer
     final completer = Completer<void>();
-    when(() => brain.switchProfile(
-          observationBuilder: any(named: 'observationBuilder'),
-          standingPose: any(named: 'standingPose'),
-          sittingPose: any(named: 'sittingPose'),
-          modelPath: any(named: 'modelPath'),
-          standUpCounts: any(named: 'standUpCounts'),
-          sitDownCounts: any(named: 'sitDownCounts'),
-        )).thenAnswer((_) => completer.future);
+    when(
+      () => brain.switchProfile(
+        observationBuilder: any(named: 'observationBuilder'),
+        standingPose: any(named: 'standingPose'),
+        sittingPose: any(named: 'sittingPose'),
+        modelPath: any(named: 'modelPath'),
+        standUpCounts: any(named: 'standUpCounts'),
+        sitDownCounts: any(named: 'sitDownCounts'),
+        inputName: any(named: 'inputName'),
+        bodyHeightCommand: any(named: 'bodyHeightCommand'),
+        minBodyHeightCommand: any(named: 'minBodyHeightCommand'),
+        maxBodyHeightCommand: any(named: 'maxBodyHeightCommand'),
+      ),
+    ).thenAnswer((_) => completer.future);
 
     final pm = ProfileManager(
       profiles: profiles,
@@ -272,24 +325,32 @@ void main() {
 
   test('onFault called when switch AND rollback both fail', () async {
     // brain.switchProfile fails on switch
-    when(() => brain.switchProfile(
-          observationBuilder: any(named: 'observationBuilder'),
-          standingPose: any(named: 'standingPose'),
-          sittingPose: any(named: 'sittingPose'),
-          modelPath: any(named: 'modelPath'),
-          standUpCounts: any(named: 'standUpCounts'),
-          sitDownCounts: any(named: 'sitDownCounts'),
-        )).thenThrow(Exception('model corrupt'));
+    when(
+      () => brain.switchProfile(
+        observationBuilder: any(named: 'observationBuilder'),
+        standingPose: any(named: 'standingPose'),
+        sittingPose: any(named: 'sittingPose'),
+        modelPath: any(named: 'modelPath'),
+        standUpCounts: any(named: 'standUpCounts'),
+        sitDownCounts: any(named: 'sitDownCounts'),
+        inputName: any(named: 'inputName'),
+        bodyHeightCommand: any(named: 'bodyHeightCommand'),
+        minBodyHeightCommand: any(named: 'minBodyHeightCommand'),
+        maxBodyHeightCommand: any(named: 'maxBodyHeightCommand'),
+      ),
+    ).thenThrow(Exception('model corrupt'));
 
     // gains.switchGains fails on rollback
-    when(() => gains.switchGains(
-          inferKp: any(named: 'inferKp'),
-          inferKd: any(named: 'inferKd'),
-          standUpKp: any(named: 'standUpKp'),
-          standUpKd: any(named: 'standUpKd'),
-          sitDownKp: any(named: 'sitDownKp'),
-          sitDownKd: any(named: 'sitDownKd'),
-        )).thenThrow(Exception('gains rollback failed'));
+    when(
+      () => gains.switchGains(
+        inferKp: any(named: 'inferKp'),
+        inferKd: any(named: 'inferKd'),
+        standUpKp: any(named: 'standUpKp'),
+        standUpKd: any(named: 'standUpKd'),
+        sitDownKp: any(named: 'sitDownKp'),
+        sitDownKd: any(named: 'sitDownKd'),
+      ),
+    ).thenThrow(Exception('gains rollback failed'));
 
     String? faultReason;
     final pm = ProfileManager(
@@ -322,7 +383,8 @@ void main() {
     /// 写入一条最小合法 profile JSON 文件到 [dir]/[name].json。
     Future<void> writeProfileJson(Directory dir, String name) async {
       const zeros16 = '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]';
-      final json = '{'
+      final json =
+          '{'
           '"name":"$name","modelPath":"$name.onnx",'
           '"standingPose":$zeros16,"sittingPose":$zeros16,'
           '"inferKp":$zeros16,"inferKd":$zeros16,'
@@ -352,54 +414,60 @@ void main() {
       }
     });
 
-    test('reload removes profiles deleted from disk, never removes current', () async {
-      final dir = await Directory.systemTemp.createTemp('pm_test_');
-      try {
-        // Disk only has alpha and beta — gamma was deleted
-        await writeProfileJson(dir, 'alpha');
-        await writeProfileJson(dir, 'beta');
+    test(
+      'reload removes profiles deleted from disk, never removes current',
+      () async {
+        final dir = await Directory.systemTemp.createTemp('pm_test_');
+        try {
+          // Disk only has alpha and beta — gamma was deleted
+          await writeProfileJson(dir, 'alpha');
+          await writeProfileJson(dir, 'beta');
 
-        final pm = ProfileManager(
-          profiles: {
-            'alpha': profiles['alpha']!,
-            'beta': profiles['beta']!,
-            'gamma': _profile('gamma', _pose1, _kp1, _kd1),
-          },
-          brain: brain,
-          initial: 'alpha',
-        );
-        expect(pm.names, containsAll(['alpha', 'beta', 'gamma']));
+          final pm = ProfileManager(
+            profiles: {
+              'alpha': profiles['alpha']!,
+              'beta': profiles['beta']!,
+              'gamma': _profile('gamma', _pose1, _kp1, _kd1),
+            },
+            brain: brain,
+            initial: 'alpha',
+          );
+          expect(pm.names, containsAll(['alpha', 'beta', 'gamma']));
 
-        await pm.reload(dir.path);
+          await pm.reload(dir.path);
 
-        expect(pm.names, isNot(contains('gamma'))); // 磁盘上已删除
-        expect(pm.names, containsAll(['alpha', 'beta']));
-        expect(pm.currentName, 'alpha'); // 当前策略不受影响
-      } finally {
-        await dir.delete(recursive: true);
-      }
-    });
+          expect(pm.names, isNot(contains('gamma'))); // 磁盘上已删除
+          expect(pm.names, containsAll(['alpha', 'beta']));
+          expect(pm.currentName, 'alpha'); // 当前策略不受影响
+        } finally {
+          await dir.delete(recursive: true);
+        }
+      },
+    );
 
-    test('reload does not remove current profile even if absent from disk', () async {
-      final dir = await Directory.systemTemp.createTemp('pm_test_');
-      try {
-        // Disk only has beta — alpha (current) is absent
-        await writeProfileJson(dir, 'beta');
+    test(
+      'reload does not remove current profile even if absent from disk',
+      () async {
+        final dir = await Directory.systemTemp.createTemp('pm_test_');
+        try {
+          // Disk only has beta — alpha (current) is absent
+          await writeProfileJson(dir, 'beta');
 
-        final pm = ProfileManager(
-          profiles: {'alpha': profiles['alpha']!, 'beta': profiles['beta']!},
-          brain: brain,
-          initial: 'alpha',
-        );
+          final pm = ProfileManager(
+            profiles: {'alpha': profiles['alpha']!, 'beta': profiles['beta']!},
+            brain: brain,
+            initial: 'alpha',
+          );
 
-        await pm.reload(dir.path);
+          await pm.reload(dir.path);
 
-        // alpha is current → 即使磁盘上不存在也不能移除
-        expect(pm.names, contains('alpha'));
-        expect(pm.currentName, 'alpha');
-      } finally {
-        await dir.delete(recursive: true);
-      }
-    });
+          // alpha is current → 即使磁盘上不存在也不能移除
+          expect(pm.names, contains('alpha'));
+          expect(pm.currentName, 'alpha');
+        } finally {
+          await dir.delete(recursive: true);
+        }
+      },
+    );
   });
 }
