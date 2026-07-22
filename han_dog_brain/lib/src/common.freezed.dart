@@ -396,7 +396,7 @@ as String,
 /// @nodoc
 mixin _$History {
 
- Vector3 get gyroscope; Vector3 get projectedGravity; Command get command; JointsMatrix get jointPosition; JointsMatrix get jointVelocity; JointsMatrix get action; JointsMatrix get nextAction;
+ Vector3 get gyroscope; Vector3 get projectedGravity; Command get command; double get bodyHeightCommand; JointsMatrix get jointPosition; JointsMatrix get jointVelocity; JointsMatrix get action; JointsMatrix get nextAction;
 /// Create a copy of History
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -407,12 +407,12 @@ $HistoryCopyWith<History> get copyWith => _$HistoryCopyWithImpl<History>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is History&&(identical(other.gyroscope, gyroscope) || other.gyroscope == gyroscope)&&(identical(other.projectedGravity, projectedGravity) || other.projectedGravity == projectedGravity)&&(identical(other.command, command) || other.command == command)&&(identical(other.jointPosition, jointPosition) || other.jointPosition == jointPosition)&&(identical(other.jointVelocity, jointVelocity) || other.jointVelocity == jointVelocity)&&(identical(other.action, action) || other.action == action)&&(identical(other.nextAction, nextAction) || other.nextAction == nextAction));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is History&&(identical(other.gyroscope, gyroscope) || other.gyroscope == gyroscope)&&(identical(other.projectedGravity, projectedGravity) || other.projectedGravity == projectedGravity)&&(identical(other.command, command) || other.command == command)&&(identical(other.bodyHeightCommand, bodyHeightCommand) || other.bodyHeightCommand == bodyHeightCommand)&&(identical(other.jointPosition, jointPosition) || other.jointPosition == jointPosition)&&(identical(other.jointVelocity, jointVelocity) || other.jointVelocity == jointVelocity)&&(identical(other.action, action) || other.action == action)&&(identical(other.nextAction, nextAction) || other.nextAction == nextAction));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,gyroscope,projectedGravity,command,jointPosition,jointVelocity,action,nextAction);
+int get hashCode => Object.hash(runtimeType,gyroscope,projectedGravity,command,bodyHeightCommand,jointPosition,jointVelocity,action,nextAction);
 
 
 
@@ -423,7 +423,7 @@ abstract mixin class $HistoryCopyWith<$Res>  {
   factory $HistoryCopyWith(History value, $Res Function(History) _then) = _$HistoryCopyWithImpl;
 @useResult
 $Res call({
- Vector3 gyroscope, Vector3 projectedGravity, Command command, JointsMatrix jointPosition, JointsMatrix jointVelocity, JointsMatrix action, JointsMatrix nextAction
+ Vector3 gyroscope, Vector3 projectedGravity, Command command, double bodyHeightCommand, JointsMatrix jointPosition, JointsMatrix jointVelocity, JointsMatrix action, JointsMatrix nextAction
 });
 
 
@@ -440,12 +440,13 @@ class _$HistoryCopyWithImpl<$Res>
 
 /// Create a copy of History
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? gyroscope = null,Object? projectedGravity = null,Object? command = null,Object? jointPosition = null,Object? jointVelocity = null,Object? action = null,Object? nextAction = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? gyroscope = null,Object? projectedGravity = null,Object? command = null,Object? bodyHeightCommand = null,Object? jointPosition = null,Object? jointVelocity = null,Object? action = null,Object? nextAction = null,}) {
   return _then(_self.copyWith(
 gyroscope: null == gyroscope ? _self.gyroscope : gyroscope // ignore: cast_nullable_to_non_nullable
 as Vector3,projectedGravity: null == projectedGravity ? _self.projectedGravity : projectedGravity // ignore: cast_nullable_to_non_nullable
 as Vector3,command: null == command ? _self.command : command // ignore: cast_nullable_to_non_nullable
-as Command,jointPosition: null == jointPosition ? _self.jointPosition : jointPosition // ignore: cast_nullable_to_non_nullable
+as Command,bodyHeightCommand: null == bodyHeightCommand ? _self.bodyHeightCommand : bodyHeightCommand // ignore: cast_nullable_to_non_nullable
+as double,jointPosition: null == jointPosition ? _self.jointPosition : jointPosition // ignore: cast_nullable_to_non_nullable
 as JointsMatrix,jointVelocity: null == jointVelocity ? _self.jointVelocity : jointVelocity // ignore: cast_nullable_to_non_nullable
 as JointsMatrix,action: null == action ? _self.action : action // ignore: cast_nullable_to_non_nullable
 as JointsMatrix,nextAction: null == nextAction ? _self.nextAction : nextAction // ignore: cast_nullable_to_non_nullable
@@ -543,10 +544,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Vector3 gyroscope,  Vector3 projectedGravity,  Command command,  JointsMatrix jointPosition,  JointsMatrix jointVelocity,  JointsMatrix action,  JointsMatrix nextAction)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Vector3 gyroscope,  Vector3 projectedGravity,  Command command,  double bodyHeightCommand,  JointsMatrix jointPosition,  JointsMatrix jointVelocity,  JointsMatrix action,  JointsMatrix nextAction)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _History() when $default != null:
-return $default(_that.gyroscope,_that.projectedGravity,_that.command,_that.jointPosition,_that.jointVelocity,_that.action,_that.nextAction);case _:
+return $default(_that.gyroscope,_that.projectedGravity,_that.command,_that.bodyHeightCommand,_that.jointPosition,_that.jointVelocity,_that.action,_that.nextAction);case _:
   return orElse();
 
 }
@@ -564,10 +565,10 @@ return $default(_that.gyroscope,_that.projectedGravity,_that.command,_that.joint
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Vector3 gyroscope,  Vector3 projectedGravity,  Command command,  JointsMatrix jointPosition,  JointsMatrix jointVelocity,  JointsMatrix action,  JointsMatrix nextAction)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Vector3 gyroscope,  Vector3 projectedGravity,  Command command,  double bodyHeightCommand,  JointsMatrix jointPosition,  JointsMatrix jointVelocity,  JointsMatrix action,  JointsMatrix nextAction)  $default,) {final _that = this;
 switch (_that) {
 case _History():
-return $default(_that.gyroscope,_that.projectedGravity,_that.command,_that.jointPosition,_that.jointVelocity,_that.action,_that.nextAction);case _:
+return $default(_that.gyroscope,_that.projectedGravity,_that.command,_that.bodyHeightCommand,_that.jointPosition,_that.jointVelocity,_that.action,_that.nextAction);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -584,10 +585,10 @@ return $default(_that.gyroscope,_that.projectedGravity,_that.command,_that.joint
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Vector3 gyroscope,  Vector3 projectedGravity,  Command command,  JointsMatrix jointPosition,  JointsMatrix jointVelocity,  JointsMatrix action,  JointsMatrix nextAction)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Vector3 gyroscope,  Vector3 projectedGravity,  Command command,  double bodyHeightCommand,  JointsMatrix jointPosition,  JointsMatrix jointVelocity,  JointsMatrix action,  JointsMatrix nextAction)?  $default,) {final _that = this;
 switch (_that) {
 case _History() when $default != null:
-return $default(_that.gyroscope,_that.projectedGravity,_that.command,_that.jointPosition,_that.jointVelocity,_that.action,_that.nextAction);case _:
+return $default(_that.gyroscope,_that.projectedGravity,_that.command,_that.bodyHeightCommand,_that.jointPosition,_that.jointVelocity,_that.action,_that.nextAction);case _:
   return null;
 
 }
@@ -599,12 +600,13 @@ return $default(_that.gyroscope,_that.projectedGravity,_that.command,_that.joint
 
 
 class _History extends History {
-  const _History({required this.gyroscope, required this.projectedGravity, required this.command, required this.jointPosition, required this.jointVelocity, required this.action, required this.nextAction}): super._();
+  const _History({required this.gyroscope, required this.projectedGravity, required this.command, this.bodyHeightCommand = 0.35, required this.jointPosition, required this.jointVelocity, required this.action, required this.nextAction}): super._();
   
 
 @override final  Vector3 gyroscope;
 @override final  Vector3 projectedGravity;
 @override final  Command command;
+@override@JsonKey() final  double bodyHeightCommand;
 @override final  JointsMatrix jointPosition;
 @override final  JointsMatrix jointVelocity;
 @override final  JointsMatrix action;
@@ -620,12 +622,12 @@ _$HistoryCopyWith<_History> get copyWith => __$HistoryCopyWithImpl<_History>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _History&&(identical(other.gyroscope, gyroscope) || other.gyroscope == gyroscope)&&(identical(other.projectedGravity, projectedGravity) || other.projectedGravity == projectedGravity)&&(identical(other.command, command) || other.command == command)&&(identical(other.jointPosition, jointPosition) || other.jointPosition == jointPosition)&&(identical(other.jointVelocity, jointVelocity) || other.jointVelocity == jointVelocity)&&(identical(other.action, action) || other.action == action)&&(identical(other.nextAction, nextAction) || other.nextAction == nextAction));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _History&&(identical(other.gyroscope, gyroscope) || other.gyroscope == gyroscope)&&(identical(other.projectedGravity, projectedGravity) || other.projectedGravity == projectedGravity)&&(identical(other.command, command) || other.command == command)&&(identical(other.bodyHeightCommand, bodyHeightCommand) || other.bodyHeightCommand == bodyHeightCommand)&&(identical(other.jointPosition, jointPosition) || other.jointPosition == jointPosition)&&(identical(other.jointVelocity, jointVelocity) || other.jointVelocity == jointVelocity)&&(identical(other.action, action) || other.action == action)&&(identical(other.nextAction, nextAction) || other.nextAction == nextAction));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,gyroscope,projectedGravity,command,jointPosition,jointVelocity,action,nextAction);
+int get hashCode => Object.hash(runtimeType,gyroscope,projectedGravity,command,bodyHeightCommand,jointPosition,jointVelocity,action,nextAction);
 
 
 
@@ -636,7 +638,7 @@ abstract mixin class _$HistoryCopyWith<$Res> implements $HistoryCopyWith<$Res> {
   factory _$HistoryCopyWith(_History value, $Res Function(_History) _then) = __$HistoryCopyWithImpl;
 @override @useResult
 $Res call({
- Vector3 gyroscope, Vector3 projectedGravity, Command command, JointsMatrix jointPosition, JointsMatrix jointVelocity, JointsMatrix action, JointsMatrix nextAction
+ Vector3 gyroscope, Vector3 projectedGravity, Command command, double bodyHeightCommand, JointsMatrix jointPosition, JointsMatrix jointVelocity, JointsMatrix action, JointsMatrix nextAction
 });
 
 
@@ -653,12 +655,13 @@ class __$HistoryCopyWithImpl<$Res>
 
 /// Create a copy of History
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? gyroscope = null,Object? projectedGravity = null,Object? command = null,Object? jointPosition = null,Object? jointVelocity = null,Object? action = null,Object? nextAction = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? gyroscope = null,Object? projectedGravity = null,Object? command = null,Object? bodyHeightCommand = null,Object? jointPosition = null,Object? jointVelocity = null,Object? action = null,Object? nextAction = null,}) {
   return _then(_History(
 gyroscope: null == gyroscope ? _self.gyroscope : gyroscope // ignore: cast_nullable_to_non_nullable
 as Vector3,projectedGravity: null == projectedGravity ? _self.projectedGravity : projectedGravity // ignore: cast_nullable_to_non_nullable
 as Vector3,command: null == command ? _self.command : command // ignore: cast_nullable_to_non_nullable
-as Command,jointPosition: null == jointPosition ? _self.jointPosition : jointPosition // ignore: cast_nullable_to_non_nullable
+as Command,bodyHeightCommand: null == bodyHeightCommand ? _self.bodyHeightCommand : bodyHeightCommand // ignore: cast_nullable_to_non_nullable
+as double,jointPosition: null == jointPosition ? _self.jointPosition : jointPosition // ignore: cast_nullable_to_non_nullable
 as JointsMatrix,jointVelocity: null == jointVelocity ? _self.jointVelocity : jointVelocity // ignore: cast_nullable_to_non_nullable
 as JointsMatrix,action: null == action ? _self.action : action // ignore: cast_nullable_to_non_nullable
 as JointsMatrix,nextAction: null == nextAction ? _self.nextAction : nextAction // ignore: cast_nullable_to_non_nullable

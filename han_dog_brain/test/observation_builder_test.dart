@@ -34,19 +34,20 @@ void main() {
     Vector3? gyroscope,
     Vector3? projectedGravity,
     Command? command,
+    double bodyHeightCommand = 0.35,
     JointsMatrix? jointPosition,
     JointsMatrix? jointVelocity,
     JointsMatrix? action,
-  }) =>
-      History(
-        gyroscope: gyroscope ?? Vector3.zero(),
-        projectedGravity: projectedGravity ?? Vector3(0, 0, -1),
-        command: command ?? const Command.idle(),
-        jointPosition: jointPosition ?? JointsMatrix.zero(),
-        jointVelocity: jointVelocity ?? JointsMatrix.zero(),
-        action: action ?? JointsMatrix.zero(),
-        nextAction: JointsMatrix.zero(),
-      );
+  }) => History(
+    gyroscope: gyroscope ?? Vector3.zero(),
+    projectedGravity: projectedGravity ?? Vector3(0, 0, -1),
+    command: command ?? const Command.idle(),
+    bodyHeightCommand: bodyHeightCommand,
+    jointPosition: jointPosition ?? JointsMatrix.zero(),
+    jointVelocity: jointVelocity ?? JointsMatrix.zero(),
+    action: action ?? JointsMatrix.zero(),
+    nextAction: JointsMatrix.zero(),
+  );
 
   group('tensorSize', () {
     test('is 57', () {
@@ -105,31 +106,34 @@ void main() {
     // jointPosition section: out[9..24]
     // Formula: (jointPosition - standingPose).discardFoot()
     // discardFoot() zeroes indices 12-15 (frFoot/flFoot/rrFoot/rlFoot)
-    test('out[9-20] = jointPosition delta (hip/thigh/calf), out[21-24] = 0 (feet discarded)', () {
-      // Put recognisable values in hip/thigh/calf; put 99 in foot slots
-      final delta = JointsMatrix.fromList([
-        0.1, 0.2, 0.3, // fr hip/thigh/calf
-        0.4, 0.5, 0.6, // fl
-        0.7, 0.8, 0.9, // rr
-        1.0, 1.1, 1.2, // rl
-        99.0, 99.0, 99.0, 99.0, // feet → must become 0 after discardFoot
-      ]);
-      final jointPos = standingPose + delta;
-      final out = builder.build(makeHistory(jointPosition: jointPos));
+    test(
+      'out[9-20] = jointPosition delta (hip/thigh/calf), out[21-24] = 0 (feet discarded)',
+      () {
+        // Put recognisable values in hip/thigh/calf; put 99 in foot slots
+        final delta = JointsMatrix.fromList([
+          0.1, 0.2, 0.3, // fr hip/thigh/calf
+          0.4, 0.5, 0.6, // fl
+          0.7, 0.8, 0.9, // rr
+          1.0, 1.1, 1.2, // rl
+          99.0, 99.0, 99.0, 99.0, // feet → must become 0 after discardFoot
+        ]);
+        final jointPos = standingPose + delta;
+        final out = builder.build(makeHistory(jointPosition: jointPos));
 
-      // hip/thigh/calf values preserved
-      expect(out[9],  closeTo(0.1, 1e-9)); // frHip
-      expect(out[10], closeTo(0.2, 1e-9)); // frThigh
-      expect(out[11], closeTo(0.3, 1e-9)); // frCalf
-      expect(out[12], closeTo(0.4, 1e-9)); // flHip (NOT foot!)
-      expect(out[20], closeTo(1.2, 1e-9)); // rlCalf
+        // hip/thigh/calf values preserved
+        expect(out[9], closeTo(0.1, 1e-9)); // frHip
+        expect(out[10], closeTo(0.2, 1e-9)); // frThigh
+        expect(out[11], closeTo(0.3, 1e-9)); // frCalf
+        expect(out[12], closeTo(0.4, 1e-9)); // flHip (NOT foot!)
+        expect(out[20], closeTo(1.2, 1e-9)); // rlCalf
 
-      // foot indices 12-15 in JointsMatrix → out[21-24]
-      expect(out[21], 0.0); // frFoot zeroed
-      expect(out[22], 0.0); // flFoot zeroed
-      expect(out[23], 0.0); // rrFoot zeroed
-      expect(out[24], 0.0); // rlFoot zeroed
-    });
+        // foot indices 12-15 in JointsMatrix → out[21-24]
+        expect(out[21], 0.0); // frFoot zeroed
+        expect(out[22], 0.0); // flFoot zeroed
+        expect(out[23], 0.0); // rrFoot zeroed
+        expect(out[24], 0.0); // rlFoot zeroed
+      },
+    );
 
     // jointVelocity section: out[25..40]
     // Formula: jointVelocity * jointVelocityScale  (no discardFoot)
@@ -141,11 +145,11 @@ void main() {
       expect(out[25], closeTo(0.05, 1e-9)); // frHip
       expect(out[28], closeTo(0.05, 1e-9)); // flHip
       // thigh (indices 1,4,7,10 → out[26,29,32,35]) × 0.1
-      expect(out[26], closeTo(0.1, 1e-9));  // frThigh
+      expect(out[26], closeTo(0.1, 1e-9)); // frThigh
       // calf (indices 2,5,8,11 → out[27,30,33,36]) × 0.2
-      expect(out[27], closeTo(0.2, 1e-9));  // frCalf
+      expect(out[27], closeTo(0.2, 1e-9)); // frCalf
       // foot (indices 12-15 → out[37-40]) × 0.5
-      expect(out[37], closeTo(0.5, 1e-9));  // frFoot
+      expect(out[37], closeTo(0.5, 1e-9)); // frFoot
     });
 
     // action section: out[41..56]
@@ -153,8 +157,11 @@ void main() {
     test('out[41-56] = 0 when action == standingPose', () {
       final out = builder.build(makeHistory(action: standingPose));
       for (int i = 41; i < 57; i++) {
-        expect(out[i], closeTo(0.0, 1e-9),
-            reason: 'index $i: action==standingPose → 0');
+        expect(
+          out[i],
+          closeTo(0.0, 1e-9),
+          reason: 'index $i: action==standingPose → 0',
+        );
       }
     });
 
@@ -187,6 +194,41 @@ void main() {
 
     test('actionScale returns constructor value', () {
       expect(builder.actionScale, (0.125, 0.25, 0.25, 5.0));
+    });
+  });
+
+  group('BodyHeightObservationBuilder', () {
+    final bodyHeightBuilder = BodyHeightObservationBuilder(
+      standingPose: standingPose,
+      imuGyroscopeScale: 0.25,
+      jointVelocityScale: (0.05, 0.1, 0.2, 0.5),
+      actionScale: (0.125, 0.25, 0.25, 5.0),
+    );
+
+    test('preserves the exact standard prefix and appends raw metres', () {
+      final history = makeHistory(
+        gyroscope: Vector3(1, 2, 3),
+        command: Command.walk(Vector3(0.5, -0.25, 0.75)),
+        bodyHeightCommand: 0.42,
+        jointPosition: JointsMatrix.fromList(List.filled(16, 0.7)),
+        jointVelocity: JointsMatrix.fromList(List.filled(16, -0.8)),
+        action: JointsMatrix.fromList(List.filled(16, 0.9)),
+      );
+
+      final standard = builder.build(history);
+      final bodyHeight = bodyHeightBuilder.build(history);
+
+      expect(bodyHeightBuilder.tensorSize, 58);
+      expect(bodyHeight, hasLength(58));
+      expect(bodyHeight.sublist(0, 57), orderedEquals(standard));
+      expect(bodyHeight[57], 0.42);
+    });
+
+    test('sanitizes a non-finite height like the standard features', () {
+      expect(
+        bodyHeightBuilder.build(makeHistory(bodyHeightCommand: double.nan))[57],
+        0.0,
+      );
     });
   });
 }

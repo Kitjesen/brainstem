@@ -32,6 +32,7 @@ abstract class History with _$History {
     required Vector3 gyroscope,
     required Vector3 projectedGravity,
     required Command command,
+    @Default(0.35) double bodyHeightCommand,
     required JointsMatrix jointPosition,
     required JointsMatrix jointVelocity,
     required JointsMatrix action,

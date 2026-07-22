@@ -13,7 +13,13 @@ class Brain {
   final Memory<History> memory;
   final ImuService imu;
   final JointService joint;
+  final double Function() _bodyHeightCommandProvider;
   JointsMatrix get standingPose => walk.observationBuilder.standingPose;
+  double get bodyHeightCommand => walk.bodyHeightCommand;
+  set bodyHeightCommand(double value) {
+    walk.bodyHeightCommand = value;
+  }
+
   Idle idle;
   SitDown sitDown;
   StandUp standUp;
@@ -34,14 +40,24 @@ class Brain {
     required ObservationBuilder observationBuilder,
     required JointsMatrix sittingPose,
     required this.memory,
-  }) :
-       idle = .new(clock: clock, imu: imu, joint: joint, memory: memory,
-),
+    required double Function() bodyHeightCommandProvider,
+    double bodyHeightCommand = 0.35,
+    double minBodyHeightCommand = 0.20,
+    double maxBodyHeightCommand = 0.54,
+  }) : _bodyHeightCommandProvider = bodyHeightCommandProvider,
+       idle = .new(
+         clock: clock,
+         imu: imu,
+         joint: joint,
+         memory: memory,
+         bodyHeightCommandProvider: bodyHeightCommandProvider,
+       ),
        sitDown = .new(
          clock: clock,
          imu: imu,
          joint: joint,
          memory: memory,
+         bodyHeightCommandProvider: bodyHeightCommandProvider,
          sittingPose: sittingPose,
          counts: sitDownCounts,
        ),
@@ -50,6 +66,7 @@ class Brain {
          imu: imu,
          joint: joint,
          memory: memory,
+         bodyHeightCommandProvider: bodyHeightCommandProvider,
          standingPose: observationBuilder.standingPose,
          counts: standUpCounts,
        ),
@@ -59,6 +76,9 @@ class Brain {
          joint: joint,
          clock: clock,
          memory: memory,
+         bodyHeightCommand: bodyHeightCommand,
+         minBodyHeightCommand: minBodyHeightCommand,
+         maxBodyHeightCommand: maxBodyHeightCommand,
        );
 
   factory Brain({
@@ -80,23 +100,38 @@ class Brain {
     ),
     (double, double, double, double) actionScale = (0.125, 0.25, 0.25, 5.0),
     History? initialHistory,
+    double bodyHeightCommand = 0.35,
+    double minBodyHeightCommand = 0.20,
+    double maxBodyHeightCommand = 0.54,
   }) {
-    final builder = observationBuilder ??
+    final builder =
+        observationBuilder ??
         StandardObservationBuilder(
           standingPose: standingPose,
           imuGyroscopeScale: imuGyroscopeScale,
           jointVelocityScale: jointVelocityScale,
           actionScale: actionScale,
         );
-    final brain = Brain.shareMemory(
+    final safeBodyHeightCommand = Walk.normalizeBodyHeightCommand(
+      value: bodyHeightCommand,
+      minimum: minBodyHeightCommand,
+      maximum: maxBodyHeightCommand,
+    );
+    late Brain brain;
+    double currentBodyHeightCommand() => brain.walk.bodyHeightCommand;
+    brain = Brain.shareMemory(
       historySize: historySize,
       imu: imu,
       joint: joint,
       clock: clock,
       standUpCounts: standUpCounts,
+      bodyHeightCommandProvider: currentBodyHeightCommand,
       sitDownCounts: sitDownCounts,
       observationBuilder: builder,
       sittingPose: sittingPose,
+      bodyHeightCommand: safeBodyHeightCommand,
+      minBodyHeightCommand: minBodyHeightCommand,
+      maxBodyHeightCommand: maxBodyHeightCommand,
       memory: Memory<History>(
         historySize: historySize,
         initial:
@@ -105,6 +140,7 @@ class Brain {
               gyroscope: imu.initialGyroscope,
               projectedGravity: imu.initialProjectedGravity,
               command: const Command.idle(),
+              bodyHeightCommand: safeBodyHeightCommand,
               jointPosition: joint.initialPosition,
               jointVelocity: joint.initialVelocity,
               action: JointsMatrix.zero(),
@@ -127,6 +163,7 @@ class Brain {
       joint: joint,
       memory: memory,
       definition: definition,
+      bodyHeightCommandProvider: _bodyHeightCommandProvider,
     );
   }
 
@@ -178,8 +215,12 @@ class Brain {
     ),
     (double, double, double, double) actionScale = (0.125, 0.25, 0.25, 5.0),
     String? inputName,
+    double bodyHeightCommand = 0.35,
+    double minBodyHeightCommand = 0.20,
+    double maxBodyHeightCommand = 0.54,
   }) async {
-    final builder = observationBuilder ??
+    final builder =
+        observationBuilder ??
         StandardObservationBuilder(
           standingPose: standingPose,
           imuGyroscopeScale: imuGyroscopeScale,
@@ -192,6 +233,7 @@ class Brain {
       joint: joint,
       memory: memory,
       standingPose: standingPose,
+      bodyHeightCommandProvider: _bodyHeightCommandProvider,
       counts: standUpCounts,
     );
     final newSitDown = SitDown(
@@ -200,6 +242,7 @@ class Brain {
       joint: joint,
       memory: memory,
       sittingPose: sittingPose,
+      bodyHeightCommandProvider: _bodyHeightCommandProvider,
       counts: sitDownCounts,
     );
     final newWalk = Walk(
@@ -208,6 +251,9 @@ class Brain {
       joint: joint,
       clock: clock,
       memory: memory,
+      bodyHeightCommand: bodyHeightCommand,
+      minBodyHeightCommand: minBodyHeightCommand,
+      maxBodyHeightCommand: maxBodyHeightCommand,
     );
 
     try {
@@ -226,15 +272,18 @@ class Brain {
     // 清除旧策略的观测历史帧，防止新模型推理时读到不兼容的历史数据。
     // 使用当前传感器读数初始化，比 initialGyroscope/initialProjectedGravity
     // 更贴近机器人实际状态（此时 FSM 处于 Grounded，关节已稳定）。
-    memory.reset(History(
-      gyroscope: imu.gyroscope,
-      projectedGravity: imu.projectedGravity,
-      command: Command.idle(),
-      jointPosition: joint.position,
-      jointVelocity: joint.velocity,
-      action: JointsMatrix.zero(),
-      nextAction: JointsMatrix.zero(),
-    ));
+    memory.reset(
+      History(
+        gyroscope: imu.gyroscope,
+        projectedGravity: imu.projectedGravity,
+        command: Command.idle(),
+        bodyHeightCommand: newWalk.bodyHeightCommand,
+        jointPosition: joint.position,
+        jointVelocity: joint.velocity,
+        action: JointsMatrix.zero(),
+        nextAction: JointsMatrix.zero(),
+      ),
+    );
   }
 
   void dispose() {

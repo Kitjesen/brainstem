@@ -134,15 +134,19 @@ void main() {
       act: (m) => m.add(const A.sitDown()),
       expect: () => [
         // Walking → Transitioning(StandUp, pending: SitDown)
-        predicate((S s) =>
-            s is Transitioning &&
-            s.target is StandUpCommand &&
-            s.pending is CmdSitDown),
+        predicate(
+          (S s) =>
+              s is Transitioning &&
+              s.target is StandUpCommand &&
+              s.pending is CmdSitDown,
+        ),
         // StandUp done → Transitioning(SitDown)
-        predicate((S s) =>
-            s is Transitioning &&
-            s.target is SitDownCommand &&
-            s.pending == null),
+        predicate(
+          (S s) =>
+              s is Transitioning &&
+              s.target is SitDownCommand &&
+              s.pending == null,
+        ),
         // SitDown done → Grounded
         predicate((S s) => s is Grounded),
       ],
@@ -201,6 +205,40 @@ void main() {
     act: (m) => m.add(A.fault('test error')),
     expect: () => <S>[],
   );
+
+  group('body height command', () {
+    for (final seedState in <S Function()>[
+      () => Grounded(Stream<History>.empty().listen((_) {})),
+      () => Standing(Stream<History>.empty().listen((_) {})),
+      () => Walking(Stream<History>.empty().listen((_) {})),
+    ]) {
+      blocTest<TestM, S>(
+        'stable state updates Brain target without changing FSM state',
+        build: () => TestM(),
+        seed: seedState,
+        act: (m) => m.add(const A.setBodyHeight(0.31)),
+        expect: () => <S>[],
+        verify: (m) {
+          verify(() => m.mockBrain.bodyHeightCommand = 0.31).called(1);
+        },
+      );
+    }
+
+    blocTest<TestM, S>(
+      'transitioning rejects body height updates',
+      build: () => TestM(),
+      seed: () => Transitioning(
+        const Command.standUp(),
+        Stream<History>.empty().listen((_) {}),
+        null,
+      ),
+      act: (m) => m.add(const A.setBodyHeight(0.31)),
+      expect: () => <S>[],
+      verify: (m) {
+        verifyNever(() => m.mockBrain.bodyHeightCommand = any());
+      },
+    );
+  });
 
   // ── Standing → SitDown ───────────────────────────────────
 
@@ -319,10 +357,12 @@ void main() {
         when(() => mockBrain.idle).thenReturn(mockBrain.mockIdle);
         when(() => mockBrain.memory).thenReturn(mockBrain.mockMemory);
         // Walk stream closes immediately (simulates clock interruption)
-        when(() => mockBrain.mockWalk.doing(any()))
-            .thenAnswer((_) => Stream.empty());
-        when(() => mockBrain.mockStandUp.doing)
-            .thenAnswer((_) => Stream.fromIterable(standUpSequence));
+        when(
+          () => mockBrain.mockWalk.doing(any()),
+        ).thenAnswer((_) => Stream.empty());
+        when(
+          () => mockBrain.mockStandUp.doing,
+        ).thenAnswer((_) => Stream.fromIterable(standUpSequence));
         when(() => mockBrain.mockIdle.doing).thenAnswer((_) => Stream.empty());
         return m;
       },
@@ -357,11 +397,11 @@ void main() {
         when(() => mockBrain.standUp).thenReturn(mockBrain.mockStandUp);
         when(() => mockBrain.idle).thenReturn(mockBrain.mockIdle);
         when(() => mockBrain.memory).thenReturn(mockBrain.mockMemory);
-        when(() => mockBrain.mockStandUp.doing)
-            .thenAnswer((_) => Stream.fromIterable(standUpSequence));
+        when(
+          () => mockBrain.mockStandUp.doing,
+        ).thenAnswer((_) => Stream.fromIterable(standUpSequence));
         // Idle stream closes immediately — simulates clock stream interruption
-        when(() => mockBrain.mockIdle.doing)
-            .thenAnswer((_) => Stream.empty());
+        when(() => mockBrain.mockIdle.doing).thenAnswer((_) => Stream.empty());
         return m;
       },
       seed: () => Grounded(Stream<History>.empty().listen((_) {})),
@@ -394,9 +434,7 @@ void main() {
       null,
     ),
     act: (m) => m.add(A.fault('SitDown hardware error')),
-    expect: () => [
-      predicate((S s) => s is Grounded),
-    ],
+    expect: () => [predicate((S s) => s is Grounded)],
   );
 }
 

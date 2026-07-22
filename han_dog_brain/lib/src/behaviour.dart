@@ -15,16 +15,20 @@ import 'observation_builder.dart';
 
 final _log = Logger('han_dog_brain.behaviour');
 
+double _defaultBodyHeightCommand() => 0.35;
+
 abstract class Behaviour {
   final StreamController<void> clock;
   final ImuService imu;
   final JointService joint;
   final Memory<History> memory;
+  final double Function() bodyHeightCommandProvider;
   const Behaviour({
     required this.clock,
     required this.imu,
     required this.joint,
     required this.memory,
+    this.bodyHeightCommandProvider = _defaultBodyHeightCommand,
   });
 
   Stream<void> get ts => clock.stream;
@@ -35,11 +39,14 @@ abstract class Behaviour {
         gyroscope: imu.gyroscope,
         projectedGravity: imu.projectedGravity,
         command: command,
+        bodyHeightCommand: bodyHeightCommandForHistory,
         jointPosition: joint.position,
         jointVelocity: joint.velocity,
         action: memory.latestAction,
         nextAction: nextAction,
       );
+
+  double get bodyHeightCommandForHistory => bodyHeightCommandProvider();
 }
 
 class Idle extends Behaviour {
@@ -52,14 +59,15 @@ class Idle extends Behaviour {
     required super.imu,
     required super.joint,
     required super.memory,
+    super.bodyHeightCommandProvider,
     this.inferAction,
   });
 
   Stream<History> get doing => ts.map((_) {
-        inferAction?.call();
-        // 物理目标：保持上一帧的 nextAction（standingPose）
-        return next(command: .idle(), nextAction: memory.latestAction);
-      });
+    inferAction?.call();
+    // 物理目标：保持上一帧的 nextAction（standingPose）
+    return next(command: .idle(), nextAction: memory.latestAction);
+  });
 }
 
 class SitDown extends Behaviour {
@@ -71,6 +79,7 @@ class SitDown extends Behaviour {
     required super.imu,
     required super.joint,
     required super.memory,
+    super.bodyHeightCommandProvider,
     required this.sittingPose,
     required this.counts,
   });
@@ -102,6 +111,7 @@ class StandUp extends Behaviour {
     required super.imu,
     required super.joint,
     required super.memory,
+    super.bodyHeightCommandProvider,
     required this.standingPose,
     required this.counts,
   });
@@ -134,6 +144,7 @@ class Gesture extends Behaviour {
     required super.imu,
     required super.joint,
     required super.memory,
+    super.bodyHeightCommandProvider,
     required this.definition,
   });
 
@@ -161,6 +172,43 @@ class Gesture extends Behaviour {
   }
 }
 
+/// Builds a fixed-size policy history in chronological order.
+///
+/// The oldest stored frame is evicted and [current] is appended.
+Float64List assembleObservationHistory({
+  required ObservationBuilder observationBuilder,
+  required List<History> histories,
+  required History current,
+}) {
+  if (histories.isEmpty) {
+    throw ArgumentError.value(histories, 'histories', 'must not be empty');
+  }
+  final historySize = histories.length;
+  final tensorSize = observationBuilder.tensorSize;
+  final result = Float64List(historySize * tensorSize);
+  for (
+    var destinationFrame = 0;
+    destinationFrame < historySize;
+    destinationFrame++
+  ) {
+    final history = destinationFrame == historySize - 1
+        ? current
+        : histories[destinationFrame + 1];
+    final row = observationBuilder.build(history);
+    if (row.length != tensorSize) {
+      throw StateError(
+        'ObservationBuilder returned ${row.length} values, expected $tensorSize',
+      );
+    }
+    result.setRange(
+      destinationFrame * tensorSize,
+      (destinationFrame + 1) * tensorSize,
+      row,
+    );
+  }
+  return result;
+}
+
 class Walk extends Behaviour {
   final ObservationBuilder observationBuilder;
 
@@ -168,8 +216,12 @@ class Walk extends Behaviour {
   /// Dart 单 Isolate 模型保证同一 Isolate 内的读写是顺序执行的。
   Vector3 direction = .zero();
 
-  /// [debug] 最近一帧 ONNX 输入（285 维），供外部对比验证。
+  /// [debug] Latest flattened ONNX input for parity validation.
   Float64List? lastObservation;
+
+  final double minBodyHeightCommand;
+  final double maxBodyHeightCommand;
+  double _bodyHeightCommand;
 
   Walk({
     required this.observationBuilder,
@@ -177,12 +229,46 @@ class Walk extends Behaviour {
     required super.joint,
     required super.memory,
     required super.clock,
-  });
+    this.minBodyHeightCommand = 0.20,
+    this.maxBodyHeightCommand = 0.54,
+    double bodyHeightCommand = 0.35,
+  }) : _bodyHeightCommand = normalizeBodyHeightCommand(
+         value: bodyHeightCommand,
+         minimum: minBodyHeightCommand,
+         maximum: maxBodyHeightCommand,
+       );
 
-  final _env = OnnxEnv.create(
-    OrtLoggingLevel.ORT_LOGGING_LEVEL_WARNING,
-    'Infer',
-  );
+  static double normalizeBodyHeightCommand({
+    required double value,
+    required double minimum,
+    required double maximum,
+  }) {
+    if (!minimum.isFinite || !maximum.isFinite || minimum > maximum) {
+      throw ArgumentError(
+        'Body-height bounds must be finite and minimum <= maximum '
+        '(got $minimum..$maximum)',
+      );
+    }
+    if (!value.isFinite) {
+      throw ArgumentError.value(value, 'bodyHeightCommand', 'must be finite');
+    }
+    return value.clamp(minimum, maximum).toDouble();
+  }
+
+  double get bodyHeightCommand => _bodyHeightCommand;
+
+  set bodyHeightCommand(double value) {
+    _bodyHeightCommand = normalizeBodyHeightCommand(
+      value: value,
+      minimum: minBodyHeightCommand,
+      maximum: maxBodyHeightCommand,
+    );
+  }
+
+  @override
+  double get bodyHeightCommandForHistory => bodyHeightCommand;
+
+  OnnxEnv? _env;
   InferenceSession? _session;
   String inputName = 'obs';
 
@@ -199,36 +285,71 @@ class Walk extends Behaviour {
     if (inputName != null) {
       this.inputName = inputName;
     }
+    InferenceSession? candidate;
     try {
       final modelBytes = await File(path).readAsBytes();
       _session?.dispose();
-      final session = InferenceSession.create(_env, modelBytes);
-      // Validate input shape: expect [batch, historySize * tensorSize]
-      final inputInfo = session.getInputInfo(0).info;
-      if (inputInfo.dimensions.length >= 2) {
-        final obsDim = inputInfo.dimensions[1];
-        final expectedObs = memory.historySize * observationBuilder.tensorSize;
-        if (obsDim != -1 && obsDim != expectedObs) {
-          session.dispose();
-          throw StateError(
-            'ONNX input dim=$obsDim but historySize=${memory.historySize} '
-            'requires $expectedObs',
-          );
-        }
+      _session = null;
+      final env = _env ??= OnnxEnv.create(
+        OrtLoggingLevel.ORT_LOGGING_LEVEL_WARNING,
+        'Infer',
+      );
+      candidate = InferenceSession.create(env, modelBytes);
+      if (candidate.inputCounts != 1) {
+        throw StateError(
+          'ONNX model must have exactly 1 input, got ${candidate.inputCounts}',
+        );
       }
-      // Validate output shape: expect [batch, 16]
-      final outputInfo = session.getOutputInfo(0).info;
-      if (outputInfo.dimensions.length >= 2) {
-        final actionDim = outputInfo.dimensions[1];
-        if (actionDim != -1 && actionDim != 16) {
-          session.dispose();
-          throw StateError(
-            'ONNX output dim=$actionDim, expected 16',
-          );
-        }
+      if (candidate.outputCounts != 1) {
+        throw StateError(
+          'ONNX model must have exactly 1 output, got ${candidate.outputCounts}',
+        );
       }
-      _session = session;
+      final input = candidate.getInputInfo(0);
+      final output = candidate.getOutputInfo(0);
+      if (input.type.value != 1 || input.info.tensorElementType.value != 1) {
+        throw StateError('ONNX input type must be a float tensor');
+      }
+      if (output.type.value != 1 || output.info.tensorElementType.value != 1) {
+        throw StateError('ONNX output type must be a float tensor');
+      }
+      final inputShape = input.info.dimensions;
+      final outputShape = output.info.dimensions;
+      if (inputShape.length != 2) {
+        throw StateError('ONNX input rank must be 2, got ${inputShape.length}');
+      }
+      if (outputShape.length != 2) {
+        throw StateError(
+          'ONNX output rank must be 2, got ${outputShape.length}',
+        );
+      }
+      if (inputShape[0] != 1 && inputShape[0] != -1) {
+        throw StateError(
+          'ONNX input batch must be 1 or -1, got ${inputShape[0]}',
+        );
+      }
+      if (outputShape[0] != 1 && outputShape[0] != -1) {
+        throw StateError(
+          'ONNX output batch must be 1 or -1, got ${outputShape[0]}',
+        );
+      }
+      final expectedFeatures =
+          memory.historySize * observationBuilder.tensorSize;
+      if (inputShape[1] != expectedFeatures) {
+        throw StateError(
+          'ONNX input feature dimension must be $expectedFeatures, '
+          'got ${inputShape[1]}',
+        );
+      }
+      if (outputShape[1] != 16) {
+        throw StateError(
+          'ONNX output action dimension must be 16, got ${outputShape[1]}',
+        );
+      }
+      _session = candidate;
+      candidate = null;
     } catch (e, st) {
+      candidate?.dispose();
       _session = null;
       _log.severe('Failed to load ONNX model from $path', e, st);
       rethrow;
@@ -240,7 +361,7 @@ class Walk extends Behaviour {
     _disposed = true;
     _observationController.close();
     _session?.dispose();
-    _env.dispose();
+    _env?.dispose();
   }
 
   JointsMatrix clampAction(JointsMatrix action) => action; // no-op，和 legacy 一致
@@ -249,7 +370,8 @@ class Walk extends Behaviour {
       action * observationBuilder.actionScale + observationBuilder.standingPose;
 
   JointsMatrix fromRealAction(JointsMatrix action) =>
-      (action - observationBuilder.standingPose) / observationBuilder.actionScale;
+      (action - observationBuilder.standingPose) /
+      observationBuilder.actionScale;
 
   Stream<History> doing(Vector3 direction) {
     this.direction = direction;
@@ -263,23 +385,17 @@ class Walk extends Behaviour {
         command: .walk(this.direction),
         nextAction: .zero(),
       );
-      // history 拼接: [t-3, t-2, t-1, t-0] + [t-now] = 连续5帧
-      // 跳过 histories[0]（最老帧），和 legacy skip(1) 一致
-      final histories = memory.histories;
-      for (int i = 1; i < historySize; i++) {
-        final row = observationBuilder.build(histories[i]);
-        final offset = (i - 1) * tensorSize;
-        for (int j = 0; j < tensorSize; j++) {
-          observationBuffer[offset + j] = row[j];
-        }
-      }
-      final lastRow = observationBuilder.build(holdNext);
-      final lastOffset = (historySize - 1) * tensorSize;
-      for (int j = 0; j < tensorSize; j++) {
-        observationBuffer[lastOffset + j] = lastRow[j];
-      }
+      // Drop the oldest frame and append the current frame.
+      observationBuffer.setAll(
+        0,
+        assembleObservationHistory(
+          observationBuilder: observationBuilder,
+          histories: memory.histories,
+          current: holdNext,
+        ),
+      );
       final nextAction = clampAction(toRealAction(_run(observationBuffer)));
-      // debug: 保存 285 维 obs buffer 供外部对比
+      // Preserve the exact policy input for cross-runtime validation.
       lastObservation = Float64List.fromList(observationBuffer);
       return holdNext.copyWith(nextAction: nextAction);
     });
@@ -288,24 +404,14 @@ class Walk extends Behaviour {
   /// 单次推理（供 Idle 调用）：构建 obs → ONNX → 返回 real action。
   /// 和 doing() 共享同一套 obs 构建逻辑，保证 last_action 和训练一致。
   JointsMatrix inferOnce() {
-    final historySize = memory.historySize;
-    final tensorSize = observationBuilder.tensorSize;
-    final buf = Float64List(historySize * tensorSize);
     final holdNext = next(command: .idle(), nextAction: .zero());
-    final histories = memory.histories;
-    for (int i = 0; i < historySize - 1; i++) {
-      final row = observationBuilder.build(histories[i]);
-      final offset = i * tensorSize;
-      for (int j = 0; j < tensorSize; j++) {
-        buf[offset + j] = row[j];
-      }
-    }
-    final lastRow = observationBuilder.build(holdNext);
-    final lastOffset = (historySize - 1) * tensorSize;
-    for (int j = 0; j < tensorSize; j++) {
-      buf[lastOffset + j] = lastRow[j];
-    }
+    final buf = assembleObservationHistory(
+      observationBuilder: observationBuilder,
+      histories: memory.histories,
+      current: holdNext,
+    );
     final result = clampAction(toRealAction(_run(buf)));
+    lastObservation = Float64List.fromList(buf);
     return result;
   }
 

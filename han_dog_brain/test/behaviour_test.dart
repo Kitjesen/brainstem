@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:han_dog_brain/han_dog_brain.dart';
 import 'package:han_dog_brain/src/behaviour.dart';
@@ -40,12 +41,7 @@ void main() {
 
   group('Idle', () {
     test('emits History with idle command on each clock tick', () async {
-      final idle = Idle(
-        clock: clock,
-        imu: imu,
-        joint: joint,
-        memory: memory,
-      );
+      final idle = Idle(clock: clock, imu: imu, joint: joint, memory: memory);
 
       final results = <History>[];
       final sub = idle.doing.listen(results.add);
@@ -64,22 +60,19 @@ void main() {
     test('nextAction equals memory.latestAction', () async {
       // Set up memory with a known nextAction
       final knownAction = JointsMatrix.fromList(List.filled(16, 0.42));
-      memory.add(History(
-        gyroscope: Vector3.zero(),
-        projectedGravity: Vector3(0, 0, -1),
-        command: const Command.idle(),
-        jointPosition: .zero(),
-        jointVelocity: .zero(),
-        action: .zero(),
-        nextAction: knownAction,
-      ));
-
-      final idle = Idle(
-        clock: clock,
-        imu: imu,
-        joint: joint,
-        memory: memory,
+      memory.add(
+        History(
+          gyroscope: Vector3.zero(),
+          projectedGravity: Vector3(0, 0, -1),
+          command: const Command.idle(),
+          jointPosition: .zero(),
+          jointVelocity: .zero(),
+          action: .zero(),
+          nextAction: knownAction,
+        ),
       );
+
+      final idle = Idle(clock: clock, imu: imu, joint: joint, memory: memory);
 
       final results = <History>[];
       final sub = idle.doing.listen(results.add);
@@ -275,4 +268,179 @@ void main() {
       await sub.cancel();
     });
   });
+
+  group('body-height walk contract', () {
+    late Walk walk;
+
+    setUp(() {
+      walk = Walk(
+        observationBuilder: BodyHeightObservationBuilder(
+          standingPose: JointsMatrix.zero(),
+        ),
+        imu: imu,
+        joint: joint,
+        memory: memory,
+        clock: clock,
+        minBodyHeightCommand: 0.20,
+        maxBodyHeightCommand: 0.54,
+        bodyHeightCommand: 0.35,
+      );
+    });
+
+    tearDown(() {
+      walk.dispose();
+    });
+
+    test('starts at configured default and records it in new history', () {
+      expect(walk.bodyHeightCommand, 0.35);
+      final history = walk.next(
+        command: Command.walk(Vector3.zero()),
+        nextAction: JointsMatrix.zero(),
+      );
+      expect(history.bodyHeightCommand, 0.35);
+    });
+
+    test('clamps finite values to the configured training range', () {
+      walk.bodyHeightCommand = 0.1;
+      expect(walk.bodyHeightCommand, 0.20);
+      expect(
+        walk
+            .next(
+              command: Command.walk(Vector3.zero()),
+              nextAction: JointsMatrix.zero(),
+            )
+            .bodyHeightCommand,
+        0.20,
+      );
+
+      walk.bodyHeightCommand = 0.9;
+      expect(walk.bodyHeightCommand, 0.54);
+    });
+
+    test(
+      'rejects non-finite setpoints without changing the last safe value',
+      () {
+        walk.bodyHeightCommand = 0.4;
+        expect(() => walk.bodyHeightCommand = double.nan, throwsArgumentError);
+        expect(
+          () => walk.bodyHeightCommand = double.infinity,
+          throwsArgumentError,
+        );
+        expect(walk.bodyHeightCommand, 0.4);
+      },
+    );
+  });
+
+  group('observation history assembly', () {
+    final builder = BodyHeightObservationBuilder(
+      standingPose: JointsMatrix.zero(),
+    );
+
+    History atHeight(double height) =>
+        History.zero().copyWith(bodyHeightCommand: height);
+
+    test('is oldest-to-newest and keeps each frame height command', () {
+      final result = assembleObservationHistory(
+        observationBuilder: builder,
+        histories: [atHeight(0.20), atHeight(0.30), atHeight(0.40)],
+        current: atHeight(0.50),
+      );
+
+      expect(result, isA<Float64List>());
+      expect(result, hasLength(3 * 58));
+      expect(result[57], 0.30);
+      expect(result[58 + 57], 0.40);
+      expect(result[2 * 58 + 57], 0.50);
+    });
+
+    test('supports a single-frame policy without reading stale history', () {
+      final result = assembleObservationHistory(
+        observationBuilder: builder,
+        histories: [atHeight(0.20)],
+        current: atHeight(0.44),
+      );
+
+      expect(result, hasLength(58));
+      expect(result[57], 0.44);
+    });
+  });
+
+  test('Brain seeds history with the configured body-height default', () {
+    final brain = Brain(
+      historySize: 10,
+      imu: imu,
+      joint: joint,
+      clock: clock,
+      standingPose: JointsMatrix.zero(),
+      sittingPose: JointsMatrix.zero(),
+      observationBuilder: BodyHeightObservationBuilder(
+        standingPose: JointsMatrix.zero(),
+      ),
+      bodyHeightCommand: 0.48,
+      minBodyHeightCommand: 0.20,
+      maxBodyHeightCommand: 0.54,
+    );
+    addTearDown(brain.dispose);
+
+    expect(
+      brain.histories.map((history) => history.bodyHeightCommand),
+      everyElement(0.48),
+    );
+    expect(brain.bodyHeightCommand, 0.48);
+
+    brain.bodyHeightCommand = 0.90;
+    expect(brain.bodyHeightCommand, 0.54);
+  });
+
+  test(
+    'Brain keeps idle and transition height history on the active target',
+    () {
+      final brain = Brain(
+        historySize: 10,
+        imu: imu,
+        joint: joint,
+        clock: clock,
+        standingPose: JointsMatrix.zero(),
+        sittingPose: JointsMatrix.zero(),
+        observationBuilder: BodyHeightObservationBuilder(
+          standingPose: JointsMatrix.zero(),
+        ),
+        bodyHeightCommand: 0.48,
+        minBodyHeightCommand: 0.20,
+        maxBodyHeightCommand: 0.54,
+        standUpCounts: 1,
+      );
+      addTearDown(brain.dispose);
+
+      brain.bodyHeightCommand = 0.31;
+
+      expect(
+        brain.idle
+            .next(
+              command: const Command.idle(),
+              nextAction: JointsMatrix.zero(),
+            )
+            .bodyHeightCommand,
+        0.31,
+      );
+      expect(
+        brain.standUp
+            .next(
+              command: const Command.standUp(),
+              nextAction: JointsMatrix.zero(),
+            )
+            .bodyHeightCommand,
+        0.31,
+      );
+      expect(
+        brain.sitDown
+            .next(
+              command: const Command.sitDown(),
+              nextAction: JointsMatrix.zero(),
+            )
+            .bodyHeightCommand,
+        0.31,
+      );
+    },
+  );
 }

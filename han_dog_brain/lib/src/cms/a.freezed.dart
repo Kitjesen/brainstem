@@ -55,7 +55,7 @@ extension APatterns on A {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( Init value)?  init,TResult Function( CmdStandUp value)?  standUp,TResult Function( CmdSitDown value)?  sitDown,TResult Function( CmdWalk value)?  walk,TResult Function( CmdIdle value)?  idle,TResult Function( CmdGesture value)?  gesture,TResult Function( Fault value)?  fault,TResult Function( Done value)?  done,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( Init value)?  init,TResult Function( CmdStandUp value)?  standUp,TResult Function( CmdSitDown value)?  sitDown,TResult Function( CmdWalk value)?  walk,TResult Function( CmdIdle value)?  idle,TResult Function( CmdGesture value)?  gesture,TResult Function( CmdSetBodyHeight value)?  setBodyHeight,TResult Function( Fault value)?  fault,TResult Function( Done value)?  done,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case Init() when init != null:
@@ -64,7 +64,8 @@ return standUp(_that);case CmdSitDown() when sitDown != null:
 return sitDown(_that);case CmdWalk() when walk != null:
 return walk(_that);case CmdIdle() when idle != null:
 return idle(_that);case CmdGesture() when gesture != null:
-return gesture(_that);case Fault() when fault != null:
+return gesture(_that);case CmdSetBodyHeight() when setBodyHeight != null:
+return setBodyHeight(_that);case Fault() when fault != null:
 return fault(_that);case Done() when done != null:
 return done(_that);case _:
   return orElse();
@@ -84,7 +85,7 @@ return done(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( Init value)  init,required TResult Function( CmdStandUp value)  standUp,required TResult Function( CmdSitDown value)  sitDown,required TResult Function( CmdWalk value)  walk,required TResult Function( CmdIdle value)  idle,required TResult Function( CmdGesture value)  gesture,required TResult Function( Fault value)  fault,required TResult Function( Done value)  done,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( Init value)  init,required TResult Function( CmdStandUp value)  standUp,required TResult Function( CmdSitDown value)  sitDown,required TResult Function( CmdWalk value)  walk,required TResult Function( CmdIdle value)  idle,required TResult Function( CmdGesture value)  gesture,required TResult Function( CmdSetBodyHeight value)  setBodyHeight,required TResult Function( Fault value)  fault,required TResult Function( Done value)  done,}){
 final _that = this;
 switch (_that) {
 case Init():
@@ -93,7 +94,8 @@ return standUp(_that);case CmdSitDown():
 return sitDown(_that);case CmdWalk():
 return walk(_that);case CmdIdle():
 return idle(_that);case CmdGesture():
-return gesture(_that);case Fault():
+return gesture(_that);case CmdSetBodyHeight():
+return setBodyHeight(_that);case Fault():
 return fault(_that);case Done():
 return done(_that);}
 }
@@ -109,7 +111,7 @@ return done(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( Init value)?  init,TResult? Function( CmdStandUp value)?  standUp,TResult? Function( CmdSitDown value)?  sitDown,TResult? Function( CmdWalk value)?  walk,TResult? Function( CmdIdle value)?  idle,TResult? Function( CmdGesture value)?  gesture,TResult? Function( Fault value)?  fault,TResult? Function( Done value)?  done,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( Init value)?  init,TResult? Function( CmdStandUp value)?  standUp,TResult? Function( CmdSitDown value)?  sitDown,TResult? Function( CmdWalk value)?  walk,TResult? Function( CmdIdle value)?  idle,TResult? Function( CmdGesture value)?  gesture,TResult? Function( CmdSetBodyHeight value)?  setBodyHeight,TResult? Function( Fault value)?  fault,TResult? Function( Done value)?  done,}){
 final _that = this;
 switch (_that) {
 case Init() when init != null:
@@ -118,7 +120,8 @@ return standUp(_that);case CmdSitDown() when sitDown != null:
 return sitDown(_that);case CmdWalk() when walk != null:
 return walk(_that);case CmdIdle() when idle != null:
 return idle(_that);case CmdGesture() when gesture != null:
-return gesture(_that);case Fault() when fault != null:
+return gesture(_that);case CmdSetBodyHeight() when setBodyHeight != null:
+return setBodyHeight(_that);case Fault() when fault != null:
 return fault(_that);case Done() when done != null:
 return done(_that);case _:
   return null;
@@ -137,7 +140,7 @@ return done(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  init,TResult Function()?  standUp,TResult Function()?  sitDown,TResult Function( Vector3 direction)?  walk,TResult Function()?  idle,TResult Function( String name)?  gesture,TResult Function( String reason)?  fault,TResult Function()?  done,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  init,TResult Function()?  standUp,TResult Function()?  sitDown,TResult Function( Vector3 direction)?  walk,TResult Function()?  idle,TResult Function( String name)?  gesture,TResult Function( double meters)?  setBodyHeight,TResult Function( String reason)?  fault,TResult Function()?  done,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case Init() when init != null:
 return init();case CmdStandUp() when standUp != null:
@@ -145,7 +148,8 @@ return standUp();case CmdSitDown() when sitDown != null:
 return sitDown();case CmdWalk() when walk != null:
 return walk(_that.direction);case CmdIdle() when idle != null:
 return idle();case CmdGesture() when gesture != null:
-return gesture(_that.name);case Fault() when fault != null:
+return gesture(_that.name);case CmdSetBodyHeight() when setBodyHeight != null:
+return setBodyHeight(_that.meters);case Fault() when fault != null:
 return fault(_that.reason);case Done() when done != null:
 return done();case _:
   return orElse();
@@ -165,7 +169,7 @@ return done();case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  init,required TResult Function()  standUp,required TResult Function()  sitDown,required TResult Function( Vector3 direction)  walk,required TResult Function()  idle,required TResult Function( String name)  gesture,required TResult Function( String reason)  fault,required TResult Function()  done,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  init,required TResult Function()  standUp,required TResult Function()  sitDown,required TResult Function( Vector3 direction)  walk,required TResult Function()  idle,required TResult Function( String name)  gesture,required TResult Function( double meters)  setBodyHeight,required TResult Function( String reason)  fault,required TResult Function()  done,}) {final _that = this;
 switch (_that) {
 case Init():
 return init();case CmdStandUp():
@@ -173,7 +177,8 @@ return standUp();case CmdSitDown():
 return sitDown();case CmdWalk():
 return walk(_that.direction);case CmdIdle():
 return idle();case CmdGesture():
-return gesture(_that.name);case Fault():
+return gesture(_that.name);case CmdSetBodyHeight():
+return setBodyHeight(_that.meters);case Fault():
 return fault(_that.reason);case Done():
 return done();}
 }
@@ -189,7 +194,7 @@ return done();}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  init,TResult? Function()?  standUp,TResult? Function()?  sitDown,TResult? Function( Vector3 direction)?  walk,TResult? Function()?  idle,TResult? Function( String name)?  gesture,TResult? Function( String reason)?  fault,TResult? Function()?  done,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  init,TResult? Function()?  standUp,TResult? Function()?  sitDown,TResult? Function( Vector3 direction)?  walk,TResult? Function()?  idle,TResult? Function( String name)?  gesture,TResult? Function( double meters)?  setBodyHeight,TResult? Function( String reason)?  fault,TResult? Function()?  done,}) {final _that = this;
 switch (_that) {
 case Init() when init != null:
 return init();case CmdStandUp() when standUp != null:
@@ -197,7 +202,8 @@ return standUp();case CmdSitDown() when sitDown != null:
 return sitDown();case CmdWalk() when walk != null:
 return walk(_that.direction);case CmdIdle() when idle != null:
 return idle();case CmdGesture() when gesture != null:
-return gesture(_that.name);case Fault() when fault != null:
+return gesture(_that.name);case CmdSetBodyHeight() when setBodyHeight != null:
+return setBodyHeight(_that.meters);case Fault() when fault != null:
 return fault(_that.reason);case Done() when done != null:
 return done();case _:
   return null;
@@ -461,6 +467,72 @@ class _$CmdGestureCopyWithImpl<$Res>
   return _then(CmdGesture(
 null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,
+  ));
+}
+
+
+}
+
+/// @nodoc
+
+
+class CmdSetBodyHeight implements A {
+  const CmdSetBodyHeight(this.meters);
+
+
+ final  double meters;
+
+/// Create a copy of A
+/// with the given fields replaced by the non-null parameter values.
+@JsonKey(includeFromJson: false, includeToJson: false)
+@pragma('vm:prefer-inline')
+$CmdSetBodyHeightCopyWith<CmdSetBodyHeight> get copyWith => _$CmdSetBodyHeightCopyWithImpl<CmdSetBodyHeight>(this, _$identity);
+
+
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CmdSetBodyHeight&&(identical(other.meters, meters) || other.meters == meters));
+}
+
+
+@override
+int get hashCode => Object.hash(runtimeType,meters);
+
+@override
+String toString() {
+  return 'A.setBodyHeight(meters: $meters)';
+}
+
+
+}
+
+/// @nodoc
+abstract mixin class $CmdSetBodyHeightCopyWith<$Res> implements $ACopyWith<$Res> {
+  factory $CmdSetBodyHeightCopyWith(CmdSetBodyHeight value, $Res Function(CmdSetBodyHeight) _then) = _$CmdSetBodyHeightCopyWithImpl;
+@useResult
+$Res call({
+ double meters
+});
+
+
+
+
+}
+/// @nodoc
+class _$CmdSetBodyHeightCopyWithImpl<$Res>
+    implements $CmdSetBodyHeightCopyWith<$Res> {
+  _$CmdSetBodyHeightCopyWithImpl(this._self, this._then);
+
+  final CmdSetBodyHeight _self;
+  final $Res Function(CmdSetBodyHeight) _then;
+
+/// Create a copy of A
+/// with the given fields replaced by the non-null parameter values.
+@pragma('vm:prefer-inline') $Res call({Object? meters = null,}) {
+  return _then(CmdSetBodyHeight(
+null == meters ? _self.meters : meters // ignore: cast_nullable_to_non_nullable
+as double,
   ));
 }
 

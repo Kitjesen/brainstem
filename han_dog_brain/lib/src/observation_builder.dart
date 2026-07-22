@@ -54,9 +54,15 @@ class StandardObservationBuilder implements ObservationBuilder {
     final jointVelocity = h.jointVelocity * jointVelocityScale;
     final action = (h.action - standingPose) / actionScale;
     final obs = [
-      gyroscope.x, gyroscope.y, gyroscope.z,
-      pg.x, pg.y, pg.z,
-      direction.x, direction.y, direction.z,
+      gyroscope.x,
+      gyroscope.y,
+      gyroscope.z,
+      pg.x,
+      pg.y,
+      pg.z,
+      direction.x,
+      direction.y,
+      direction.z,
       ...jointPosition.values,
       ...jointVelocity.values,
       ...action.values,
@@ -66,5 +72,26 @@ class StandardObservationBuilder implements ObservationBuilder {
       if (!obs[i].isFinite) obs[i] = 0.0;
     }
     return obs;
+  }
+}
+
+/// Standard 57-value observation plus the raw body-height command in metres.
+class BodyHeightObservationBuilder extends StandardObservationBuilder {
+  BodyHeightObservationBuilder({
+    required super.standingPose,
+    super.imuGyroscopeScale = 0.25,
+    super.jointVelocityScale = (0.05, 0.05, 0.05, 0.05),
+    super.actionScale = (0.125, 0.25, 0.25, 5.0),
+  });
+
+  @override
+  int get tensorSize => super.tensorSize + 1;
+
+  @override
+  List<double> build(History h) {
+    final observation = super.build(h);
+    final height = h.bodyHeightCommand;
+    observation.add(height.isFinite ? height : 0.0);
+    return observation;
   }
 }
