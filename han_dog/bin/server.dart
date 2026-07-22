@@ -105,6 +105,10 @@ Future<void> main() async {
     joint: sim,
     clock: clock,
     standingPose: defaultProfile.standingPose,
+    observationBuilder: defaultProfile.toObservationBuilder(),
+    bodyHeightCommand: defaultProfile.bodyHeightCommand,
+    minBodyHeightCommand: defaultProfile.minBodyHeightCommand,
+    maxBodyHeightCommand: defaultProfile.maxBodyHeightCommand,
     sittingPose: defaultProfile.sittingPose,
     historySize: historySize,
     standUpCounts: defaultProfile.standUpCounts,
@@ -159,6 +163,7 @@ Future<void> main() async {
     mode: CmsMode.simulation,
     simInjector: sim,
     gains: gainManager,
+    initialProfile: defaultProfile,
   )..profileManager = profileManager;
   final server = Server.create(services: [cmsService]);
 
@@ -209,13 +214,22 @@ Future<int> _resolveHistorySize(RobotProfile profile) async {
 }
 
 Future<String> _resolveInputName(RobotProfile profile) async {
-  final inferred = await inferInputNameFromModel(
-    modelPath: profile.modelPath,
-  );
-  if (inferred != null && inferred.isNotEmpty) {
+  final inferred = await inferInputNameFromModel(modelPath: profile.modelPath);
+  final configured = profile.inputName;
+  if (configured != null) {
+    if (inferred != null && inferred.isNotEmpty && inferred != configured) {
+      throw StateError(
+        'Profile inputName=$configured does not match ONNX input=$inferred '
+        'for ${profile.modelPath}',
+      );
+    }
     _log.info(
-      'Inferred inputName=$inferred from model ${profile.modelPath}',
+      'Validated configured inputName=$configured for ${profile.modelPath}',
     );
+    return configured;
+  }
+  if (inferred != null && inferred.isNotEmpty) {
+    _log.info('Inferred inputName=$inferred from model ${profile.modelPath}');
     return inferred;
   }
   _log.warning(
@@ -257,10 +271,14 @@ Future<void> _shutdown(
   }
 
   // 2. 释放资源
-  try { await m.close(); } catch (_) {}
+  try {
+    await m.close();
+  } catch (_) {}
   brain.dispose();
   await clock.close();
-  try { await server.shutdown().timeout(const Duration(seconds: 3)); } catch (_) {}
+  try {
+    await server.shutdown().timeout(const Duration(seconds: 3));
+  } catch (_) {}
   _log.info('Shutdown complete');
   exit(0);
 }

@@ -130,6 +130,12 @@ void main() {
       final p = h.toProto();
       expect(p.hasTimestamp(), isFalse);
     });
+
+    test('toProto preserves the body height stored in each history frame', () {
+      final history = History.zero().copyWith(bodyHeightCommand: 0.31);
+      final p = history.toProto();
+      expect(p.bodyHeightCommand, closeTo(0.31, 1e-12));
+    });
   });
 
   group('imuSnapshot', () {

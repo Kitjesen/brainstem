@@ -33,6 +33,28 @@ RobotProfile _profile(String name) => RobotProfile(
   sitDownKp: _zeros16,
   sitDownKd: _zeros16,
 );
+RobotProfile _boundedProfile(
+  String name, {
+  double minBodyHeightCommand = 0.20,
+  double maxBodyHeightCommand = 0.54,
+  (double, double, double) velocityCommandMin = (-3.0, -3.0, -3.0),
+  (double, double, double) velocityCommandMax = (3.0, 3.0, 3.0),
+}) => RobotProfile(
+  name: name,
+  modelPath: '$name.onnx',
+  standingPose: _zeros16,
+  sittingPose: _zeros16,
+  inferKp: _zeros16,
+  inferKd: _zeros16,
+  standUpKp: _zeros16,
+  standUpKd: _zeros16,
+  sitDownKp: _zeros16,
+  sitDownKd: _zeros16,
+  minBodyHeightCommand: minBodyHeightCommand,
+  maxBodyHeightCommand: maxBodyHeightCommand,
+  velocityCommandMin: velocityCommandMin,
+  velocityCommandMax: velocityCommandMax,
+);
 
 /// 创建仿真模式服务器（无 arbiter，无 simInjector）。
 UnifiedCmsServer _simServer(_MockBrain brain, _MockM m) =>
@@ -71,21 +93,24 @@ void main() {
     test('NaN 方向向量 → 静默忽略', () async {
       final server = _simServer(brain, m);
       final result = await server.walk(
-        call, proto.Vector3(x: double.nan, y: 0, z: 0));
+        call,
+        proto.Vector3(x: double.nan, y: 0, z: 0),
+      );
       expect(result, isA<proto.Empty>());
     });
 
     test('Inf 方向向量 → 静默忽略', () async {
       final server = _simServer(brain, m);
       final result = await server.walk(
-        call, proto.Vector3(x: double.infinity, y: 0, z: 0));
+        call,
+        proto.Vector3(x: double.infinity, y: 0, z: 0),
+      );
       expect(result, isA<proto.Empty>());
     });
 
     test('幅值超过 3.0 → clamp 后执行', () async {
       final server = _simServer(brain, m);
-      final result = await server.walk(
-        call, proto.Vector3(x: 3.1, y: 0, z: 0));
+      final result = await server.walk(call, proto.Vector3(x: 3.1, y: 0, z: 0));
       expect(result, isA<proto.Empty>());
     });
 
@@ -97,6 +122,30 @@ void main() {
       final server = _simServer(brain, m);
       await server.walk(call, proto.Vector3(x: 0.5, y: 0, z: 0));
       verify(() => m.add(any())).called(1);
+
+      await sub.cancel();
+      await historyCtrl.close();
+    });
+
+    test('profile clamp still preserves the legacy magnitude limit', () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(() => m.state).thenReturn(Standing(sub));
+      final server = UnifiedCmsServer(
+        brain: brain,
+        m: m,
+        mode: CmsMode.simulation,
+        initialProfile: _profile('standard'),
+      );
+
+      await server.walk(call, proto.Vector3(x: 3, y: 3, z: 3));
+
+      final action =
+          verify(() => m.add(captureAny())).captured.single as CmdWalk;
+      expect(action.direction.length, closeTo(3.0, 1e-6));
+      expect(action.direction.x, closeTo(1.7320508075688772, 1e-6));
+      expect(action.direction.y, closeTo(1.7320508075688772, 1e-6));
+      expect(action.direction.z, closeTo(1.7320508075688772, 1e-6));
 
       await sub.cancel();
       await historyCtrl.close();
@@ -267,8 +316,7 @@ void main() {
       when(() => m.state).thenReturn(Grounded(sub));
 
       final server = _simServer(brain, m);
-      final result = await server.walk(
-        call, proto.Vector3(x: 0.5, y: 0, z: 0));
+      final result = await server.walk(call, proto.Vector3(x: 0.5, y: 0, z: 0));
       expect(result, isA<proto.Empty>());
 
       await sub.cancel();
@@ -291,6 +339,179 @@ void main() {
     });
   });
 
+  group('setBodyHeight', () {
+    test('finite target in stable state dispatches through CMS', () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(() => m.state).thenReturn(Standing(sub));
+
+      final server = _simServer(brain, m);
+      await server.setBodyHeight(call, proto.BodyHeightCommand(meters: 0.31));
+
+      final action = verify(() => m.add(captureAny())).captured.single as A;
+      expect(action, const A.setBodyHeight(0.31));
+
+      await sub.cancel();
+      await historyCtrl.close();
+    });
+
+    for (final invalid in [
+      double.nan,
+      double.infinity,
+      double.negativeInfinity,
+    ]) {
+      test('non-finite target $invalid is ignored', () async {
+        final historyCtrl = StreamController<History>();
+        final sub = historyCtrl.stream.listen((_) {});
+        when(() => m.state).thenReturn(Standing(sub));
+
+        final server = _simServer(brain, m);
+        final result = await server.setBodyHeight(
+          call,
+          proto.BodyHeightCommand(meters: invalid),
+        );
+        expect(result, isA<proto.Empty>());
+        verifyNever(() => m.add(any()));
+
+        await sub.cancel();
+        await historyCtrl.close();
+      });
+    }
+
+    test('transitioning state ignores target', () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(
+        () => m.state,
+      ).thenReturn(Transitioning(const Command.standUp(), sub, null));
+
+      final server = _simServer(brain, m);
+      await server.setBodyHeight(call, proto.BodyHeightCommand(meters: 0.31));
+      verifyNever(() => m.add(any()));
+
+      await sub.cancel();
+      await historyCtrl.close();
+    });
+  });
+  test('setBodyHeight rate limits rapid updates', () async {
+    final historyCtrl = StreamController<History>();
+    final sub = historyCtrl.stream.listen((_) {});
+    when(() => m.state).thenReturn(Standing(sub));
+
+    final server = _simServer(brain, m);
+    await server.setBodyHeight(call, proto.BodyHeightCommand(meters: 0.30));
+    await server.setBodyHeight(call, proto.BodyHeightCommand(meters: 0.31));
+
+    verify(() => m.add(any())).called(1);
+
+    await sub.cancel();
+    await historyCtrl.close();
+  });
+
+  test('setBodyHeight respects arbiter ownership', () async {
+    final historyCtrl = StreamController<History>();
+    final sub = historyCtrl.stream.listen((_) {});
+    when(() => m.state).thenReturn(Standing(sub));
+    final controlArbiter = ControlArbiter(m, timeout: Duration.zero);
+    expect(
+      controlArbiter.command(const A.standUp(), ControlSource.yunzhuo),
+      isTrue,
+    );
+    clearInteractions(m);
+
+    final server = UnifiedCmsServer(
+      brain: brain,
+      m: m,
+      mode: CmsMode.hardware,
+      arbiter: controlArbiter,
+    );
+    await server.setBodyHeight(call, proto.BodyHeightCommand(meters: 0.31));
+
+    verifyNever(() => m.add(any()));
+    expect(controlArbiter.owner, ControlSource.yunzhuo);
+
+    controlArbiter.dispose();
+    await sub.cancel();
+    await historyCtrl.close();
+  });
+
+  test('initial profile clamps velocity axes and body height', () async {
+    final historyCtrl = StreamController<History>();
+    final sub = historyCtrl.stream.listen((_) {});
+    when(() => m.state).thenReturn(Standing(sub));
+    final server = UnifiedCmsServer(
+      brain: brain,
+      m: m,
+      mode: CmsMode.simulation,
+      initialProfile: _boundedProfile(
+        'initial',
+        minBodyHeightCommand: 0.25,
+        maxBodyHeightCommand: 0.40,
+        velocityCommandMin: (-0.4, -0.5, -0.6),
+        velocityCommandMax: (0.4, 0.5, 0.6),
+      ),
+    );
+
+    await server.walk(call, proto.Vector3(x: 2, y: -2, z: 3));
+    final walkAction =
+        verify(() => m.add(captureAny())).captured.single as CmdWalk;
+    expect(walkAction.direction.x, closeTo(0.4, 1e-6));
+    expect(walkAction.direction.y, closeTo(-0.5, 1e-6));
+    expect(walkAction.direction.z, closeTo(0.6, 1e-6));
+    clearInteractions(m);
+
+    await server.setBodyHeight(call, proto.BodyHeightCommand(meters: 0.50));
+    final heightAction =
+        verify(() => m.add(captureAny())).captured.single as CmdSetBodyHeight;
+    expect(heightAction.meters, 0.40);
+
+    await sub.cancel();
+    await historyCtrl.close();
+  });
+
+  test(
+    'active profile manager takes precedence over initial profile',
+    () async {
+      final historyCtrl = StreamController<History>();
+      final sub = historyCtrl.stream.listen((_) {});
+      when(() => m.state).thenReturn(Standing(sub));
+      final initialProfile = _boundedProfile('initial');
+      final activeProfile = _boundedProfile(
+        'active',
+        minBodyHeightCommand: 0.30,
+        maxBodyHeightCommand: 0.35,
+        velocityCommandMin: (-0.1, -0.2, -0.3),
+        velocityCommandMax: (0.1, 0.2, 0.3),
+      );
+      final server = UnifiedCmsServer(
+        brain: brain,
+        m: m,
+        mode: CmsMode.simulation,
+        initialProfile: initialProfile,
+      );
+      server.profileManager = ProfileManager(
+        profiles: {'active': activeProfile},
+        brain: brain,
+        initial: 'active',
+      );
+
+      await server.walk(call, proto.Vector3(x: 1, y: -1, z: 1));
+      final walkAction =
+          verify(() => m.add(captureAny())).captured.single as CmdWalk;
+      expect(walkAction.direction.x, closeTo(0.1, 1e-6));
+      expect(walkAction.direction.y, closeTo(-0.2, 1e-6));
+      expect(walkAction.direction.z, closeTo(0.3, 1e-6));
+      clearInteractions(m);
+
+      await server.setBodyHeight(call, proto.BodyHeightCommand(meters: 0.20));
+      final heightAction =
+          verify(() => m.add(captureAny())).captured.single as CmdSetBodyHeight;
+      expect(heightAction.meters, 0.30);
+
+      await sub.cancel();
+      await historyCtrl.close();
+    },
+  );
   group('cms state', () {
     test('getCmsState returns authoritative grounded state', () async {
       final historyCtrl = StreamController<History>();
