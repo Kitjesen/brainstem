@@ -2,10 +2,10 @@ import 'package:han_dog/han_dog.dart';
 
 void main() async {
   final joint = RealJoint(
-    fr: .usbbus1,
-    fl: .usbbus2,
-    rr: .usbbus3,
-    rl: .usbbus4,
+    fr: .usbbus4,
+    fl: .usbbus3,
+    rr: .usbbus2,
+    rl: .usbbus1,
   );
   if (!joint.open()) {
     print('PCAN open failed');

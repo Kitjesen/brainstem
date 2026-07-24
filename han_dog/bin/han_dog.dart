@@ -108,10 +108,10 @@ Future<void> _run() async {
 
   // PCAN USB 通道映射（由硬件接线决定）
   final joint = RealJoint(
-    fr: .usbbus1,
-    fl: .usbbus2,
-    rr: .usbbus3,
-    rl: .usbbus4,
+    fr: .usbbus4,
+    fl: .usbbus3,
+    rr: .usbbus2,
+    rl: .usbbus1,
   );
   if (!joint.open()) {
     _log.severe('Joint PCAN open failed');

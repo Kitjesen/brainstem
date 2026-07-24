@@ -42,10 +42,10 @@ void main() async {
   final timeController = StreamController<void>.broadcast();
   final imu = RealImu()..open();
   final joint = RealJoint(
-    fr: .usbbus3,
-    fl: .usbbus1,
-    rr: .usbbus4,
-    rl: .usbbus2,
+    fr: .usbbus4,
+    fl: .usbbus3,
+    rr: .usbbus2,
+    rl: .usbbus1,
   )..open();
 
   // 标定只需要一次，然后注释掉

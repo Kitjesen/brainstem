@@ -19,10 +19,10 @@ import 'package:robo_device/robo_device.dart';
 import 'package:robo_device_proto/robo_device_proto.dart';
 
 const _legConfig = <String, PcanChannel>{
-  'FR': PcanChannel.usbbus1,
-  'FL': PcanChannel.usbbus2,
-  'RR': PcanChannel.usbbus3,
-  'RL': PcanChannel.usbbus4,
+  'FR': PcanChannel.usbbus4,
+  'FL': PcanChannel.usbbus3,
+  'RR': PcanChannel.usbbus2,
+  'RL': PcanChannel.usbbus1,
 };
 
 const _jointNames = ['Hip', 'Thigh', 'Calf', 'Foot'];
