@@ -164,12 +164,7 @@ class RealControlDog {
       controller.enabled.listen(
         (enabled) {
           _log.info('H enable=$enabled');
-          if (enabled) {
-            joint.enable();
-          } else {
-            joint.disable();
-          }
-          onMotorEnableChanged?.call(enabled);
+          unawaited(_setMotorEnabled(enabled));
         },
         onError: (Object e, StackTrace st) => onStreamError(e, st, 'enabled'),
         onDone: () => _log.warning('Controller enabled stream closed'),
@@ -179,7 +174,7 @@ class RealControlDog {
       controller.red.listen(
         (_) {
           _log.info('红键 → disable motors + clear errors');
-          joint.disable(clearErrors: true);
+          unawaited(_disableMotors(clearErrors: true));
         },
         onError: (Object e, StackTrace st) => onStreamError(e, st, 'red'),
         onDone: () => _log.warning('Controller red stream closed'),
@@ -276,6 +271,42 @@ class RealControlDog {
         throw ArgumentError(
           'Velocity command bounds must be finite and ordered at axis $index',
         );
+      }
+    }
+  }
+
+  Future<void> _setMotorEnabled(bool enabled) async {
+    if (!enabled) {
+      await _disableMotors();
+      return;
+    }
+
+    try {
+      final blockReason = joint.motorEnableBlockReason();
+      if (blockReason != null) {
+        _log.warning('Controller motor enable blocked: $blockReason');
+        await _disableMotors();
+        return;
+      }
+
+      await joint.enable();
+      onMotorEnableChanged?.call(true);
+    } catch (error, stackTrace) {
+      _log.severe('Controller motor enable failed', error, stackTrace);
+      await _disableMotors();
+    }
+  }
+
+  Future<void> _disableMotors({bool clearErrors = false}) async {
+    try {
+      await joint.disable(clearErrors: clearErrors);
+    } catch (error, stackTrace) {
+      _log.severe('Motor disable failed', error, stackTrace);
+    } finally {
+      try {
+        onMotorEnableChanged?.call(false);
+      } catch (error, stackTrace) {
+        _log.severe('Motor disabled callback failed', error, stackTrace);
       }
     }
   }

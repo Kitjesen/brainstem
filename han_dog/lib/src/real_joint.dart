@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:logging/logging.dart';
@@ -15,13 +16,21 @@ final _log = Logger('han_dog.real_joint');
 class MotorFaultEvent {
   final int jointIndex;
   final Set<RSError> errors;
+  final int errorBits;
   final RSStatus status;
+  final double position;
+  final double velocity;
+  final double torque;
   final double temperature;
 
   const MotorFaultEvent({
     required this.jointIndex,
     required this.errors,
+    required this.errorBits,
     required this.status,
+    required this.position,
+    required this.velocity,
+    required this.torque,
     required this.temperature,
   });
 
@@ -29,7 +38,11 @@ class MotorFaultEvent {
 
   @override
   String toString() =>
-      'MotorFaultEvent(joint=$jointIndex, $errors, status=$status, '
+      'MotorFaultEvent(joint=$jointIndex, $errors, '
+      'errorBits=0x${errorBits.toRadixString(16)}, status=$status, '
+      'pos=${position.toStringAsFixed(3)}, '
+      'vel=${velocity.toStringAsFixed(3)}, '
+      'torque=${torque.toStringAsFixed(3)}, '
       'temp=${temperature.toStringAsFixed(1)}°C)';
 }
 
@@ -47,6 +60,37 @@ RSStateReport get _defaultReport => .new(
 );
 
 class RealJoint implements JointService, MotorService {
+  static const _enableJointLimitRad = 3.14;
+  static const _enableJointNames = [
+    'FR Hip',
+    'FR Thigh',
+    'FR Calf',
+    'FL Hip',
+    'FL Thigh',
+    'FL Calf',
+    'RR Hip',
+    'RR Thigh',
+    'RR Calf',
+    'RL Hip',
+    'RL Thigh',
+    'RL Calf',
+    'FR Foot',
+    'FL Foot',
+    'RR Foot',
+    'RL Foot',
+  ];
+
+  static bool _motorEnableAllowedFromEnvironment() =>
+      Platform.environment['HAN_DOG_ALLOW_MOTOR_ENABLE']?.toLowerCase() ==
+      'true';
+
+  final bool Function() _motorEnableAllowed;
+  bool _blockedActionLogged = false;
+
+  /// Motor torque/action authorization is fail-closed. Only the exact value
+  /// `true` permits motor enable and policy action frames.
+  bool get motorCommandsAllowed => _motorEnableAllowed();
+
   final List<PcanController<RSEvent, RSState>> pcans;
 
   PcanController<RSEvent, RSState> get fr => pcans[0];
@@ -131,7 +175,11 @@ class RealJoint implements JointService, MotorService {
     required PcanChannel fl,
     required PcanChannel rr,
     required PcanChannel rl,
-  }) : pcans = [.new(fr), .new(fl), .new(rr), .new(rl)] {
+  }) : this.withControllers([.new(fr), .new(fl), .new(rr), .new(rl)]);
+
+  RealJoint.withControllers(this.pcans, {bool Function()? motorEnableAllowed})
+    : _motorEnableAllowed =
+          motorEnableAllowed ?? _motorEnableAllowedFromEnvironment {
     subscriptions = [
       _listenLeg(0),
       _listenLeg(1),
@@ -150,15 +198,20 @@ class RealJoint implements JointService, MotorService {
             _cachedThetas = null;
             _cachedOmegas = null;
             frequencyWatches[legId * 4 + targetId - 1].add(1);
-            _reportController.add((legId * 4 + targetId - 1, state));
-            final jointIdx =
-                targetId <= 3 ? legId * 3 + (targetId - 1) : 12 + legId;
-            _motorFaultController.add(MotorFaultEvent(
-              jointIndex: jointIdx,
-              errors: state.errors.errors,
-              status: state.status,
-              temperature: state.temperature,
-            ));
+            final jointIdx = _legCanToFlatIndex(legId, targetId);
+            _reportController.add((jointIdx, state));
+            _motorFaultController.add(
+              MotorFaultEvent(
+                jointIndex: jointIdx,
+                errors: state.errors.errors,
+                errorBits: state.errors.value,
+                status: state.status,
+                position: state.position,
+                velocity: state.velocity,
+                torque: state.torque,
+                temperature: state.temperature,
+              ),
+            );
           default:
         }
       },
@@ -174,7 +227,11 @@ class RealJoint implements JointService, MotorService {
   bool open() {
     bool allOpened = true;
     for (int i = 0; i < pcans.length; i++) {
-      if (!pcans[i].open()) {
+      final pcan = pcans[i];
+      if (pcan.open()) {
+        _sendDisable(pcan);
+        _log.info('Startup motor disable sent to PCAN leg $i');
+      } else {
         _log.severe('PCAN leg $i open failed');
         allOpened = false;
       }
@@ -187,6 +244,12 @@ class RealJoint implements JointService, MotorService {
 
   @override
   Future<void> enable() async {
+    final blockReason = motorEnableBlockReason();
+    if (blockReason != null) {
+      _log.warning('Motor enable blocked: $blockReason');
+      _sendDisableAll();
+      throw StateError('Motor enable blocked: $blockReason');
+    }
     for (final pcan in pcans) {
       for (int i = 1; i <= 4; i++) {
         pcan.add(.enable(i));
@@ -196,20 +259,27 @@ class RealJoint implements JointService, MotorService {
 
   @override
   Future<void> disable({bool clearErrors = false}) async {
+    _sendDisableAll(clearErrors: clearErrors);
+  }
+
+  void _sendDisable(
+    PcanController<RSEvent, RSState> pcan, {
+    bool clearErrors = false,
+  }) {
+    for (int i = 1; i <= 4; i++) {
+      pcan.add(.disable(i, clearErrors: clearErrors));
+    }
+  }
+
+  void _sendDisableAll({bool clearErrors = false}) {
     for (final pcan in pcans) {
-      for (int i = 1; i <= 4; i++) {
-        pcan.add(.disable(i, clearErrors: clearErrors));
-      }
+      _sendDisable(pcan, clearErrors: clearErrors);
     }
   }
 
   /// 清除所有电机 fault（启动时调用，清除上次异常退出遗留的故障）。
   void clearFaults() {
-    for (final pcan in pcans) {
-      for (int i = 1; i <= 4; i++) {
-        pcan.add(.disable(i, clearErrors: true));
-      }
-    }
+    _sendDisableAll(clearErrors: true);
   }
 
   /// 设置足轮 CAN 通信超时（微秒）。程序崩溃后轮子在超时后自动停转。
@@ -234,11 +304,23 @@ class RealJoint implements JointService, MotorService {
   void sendAction(JointsMatrix action) => realActionExt(action);
 
   void realActionExt(JointsMatrix action) {
+    if (!motorCommandsAllowed) {
+      if (!_blockedActionLogged) {
+        _blockedActionLogged = true;
+        _log.warning(
+          'Motor action frames blocked: '
+          'HAN_DOG_ALLOW_MOTOR_ENABLE is not true',
+        );
+      }
+      return;
+    }
     // 最后一道安全门：NaN/Inf 绝不能到达 CAN 总线。
     if (action.hasNonFinite || kpExt.hasNonFinite || kdExt.hasNonFinite) {
-      _log.severe('realActionExt rejected: non-finite values detected '
-          '(action=${action.hasNonFinite}, kp=${kpExt.hasNonFinite}, '
-          'kd=${kdExt.hasNonFinite})');
+      _log.severe(
+        'realActionExt rejected: non-finite values detected '
+        '(action=${action.hasNonFinite}, kp=${kpExt.hasNonFinite}, '
+        'kd=${kdExt.hasNonFinite})',
+      );
       return;
     }
     _realActionExt(action, kpExt, kdExt);
@@ -272,6 +354,10 @@ class RealJoint implements JointService, MotorService {
 
   // ─── Flat-index helpers ────────────────────────────────────────────────────
 
+  /// Converts a hardware (legId, CAN ID) pair to JointsMatrix flat order.
+  int _legCanToFlatIndex(int legId, int canId) =>
+      canId <= 3 ? legId * 3 + canId - 1 : 12 + legId;
+
   /// Converts JointsMatrix flat index (0–15) to (legId, canId).
   /// idx 0–11 → legId = idx ~/3, canId = idx%3+1
   /// idx 12–15 → legId = idx-12, canId = 4
@@ -283,7 +369,54 @@ class RealJoint implements JointService, MotorService {
   /// Whether joint [idx] is actively communicating (>0 Hz in last 1s).
   bool isOnline(int idx) {
     if (idx < 0 || idx >= 16) return false;
-    return frequencyWatches[idx].value > 0;
+    final (legId, canId) = _flatIndexToLegCan(idx);
+    return frequencyWatches[legId * 4 + canId - 1].value > 0;
+  }
+
+  /// Returns null only when all hardware preconditions for motor enable pass.
+  String? motorEnableBlockReason() {
+    if (!motorCommandsAllowed) {
+      return 'HAN_DOG_ALLOW_MOTOR_ENABLE is not true';
+    }
+
+    final offline = <String>[];
+    final unsafe = <String>[];
+    for (var i = 0; i < _enableJointNames.length; i++) {
+      final name = _enableJointNames[i];
+      if (!isOnline(i)) {
+        offline.add(name);
+        continue;
+      }
+      final report = getReport(i);
+      if (report == null) {
+        offline.add(name);
+        continue;
+      }
+
+      final status = report.status.value;
+      if (status == RSStatus.calibration.value ||
+          status == RSStatus.unknown.value) {
+        unsafe.add('$name status=${report.status}');
+      }
+      if (report.errors.errors.isNotEmpty) {
+        unsafe.add('$name errors=${report.errors.errors.join(",")}');
+      }
+      final position = report.position;
+      if (!position.isFinite ||
+          (i < 12 && position.abs() > _enableJointLimitRad)) {
+        unsafe.add('$name position=${position.toStringAsFixed(3)}rad');
+      }
+      if (!report.velocity.isFinite || !report.torque.isFinite) {
+        unsafe.add('$name non-finite velocity/torque');
+      }
+      if (!report.temperature.isFinite) {
+        unsafe.add('$name temperature=${report.temperature}');
+      }
+    }
+
+    if (offline.isNotEmpty) return 'offline joints: ${offline.join(", ")}';
+    if (unsafe.isNotEmpty) return 'unsafe joints: ${unsafe.join("; ")}';
+    return null;
   }
 
   /// Returns the latest report for flat joint [idx], or null if out of range
@@ -323,15 +456,17 @@ class RealJoint implements JointService, MotorService {
     // 用每条腿的 PcanController 监听 getter 响应
     final legSubs = <StreamSubscription<RSState>>[];
     for (int legId = 0; legId < 4; legId++) {
-      legSubs.add(pcans[legId].state.listen((state) {
-        if (state is RSStateGetter && state.getter is RSGetterVbus) {
-          final canId = state.canId;
-          final voltage = (state.getter as RSGetterVbus).value;
-          // canId 1-3 → leg joints, canId 4 → foot
-          final idx = canId <= 3 ? legId * 3 + (canId - 1) : 12 + legId;
-          if (idx >= 0 && idx < 16) voltages[idx] = voltage;
-        }
-      }));
+      legSubs.add(
+        pcans[legId].state.listen((state) {
+          if (state is RSStateGetter && state.getter is RSGetterVbus) {
+            final canId = state.canId;
+            final voltage = (state.getter as RSGetterVbus).value;
+            // canId 1-3 → leg joints, canId 4 → foot
+            final idx = canId <= 3 ? legId * 3 + (canId - 1) : 12 + legId;
+            if (idx >= 0 && idx < 16) voltages[idx] = voltage;
+          }
+        }),
+      );
     }
 
     // 发送 getter 请求
@@ -359,7 +494,9 @@ class RealJoint implements JointService, MotorService {
     _disposed = true;
     _log.info('RealJoint disposing');
     for (final sub in subscriptions) {
-      try { sub.cancel(); } catch (_) {}
+      try {
+        sub.cancel();
+      } catch (_) {}
     }
     _reportController.close();
     _motorFaultController.close();
