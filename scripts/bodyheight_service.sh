@@ -25,6 +25,8 @@ SS_BIN="${SS_BIN:-ss}"
 JOURNALCTL_BIN="${JOURNALCTL_BIN:-journalctl}"
 SHA256SUM_BIN="${SHA256SUM_BIN:-sha256sum}"
 SLEEP_BIN="${SLEEP_BIN:-sleep}"
+FLOCK_BIN="${FLOCK_BIN:-flock}"
+LOCK_FILE="${LOCK_FILE:-/tmp/han-dog-bodyheight.lock}"
 
 readonly H15_PROFILE="thunder_h15"
 readonly H15_MODEL="thunder_h15_model10400.onnx"
@@ -73,15 +75,69 @@ port_is_listening() {
 }
 
 candidate_is_blocking_start() {
-  local state
-  state="$(unit_state "$CANDIDATE_UNIT")"
+  local state="$1"
   [[ "$state" == active || "$state" == activating || "$state" == deactivating ]]
 }
 
 candidate_is_blocking_restore() {
-  local state
-  state="$(unit_state "$CANDIDATE_UNIT")"
+  local state="$1"
   [[ "$state" == active || "$state" == activating || "$state" == deactivating ]]
+}
+
+validate_mutation_config() {
+  local unit
+  for unit in "$PRODUCTION_UNIT" "$CANDIDATE_UNIT"; do
+    if [[ -z "$unit" || ! "$unit" =~ ^[A-Za-z0-9_.@:-]+[.]service$ ]]; then
+      printf '配置错误：unit 名称必须为安全的非空 .service 名称：%s\n' "$unit" >&2
+      return 1
+    fi
+  done
+  if [[ "$PRODUCTION_UNIT" == "$CANDIDATE_UNIT" ]]; then
+    printf '配置错误：PRODUCTION_UNIT 与 CANDIDATE_UNIT 不得相同。\n' >&2
+    return 1
+  fi
+  if [[ ! "$GRPC_PORT" =~ ^[1-9][0-9]{0,4}$ ]] ||
+    ((10#$GRPC_PORT < 1 || 10#$GRPC_PORT > 65535)); then
+    printf '配置错误：GRPC_PORT 必须是 1..65535 的十进制整数：%s\n' "$GRPC_PORT" >&2
+    return 1
+  fi
+  if [[ ! "$START_TIMEOUT_SECONDS" =~ ^[1-9][0-9]{0,2}$ ]] ||
+    ((10#$START_TIMEOUT_SECONDS < 1 || 10#$START_TIMEOUT_SECONDS > 300)); then
+    printf '配置错误：START_TIMEOUT_SECONDS 必须是 1..300 的十进制整数：%s\n' \
+      "$START_TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+  if [[ ! "$STOP_TIMEOUT_SECONDS" =~ ^[1-9][0-9]{0,2}s$ ]]; then
+    printf '配置错误：STOP_TIMEOUT_SECONDS 必须使用 1s..999s 格式：%s\n' \
+      "$STOP_TIMEOUT_SECONDS" >&2
+    return 1
+  fi
+}
+
+acquire_mutation_lock() {
+  if [[ -z "$LOCK_FILE" || "$LOCK_FILE" != /* || "$LOCK_FILE" == *$'\n'* ]]; then
+    printf '配置错误：LOCK_FILE 必须是无换行的非空绝对路径。\n' >&2
+    return 1
+  fi
+  if ! command -v "$FLOCK_BIN" >/dev/null 2>&1; then
+    printf '安全锁不可用：找不到 flock：%s\n' "$FLOCK_BIN" >&2
+    return 1
+  fi
+  if ! exec 9>"$LOCK_FILE"; then
+    printf '安全锁不可用：无法打开锁文件：%s\n' "$LOCK_FILE" >&2
+    return 1
+  fi
+  if ! "$FLOCK_BIN" -n 9; then
+    printf '拒绝操作：另一个 body-height 生命周期操作正在进行（锁：%s）。\n' \
+      "$LOCK_FILE" >&2
+    return 1
+  fi
+}
+
+run_mutation() {
+  acquire_mutation_lock || return 1
+  validate_mutation_config || return 1
+  "$@"
 }
 
 show_status() {
@@ -238,7 +294,7 @@ preflight_runtime() {
   fi
 
   candidate_state="$(unit_state "$CANDIDATE_UNIT")"
-  if candidate_is_blocking_start; then
+  if candidate_is_blocking_start "$candidate_state"; then
     printf '拒绝启动：候选服务状态为 %s。\n' "$candidate_state" >&2
     printf '确认安全后执行：sudo systemctl stop %s\n' "$CANDIDATE_UNIT" >&2
     return 1
@@ -278,6 +334,16 @@ wait_until_ready() {
   return 1
 }
 
+observed_port_state() {
+  local result
+  if port_is_listening; then
+    printf 'listening'
+  else
+    result=$?
+    if ((result == 2)); then printf 'unknown'; else printf 'free'; fi
+  fi
+}
+
 start_candidate() {
   local requested_profile="$1"
   select_profile "$requested_profile" || return 2
@@ -314,10 +380,17 @@ start_candidate() {
     return 0
   fi
 
-  printf '启动失败：候选服务未在 %s 秒内进入 active 且监听端口 %s。\n' \
-    "$START_TIMEOUT_SECONDS" "$GRPC_PORT" >&2
-  printf '检查：%s status\n' "$0" >&2
-  printf '日志：%s logs\n' "$0" >&2
+  local observed_candidate observed_port
+  observed_candidate="$(unit_state "$CANDIDATE_UNIT")"
+  observed_port="$(observed_port_state)"
+  printf 'READINESS NOT CONFIRMED: candidate MAY STILL BE ACTIVE and may hold IMU/PCAN/port.\n' >&2
+  printf 'DO NOT restore-master until the candidate is safely stopped and status is verified.\n' >&2
+  printf 'Observed candidate state: %s\n' "$observed_candidate" >&2
+  printf 'Observed port state: %s\n' "$observed_port" >&2
+  printf 'Safe sequence:\n' >&2
+  printf '  1. disable motors and support robot\n' >&2
+  printf '  2. %s stop\n' "$0" >&2
+  printf '  3. %s status\n' "$0" >&2
   return 1
 }
 
@@ -340,9 +413,9 @@ stop_candidate() {
 }
 
 restore_master() {
-  local candidate_state port_result
+  local candidate_state production_state port_result
   candidate_state="$(unit_state "$CANDIDATE_UNIT")"
-  if candidate_is_blocking_restore; then
+  if candidate_is_blocking_restore "$candidate_state"; then
     printf '拒绝恢复：候选服务状态为 %s，必须先安全停止。\n' "$candidate_state" >&2
     printf '确认电机已禁用且机器人已支撑后执行：sudo systemctl stop %s\n' \
       "$CANDIDATE_UNIT" >&2
@@ -350,6 +423,12 @@ restore_master() {
   fi
   if [[ "$candidate_state" != inactive && "$candidate_state" != failed ]]; then
     printf '拒绝恢复：无法确认候选服务已停止（状态：%s）。\n' "$candidate_state" >&2
+    return 1
+  fi
+
+  production_state="$(unit_state "$PRODUCTION_UNIT")"
+  if [[ "$production_state" != inactive && "$production_state" != failed ]]; then
+    printf '拒绝恢复：生产服务状态不适合启动（状态：%s）。\n' "$production_state" >&2
     return 1
   fi
 
@@ -391,18 +470,18 @@ main() {
         usage_error "未知 profile：$1（仅支持 h15 或 h18）"
         return
       fi
-      start_candidate "$1"
+      run_mutation start_candidate "$1"
       ;;
     logs)
       show_logs "$@"
       ;;
     stop)
       (($# == 0)) || usage_error "stop 不接受额外参数"
-      stop_candidate
+      run_mutation stop_candidate
       ;;
     restore-master)
       (($# == 0)) || usage_error "restore-master 不接受额外参数"
-      restore_master
+      run_mutation restore_master
       ;;
     *)
       usage_error "未知命令：$command"
