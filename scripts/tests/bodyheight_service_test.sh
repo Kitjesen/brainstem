@@ -148,6 +148,7 @@ reset_fixture() {
   RUN_MARKER="$CASE_DIR/systemd-run.called"
   CANDIDATE_MARKER="$CASE_DIR/candidate.active"
   DART_BIN="$CASE_DIR/dart"
+  PYTHON_BIN="${PYTHON_BIN_FOR_TESTS:-python3}"
   IMU_PORT="$CASE_DIR/imu"
   YUNZHUO_PORT="$CASE_DIR/yunzhuo"
   mkdir -p "$PROFILE_DIR" "$BRAINSTEM_ROOT/han_dog/bin" "$BRAINSTEM_ROOT/model"
@@ -178,6 +179,7 @@ run_service() {
   LAST_OUTPUT="$(
     BRAINSTEM_ROOT="$BRAINSTEM_ROOT" \
     DART_BIN="$DART_BIN" \
+    PYTHON_BIN="$PYTHON_BIN" \
     SERVICE_USER=test-user \
     SERVICE_GROUP=test-group \
     PRODUCTION_UNIT=han_dog.service \
@@ -273,6 +275,35 @@ test_preflight_failures_do_not_launch() {
   run_service start h15
   assert_status 1 "profile mismatch fails preflight"
   assert_file_absent "$RUN_MARKER" "profile mismatch prevents systemd-run"
+
+  reset_fixture
+  printf '%s\n' '{"name":"thunder_h15",' >"$PROFILE_DIR/thunder_h15.json"
+  run_service start h15
+  assert_status 1 "malformed profile JSON fails preflight"
+  assert_file_absent "$RUN_MARKER" "malformed profile JSON prevents systemd-run"
+
+  reset_fixture
+  cat >"$PROFILE_DIR/thunder_h15.json" <<'EOF'
+{"name":"thunder_h15","name":"wrong","modelPath":"model/thunder_h15_model10400.onnx","_onnxSha256":"ded34be402b25a3a77a9feba196a3d76efa2b5660d7d9c8396b28963a0efbde4"}
+EOF
+  run_service start h15
+  assert_status 1 "duplicate profile key fails preflight"
+  assert_file_absent "$RUN_MARKER" "duplicate profile key prevents systemd-run"
+
+  reset_fixture
+  cat >"$PROFILE_DIR/thunder_h15.json" <<'EOF'
+{"name":"wrong","modelPath":"model/wrong.onnx","_onnxSha256":"bad","spoof":"\"name\":\"thunder_h15\",\"modelPath\":\"model/thunder_h15_model10400.onnx\",\"_onnxSha256\":\"ded34be402b25a3a77a9feba196a3d76efa2b5660d7d9c8396b28963a0efbde4\""}
+EOF
+  run_service start h15
+  assert_status 1 "unrelated-field profile spoof fails preflight"
+  assert_file_absent "$RUN_MARKER" "unrelated-field spoof prevents systemd-run"
+
+  reset_fixture
+  PYTHON_BIN="$CASE_DIR/missing-python3"
+  run_service start h15
+  assert_status 1 "missing JSON parser fails preflight"
+  assert_contains "Python" "missing JSON parser prints actionable output"
+  assert_file_absent "$RUN_MARKER" "missing JSON parser prevents systemd-run"
 }
 
 test_successful_start_command() {
@@ -280,6 +311,7 @@ test_successful_start_command() {
   run_service start h15
   assert_status 0 "valid h15 start succeeds with fakes"
   assert_contains "候选服务已启动" "successful start reports readiness"
+  assert_log_line "--collect" "launch collects completed transient unit"
   assert_log_line "--unit=han-dog-bodyheight.service" "launch uses exact candidate unit"
   assert_log_line "--property=User=test-user" "launch sets service user"
   assert_log_line "--property=Group=test-group" "launch sets service group"

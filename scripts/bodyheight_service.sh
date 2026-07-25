@@ -4,6 +4,7 @@ set -Eeuo pipefail
 # Robot paths and service identity. Every value can be overridden for testing.
 BRAINSTEM_ROOT="${BRAINSTEM_ROOT:-/home/bsrl1/brainstem-bodyheightctrl}"
 DART_BIN="${DART_BIN:-/home/bsrl1/flutter/bin/dart}"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
 SERVICE_USER="${SERVICE_USER:-bsrl1}"
 SERVICE_GROUP="${SERVICE_GROUP:-bsrl1}"
 PRODUCTION_UNIT="${PRODUCTION_UNIT:-han_dog.service}"
@@ -132,7 +133,7 @@ select_profile() {
 preflight_files() {
   local profile_file="$PROFILE_DIR/$PROFILE_NAME.json"
   local model_file="$BRAINSTEM_ROOT/model/$MODEL_NAME"
-  local profile_json compact_json hash_output actual_sha256
+  local hash_output actual_sha256
 
   [[ -d "$BRAINSTEM_ROOT" ]] || {
     printf '预检失败：仓库目录不存在：%s\n' "$BRAINSTEM_ROOT" >&2
@@ -163,12 +164,55 @@ preflight_files() {
     return 1
   }
 
-  profile_json="$(<"$profile_file")"
-  compact_json="${profile_json//[[:space:]]/}"
-  if [[ "$compact_json" != *"\"name\":\"$PROFILE_NAME\""* ||
-        "$compact_json" != *"\"modelPath\":\"model/$MODEL_NAME\""* ||
-        "$compact_json" != *"\"_onnxSha256\":\"$EXPECTED_SHA256\""* ]]; then
-    printf '预检失败：profile JSON 与所选策略/模型/哈希不匹配：%s\n' "$profile_file" >&2
+  if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+    printf '预检失败：找不到 Python JSON 解析器：%s\n' "$PYTHON_BIN" >&2
+    printf '请安装 Python 3，或通过 PYTHON_BIN 指定可执行文件。\n' >&2
+    return 1
+  fi
+  if ! "$PYTHON_BIN" - "$profile_file" "$PROFILE_NAME" \
+    "model/$MODEL_NAME" "$EXPECTED_SHA256" <<'PY'
+import json
+import sys
+
+
+class DuplicateKeyError(ValueError):
+    pass
+
+
+def reject_duplicate_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateKeyError(f"duplicate key: {key}")
+        result[key] = value
+    return result
+
+
+profile_path, expected_name, expected_model, expected_sha256 = sys.argv[1:]
+expected = {
+    "name": expected_name,
+    "modelPath": expected_model,
+    "_onnxSha256": expected_sha256,
+}
+
+try:
+    with open(profile_path, "r", encoding="utf-8") as profile_file:
+        profile = json.load(profile_file, object_pairs_hook=reject_duplicate_keys)
+    if not isinstance(profile, dict):
+        raise ValueError("top-level JSON value must be an object")
+    for key, expected_value in expected.items():
+        actual_value = profile.get(key)
+        if actual_value != expected_value:
+            raise ValueError(
+                f"top-level {key} mismatch: expected {expected_value!r}, "
+                f"got {actual_value!r}"
+            )
+except (OSError, UnicodeError, ValueError) as error:
+    print(f"profile JSON validation failed: {error}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+  then
+    printf '预检失败：profile JSON 结构或顶层策略字段无效：%s\n' "$profile_file" >&2
     return 1
   fi
 
@@ -242,6 +286,7 @@ start_candidate() {
 
   printf '预检通过，启动候选服务 %s（不会启用电机）...\n' "$PROFILE_NAME"
   if ! "$SUDO_BIN" "$SYSTEMD_RUN_BIN" \
+    "--collect" \
     "--unit=$CANDIDATE_UNIT" \
     "--property=User=$SERVICE_USER" \
     "--property=Group=$SERVICE_GROUP" \
