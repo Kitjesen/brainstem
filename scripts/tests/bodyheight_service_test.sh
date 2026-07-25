@@ -239,7 +239,10 @@ EOF
 set -Eeuo pipefail
 printf 'flock:%s\n' "$*" >>"$CALL_LOG"
 (($# == 2)) && [[ "$1" == -n && "$2" =~ ^[0-9]+$ ]] || exit 97
-[[ "${LOCK_BUSY:-0}" == 1 ]] && exit 1
+if [[ "${LOCK_BUSY:-0}" == 1 ]]; then
+  exit 1
+fi
+exit 0
 EOF
 
   cat >"$FAKE_BIN/mkdir" <<'EOF'
