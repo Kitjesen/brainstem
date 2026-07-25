@@ -109,58 +109,18 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.Empty> enable(ServiceCall call, proto.Empty request) async {
-    final blockReason = _enableBlockReason();
-    if (blockReason != null) {
-      _log.warning('Motors enable blocked: $blockReason');
-      await _forceMotorDisabled();
-      throw GrpcError.failedPrecondition('Motors enable blocked: $blockReason');
-    }
-    try {
-      await motor?.enable();
-      onMotorEnableChanged?.call(true);
-    } catch (error, stackTrace) {
-      _log.severe('Motors enable failed', error, stackTrace);
-      await _forceMotorDisabled();
-      rethrow;
-    }
+    await motor?.enable();
+    onMotorEnableChanged?.call(true);
     _log.info('Motors enabled');
     return proto.Empty();
   }
 
   @override
   Future<proto.Empty> disable(ServiceCall call, proto.Empty request) async {
-    try {
-      await motor?.disable();
-    } finally {
-      try {
-        onMotorEnableChanged?.call(false);
-      } catch (error, stackTrace) {
-        _log.severe('Motor disabled callback failed', error, stackTrace);
-      }
-    }
+    await motor?.disable();
+    onMotorEnableChanged?.call(false);
     _log.info('Motors disabled');
     return proto.Empty();
-  }
-
-  String? _enableBlockReason() {
-    if (mode != CmsMode.hardware) return null;
-    if (motor == null) return 'motor service unavailable';
-    final hardwareJoint = joint;
-    if (hardwareJoint == null) return 'joint controller unavailable';
-    return hardwareJoint.motorEnableBlockReason();
-  }
-
-  Future<void> _forceMotorDisabled() async {
-    try {
-      await motor?.disable();
-    } catch (error, stackTrace) {
-      _log.severe('Fallback motor disable failed', error, stackTrace);
-    }
-    try {
-      onMotorEnableChanged?.call(false);
-    } catch (error, stackTrace) {
-      _log.severe('Motor disabled callback failed', error, stackTrace);
-    }
   }
 
   // ═══════════════════════════════════════════════════════════

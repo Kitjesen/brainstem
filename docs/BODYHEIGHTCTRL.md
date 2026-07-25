@@ -70,27 +70,6 @@ The validation run on 2026-07-22 completed the full `Grounded -> StandUp -> SetB
 
 No unattended or remote motor motion is part of automated validation. Complete every item below on the robot before enabling output:
 
-Motor torque and policy action frames are fail-closed. The hardware process
-permits them only when the environment contains the exact, case-insensitive
-value:
-
-```bash
-HAN_DOG_ALLOW_MOTOR_ENABLE=true
-```
-
-If the variable is missing, `false`, or any other value, gRPC and controller
-enable requests fail, the enabled callback remains false, and policy action
-frames are dropped. The process still opens the IMU and PCAN devices and sends
-safety/management frames such as startup disable, clear-fault, wheel timeout,
-reporting, and queries. Therefore this mode is not a passive shadow process:
-stop the production service and release all four PCAN channels before starting
-the candidate, even with `HAN_DOG_ALLOW_MOTOR_ENABLE=false`.
-
-Before an authorized enable, all 16 motors must be online, fault-free, in a
-valid run state, and report finite telemetry; the 12 leg joints must also be
-within `±3.14 rad`. Every successfully opened PCAN channel receives disable
-commands for CAN IDs 1–4 before startup proceeds.
-
 1. Verify the ONNX hashes, selected profile name, input name, inferred history length, finite zero-state inference, and all Dart/Python tests.
 2. Place the robot on a rigid support with all wheels clear of the floor; use a restraint/harness and keep the work area clear.
 3. Assign a second operator to the physical emergency stop. Confirm that disable cuts motor output before any policy command.

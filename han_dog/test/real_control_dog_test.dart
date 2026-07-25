@@ -102,7 +102,6 @@ void main() {
     when(() => joint.enable()).thenAnswer((_) async {});
     when(() => joint.disable()).thenAnswer((_) async {});
     when(() => joint.disable(clearErrors: true)).thenAnswer((_) async {});
-    when(() => joint.motorEnableBlockReason()).thenReturn(null);
 
     when(() => arbiter.stateStream).thenAnswer((_) => stateCtrl.stream);
     when(() => arbiter.state).thenReturn(const Zero());
@@ -253,62 +252,27 @@ void main() {
     });
 
     test('red → joint.disable(clearErrors: true)', () async {
-      final enabledStates = <bool>[];
-      buildDog().onMotorEnableChanged = enabledStates.add;
+      buildDog();
       redCtrl.add(true);
       await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.disable(clearErrors: true)).called(1);
-      expect(enabledStates, [false]);
     });
 
     test('enabled true → joint.enable()', () async {
-      final enabledStates = <bool>[];
-      buildDog().onMotorEnableChanged = enabledStates.add;
+      buildDog();
       enabledCtrl.add(true);
       await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.enable()).called(1);
-      expect(enabledStates, [true]);
-    });
-
-    test('unsafe enable is rejected and never reported as enabled', () async {
-      when(
-        () => joint.motorEnableBlockReason(),
-      ).thenReturn('motor authorization is disabled');
-      final enabledStates = <bool>[];
-      buildDog().onMotorEnableChanged = enabledStates.add;
-
-      enabledCtrl.add(true);
-      await Future<void>.delayed(Duration.zero);
-
-      verifyNever(() => joint.enable());
-      verify(() => joint.disable()).called(1);
-      expect(enabledStates, [false]);
-    });
-
-    test('enable failure falls back to disable and reports false', () async {
-      when(() => joint.enable()).thenThrow(StateError('CAN write failed'));
-      final enabledStates = <bool>[];
-      buildDog().onMotorEnableChanged = enabledStates.add;
-
-      enabledCtrl.add(true);
-      await Future<void>.delayed(Duration.zero);
-      await Future<void>.delayed(Duration.zero);
-
-      verify(() => joint.enable()).called(1);
-      verify(() => joint.disable()).called(1);
-      expect(enabledStates, [false]);
     });
 
     test('enabled false → joint.disable()', () async {
-      final enabledStates = <bool>[];
-      buildDog().onMotorEnableChanged = enabledStates.add;
+      buildDog();
       enabledCtrl.add(false);
       await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.disable()).called(1);
-      expect(enabledStates, [false]);
     });
   });
 

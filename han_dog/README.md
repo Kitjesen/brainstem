@@ -93,12 +93,6 @@ dart run han_dog/bin/server.dart
 | `HAN_DOG_SENSOR_LOW_THRESHOLD` | `3` | 传感器降频容忍次数 |
 | `HAN_DOG_LOG_DIR` | `logs` | 日志目录（空字符串禁用） |
 | `HAN_DOG_DEBUG_TUI` | `false` | 启用 ANSI 调试 TUI |
-| `HAN_DOG_ALLOW_MOTOR_ENABLE` | `false` | 仅精确设为 `true` 时允许电机 Enable 与策略动作帧 |
-
-`HAN_DOG_ALLOW_MOTOR_ENABLE=false` 不是与生产服务并行运行的“只读模式”。
-程序仍会独占四路 PCAN，并发送启动失能、清故障、足轮超时、主动上报和查询等
-管理帧。用它验证候选服务时，必须先停止生产服务并确认 PCAN 已释放；它的作用
-是在候选服务独占硬件期间阻止上力和策略动作。
 
 ### server.dart 使用
 
