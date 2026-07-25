@@ -1,7 +1,8 @@
 import math
+import sys
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 
 from scripts import bodyheight_grpc
@@ -79,6 +80,18 @@ class FailingHistoryStub(FakeStub):
         return stream()
 
 
+class OrderingStub(FakeStub):
+    def ListenHistory(self, request, timeout=None):
+        self.calls.append(("ListenHistory", request, timeout))
+
+        def stream():
+            for item in self.histories:
+                self.calls.append(("History", item, None))
+                yield item
+
+        return stream()
+
+
 class BodyHeightGrpcTests(unittest.TestCase):
     def setUp(self):
         self.profile_dir = bodyheight_grpc.DEFAULT_PROFILE_DIR
@@ -114,6 +127,11 @@ class BodyHeightGrpcTests(unittest.TestCase):
         args = bodyheight_grpc.build_parser().parse_args(["set-velocity"])
         with self.assertRaisesRegex(bodyheight_grpc.CommandError, "at least one"):
             bodyheight_grpc.resolve_velocity(args)
+
+    def test_velocity_help_warns_that_enabled_motors_may_move(self):
+        help_text = bodyheight_grpc.build_parser().format_help().lower()
+        self.assertIn("motors are enabled", help_text)
+        self.assertIn("may move", help_text)
 
     def test_profile_ranges_are_loaded(self):
         profile = bodyheight_grpc.load_profile(self.profile_dir, "thunder_h18")
@@ -154,10 +172,36 @@ class BodyHeightGrpcTests(unittest.TestCase):
     def test_height_command_is_confirmed_by_telemetry(self):
         stub = FakeStub(histories=[history(0.3), history(0.3504)])
         client = self.make_client(stub)
-        confirmed = client.set_height(0.35, self.profile_dir, tolerance=0.001)
-        self.assertAlmostEqual(confirmed.body_height_command, 0.3504)
+        result = client.set_height(0.35, self.profile_dir, tolerance=0.001)
+        self.assertEqual(result.state, "confirmed")
+        self.assertAlmostEqual(result.history.body_height_command, 0.3504)
         sent = next(call[1] for call in stub.calls if call[0] == "SetBodyHeight")
         self.assertEqual(sent.meters, 0.35)
+
+    def test_same_height_is_already_active_without_command_rpc(self):
+        stub = FakeStub(histories=[history(0.3504)])
+        result = self.make_client(stub).set_height(
+            0.35, self.profile_dir, tolerance=0.001
+        )
+        self.assertEqual(result.state, "already_active")
+        self.assertFalse(any(call[0] == "SetBodyHeight" for call in stub.calls))
+
+    def test_missing_height_baseline_fails_before_command_rpc(self):
+        missing_height = message(command=message(WhichOneof=lambda _: None))
+        stub = FakeStub(histories=[missing_height, history(0.35)])
+        with self.assertRaisesRegex(bodyheight_grpc.TelemetryError, "baseline"):
+            self.make_client(stub).set_height(0.35, self.profile_dir)
+        self.assertFalse(any(call[0] == "SetBodyHeight" for call in stub.calls))
+
+    def test_height_baseline_is_consumed_before_command(self):
+        stub = OrderingStub(histories=[history(0.3), history(0.35)])
+        result = self.make_client(stub).set_height(0.35, self.profile_dir)
+        names = [call[0] for call in stub.calls]
+        self.assertEqual(result.state, "confirmed")
+        self.assertLess(names.index("ListenHistory"), names.index("History"))
+        self.assertLess(names.index("History"), names.index("SetBodyHeight"))
+        self.assertLess(names.index("SetBodyHeight"), len(names) - 1)
+        self.assertEqual(names[-1], "History")
 
     def test_silent_height_rejection_is_reported(self):
         stub = FakeStub(histories=[history(0.3), history(0.3)])
@@ -180,12 +224,32 @@ class BodyHeightGrpcTests(unittest.TestCase):
     def test_velocity_command_is_confirmed_by_telemetry(self):
         stub = FakeStub(histories=[history(0.3), history(0.3, (0.2, -0.1, 0.3))])
         client = self.make_client(stub)
-        confirmed = client.set_velocity(
+        result = client.set_velocity(
             (0.2, -0.1, 0.3), self.profile_dir, tolerance=0.001
         )
-        self.assertEqual(confirmed.command.WhichOneof("data"), "walk")
+        self.assertEqual(result.state, "confirmed")
+        self.assertEqual(result.history.command.WhichOneof("data"), "walk")
         sent = next(call[1] for call in stub.calls if call[0] == "Walk")
         self.assertEqual((sent.x, sent.y, sent.z), (0.2, -0.1, 0.3))
+
+    def test_same_velocity_is_already_active_without_command_rpc(self):
+        stub = FakeStub(histories=[history(0.3, (0.2, -0.1, 0.3))])
+        result = self.make_client(stub).set_velocity(
+            (0.2, -0.1, 0.3), self.profile_dir
+        )
+        self.assertEqual(result.state, "already_active")
+        self.assertFalse(any(call[0] == "Walk" for call in stub.calls))
+
+    def test_velocity_baseline_is_consumed_before_command(self):
+        stub = OrderingStub(
+            histories=[history(0.3, (0.0, 0.0, 0.0)), history(0.3, (0.2, 0, 0))]
+        )
+        result = self.make_client(stub).set_velocity((0.2, 0, 0), self.profile_dir)
+        names = [call[0] for call in stub.calls]
+        self.assertEqual(result.state, "confirmed")
+        self.assertLess(names.index("ListenHistory"), names.index("History"))
+        self.assertLess(names.index("History"), names.index("Walk"))
+        self.assertEqual(names[-1], "History")
 
     def test_silent_velocity_rejection_is_reported(self):
         stub = FakeStub(histories=[history(0.3), history(0.3, (0.0, 0.0, 0.0))])
@@ -211,6 +275,36 @@ class BodyHeightGrpcTests(unittest.TestCase):
         self.assertEqual(len(list(client.histories(bounded=False))), 1)
         listen_call = next(call for call in stub.calls if call[0] == "ListenHistory")
         self.assertIsNone(listen_call[2])
+
+    def test_runtime_loader_prepends_repo_generated_api_path(self):
+        expected = (
+            Path(bodyheight_grpc.__file__).resolve().parents[1]
+            / "brainstem_api"
+            / "python"
+        )
+        fake_grpc = ModuleType("grpc")
+        fake_api = ModuleType("brainstem_api")
+        fake_api.__path__ = []
+        fake_api.Empty = object()
+        fake_api.RobotControlStub = object()
+        fake_api.Vector3 = object()
+        fake_cms = ModuleType("brainstem_api.cms_pb2")
+        fake_cms.BodyHeightCommand = object()
+        modules = {
+            "grpc": fake_grpc,
+            "brainstem_api": fake_api,
+            "brainstem_api.cms_pb2": fake_cms,
+        }
+        original_path = list(sys.path)
+        try:
+            with patch.object(Path, "is_dir", return_value=True):
+                with patch.dict(sys.modules, modules):
+                    runtime = bodyheight_grpc._load_runtime_api()
+            self.assertEqual(Path(sys.path[0]), expected)
+            self.assertIs(runtime.grpc, fake_grpc)
+            self.assertIs(runtime.body_height_factory, fake_cms.BodyHeightCommand)
+        finally:
+            sys.path[:] = original_path
 
 
 if __name__ == "__main__":

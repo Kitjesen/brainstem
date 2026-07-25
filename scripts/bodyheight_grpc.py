@@ -61,6 +61,12 @@ class RuntimeApi:
     body_height_factory: Callable[..., Any]
 
 
+@dataclass(frozen=True)
+class CommandResult:
+    state: str
+    history: Any
+
+
 def _finite_number(value: Any, field: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ConfigError(f"{field} must be a number")
@@ -160,7 +166,15 @@ def build_parser() -> argparse.ArgumentParser:
     set_height.add_argument("metres", type=float)
 
     set_velocity = subparsers.add_parser(
-        "set-velocity", help="set walk velocity and verify telemetry"
+        "set-velocity",
+        help=(
+            "set walk velocity and verify telemetry; WARNING: sending while "
+            "motors are enabled may move the robot"
+        ),
+        description=(
+            "Set walk velocity and verify telemetry. WARNING: sending this "
+            "command while motors are enabled may move the robot."
+        ),
     )
     set_velocity.add_argument("--vx", type=float, default=None, help="forward m/s")
     set_velocity.add_argument("--vy", type=float, default=None, help="lateral m/s")
@@ -259,7 +273,7 @@ class BodyHeightClient:
         profile_dir: Path | str,
         *,
         tolerance: float = 0.001,
-    ) -> Any:
+    ) -> CommandResult:
         value = float(metres)
         if not math.isfinite(value):
             raise CommandError("height must be finite")
@@ -270,14 +284,34 @@ class BodyHeightClient:
                 f"{profile.height_max:g}] for {profile.name}"
             )
 
+        try:
+            stream = iter(self.histories())
+            baseline = next(stream)
+        except StopIteration as exc:
+            raise TelemetryError(
+                "history telemetry is unavailable; height command was not sent"
+            ) from exc
+        except Exception as exc:
+            raise TelemetryError(
+                f"height baseline telemetry failed; command was not sent: {exc}"
+            ) from exc
+
+        observed = _history_height(baseline)
+        if observed is None:
+            raise TelemetryError(
+                "height baseline telemetry is missing or non-finite; command was not sent"
+            )
+        if abs(observed - value) <= tolerance:
+            return CommandResult("already_active", baseline)
+
         self._stub.SetBodyHeight(
             self._body_height_factory(meters=value), timeout=self.timeout
         )
         try:
-            for item in self.histories():
+            for item in stream:
                 observed = _history_height(item)
                 if observed is not None and abs(observed - value) <= tolerance:
-                    return item
+                    return CommandResult("confirmed", item)
         except Exception as exc:
             raise TelemetryError(
                 f"height command {value:g} was not confirmed before the telemetry "
@@ -294,7 +328,7 @@ class BodyHeightClient:
         profile_dir: Path | str,
         *,
         tolerance: float = 0.001,
-    ) -> Any:
+    ) -> CommandResult:
         if len(vector) != 3:
             raise CommandError("velocity must contain vx, vy, and yaw")
         values = tuple(float(value) for value in vector)
@@ -319,18 +353,37 @@ class BodyHeightClient:
                 f"set-velocity requires CMS state Standing or Walking; current state is {name}"
             )
 
+        try:
+            stream = iter(self.histories())
+            baseline = next(stream)
+        except StopIteration as exc:
+            raise TelemetryError(
+                "history telemetry is unavailable; velocity command was not sent"
+            ) from exc
+        except Exception as exc:
+            raise TelemetryError(
+                f"velocity baseline telemetry failed; command was not sent: {exc}"
+            ) from exc
+
+        observed = _walk_vector(baseline)
+        if observed is not None and all(
+            abs(actual - expected) <= tolerance
+            for actual, expected in zip(observed, values)
+        ):
+            return CommandResult("already_active", baseline)
+
         self._stub.Walk(
             self._vector_factory(x=values[0], y=values[1], z=values[2]),
             timeout=self.timeout,
         )
         try:
-            for item in self.histories():
+            for item in stream:
                 observed = _walk_vector(item)
                 if observed is not None and all(
                     abs(actual - expected) <= tolerance
                     for actual, expected in zip(observed, values)
                 ):
-                    return item
+                    return CommandResult("confirmed", item)
         except Exception as exc:
             requested = ", ".join(f"{value:g}" for value in values)
             raise TelemetryError(
@@ -345,13 +398,21 @@ class BodyHeightClient:
 
 
 def _load_runtime_api() -> RuntimeApi:
+    generated_root = (
+        Path(__file__).resolve().parents[1] / "brainstem_api" / "python"
+    )
+    if generated_root.is_dir():
+        generated_path = str(generated_root)
+        if generated_path not in sys.path:
+            sys.path.insert(0, generated_path)
     try:
         import grpc
         from brainstem_api import Empty, RobotControlStub, Vector3
         from brainstem_api.cms_pb2 import BodyHeightCommand
     except (ImportError, OSError) as exc:
         raise BodyHeightError(
-            "gRPC runtime unavailable; install grpc and generate brainstem_api/python"
+            "gRPC runtime unavailable; expected generated API at "
+            f"{generated_root} or an installed brainstem_api package, plus grpc"
         ) from exc
     return RuntimeApi(grpc, Empty, RobotControlStub, Vector3, BodyHeightCommand)
 
@@ -396,11 +457,13 @@ def _run(args: argparse.Namespace) -> None:
             print(f"active_profile: {profile}")
             print(_telemetry_text(latest))
         elif args.command == "set-height":
-            confirmed = client.set_height(args.metres, args.profile_dir)
-            print(f"confirmed {_telemetry_text(confirmed)}")
+            result = client.set_height(args.metres, args.profile_dir)
+            label = "already active" if result.state == "already_active" else "confirmed"
+            print(f"{label} {_telemetry_text(result.history)}")
         elif args.command == "set-velocity":
-            confirmed = client.set_velocity(resolve_velocity(args), args.profile_dir)
-            print(f"confirmed {_telemetry_text(confirmed)}")
+            result = client.set_velocity(resolve_velocity(args), args.profile_dir)
+            label = "already active" if result.state == "already_active" else "confirmed"
+            print(f"{label} {_telemetry_text(result.history)}")
         elif args.command == "watch-height":
             for item in client.histories(bounded=False):
                 print(_telemetry_text(item), flush=True)
