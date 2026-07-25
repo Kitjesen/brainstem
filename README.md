@@ -46,6 +46,21 @@ dart run han_dog/bin/server.dart
 python sim/scripts/walk_grpc.py --profile han_dog/profiles/thunder_h15.json --height 0.32 --vx 0.3 --duration 5
 ```
 
+### H15/H18 控制命令范围
+
+H15 和 H18 使用相同的训练命令范围。gRPC 服务会按照当前 profile 对超出范围的命令逐轴截断：
+
+| 命令 | gRPC 字段 | 有效范围 | 单位 |
+|------|-----------|----------|------|
+| 机身高度 | `SetBodyHeight.metres` | `0.20 .. 0.54` | m |
+| 前后速度 | `Walk.x` / `vx` | `-2.5 .. 2.5` | m/s |
+| 左右速度 | `Walk.y` / `vy` | `-1.0 .. 1.0` | m/s |
+| 偏航角速度 | `Walk.z` / `yaw` | `-1.0 .. 1.0` | rad/s |
+
+默认机身高度为 `0.35 m`。上述范围是训练包络和运行时硬限幅，不代表首次实机测试应直接使用边界值；首次体高验收建议保持零速度，并从 `0.35 m` 附近的小幅命令开始。
+
+如果同一台机器人已经运行过 master 策略，且 CAN 接线、IMU 安装、关节零位、固件和遥控器安全链路均未改变，则 `bodyheightctrl` 只需做差异验证：H15/H18 模型与 profile 加载、`SetBodyHeight` 链路、零速度体高跟踪及小速度稳定性。只有硬件配置发生变化或出现异常时，才需要重新执行完整硬件检查。
+
 体高策略接口、模型哈希、H15/H18 验证结果和真机安全门详见 [`docs/BODYHEIGHTCTRL.md`](docs/BODYHEIGHTCTRL.md)。
 
 ### 诊断工具
