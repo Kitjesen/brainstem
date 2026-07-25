@@ -26,7 +26,8 @@ JOURNALCTL_BIN="${JOURNALCTL_BIN:-journalctl}"
 SHA256SUM_BIN="${SHA256SUM_BIN:-sha256sum}"
 SLEEP_BIN="${SLEEP_BIN:-sleep}"
 FLOCK_BIN="${FLOCK_BIN:-flock}"
-LOCK_FILE="${LOCK_FILE:-/tmp/han-dog-bodyheight.lock}"
+MKDIR_BIN="${MKDIR_BIN:-mkdir}"
+LOCK_DIR="${LOCK_DIR:-/tmp/han-dog-bodyheight.lock.d}"
 
 readonly H15_PROFILE="thunder_h15"
 readonly H15_MODEL="thunder_h15_model10400.onnx"
@@ -115,21 +116,47 @@ validate_mutation_config() {
 }
 
 acquire_mutation_lock() {
-  if [[ -z "$LOCK_FILE" || "$LOCK_FILE" != /* || "$LOCK_FILE" == *$'\n'* ]]; then
-    printf '配置错误：LOCK_FILE 必须是无换行的非空绝对路径。\n' >&2
+  local old_umask mkdir_status=0
+  if [[ -z "$LOCK_DIR" || "$LOCK_DIR" != /* || "$LOCK_DIR" == *$'\n'* ||
+        "${LOCK_DIR##*/}" != han-dog-bodyheight.lock.d ]]; then
+    printf '配置错误：LOCK_DIR 必须是无换行的绝对路径，且 basename 必须为 han-dog-bodyheight.lock.d。\n' >&2
     return 1
   fi
   if ! command -v "$FLOCK_BIN" >/dev/null 2>&1; then
     printf '安全锁不可用：找不到 flock：%s\n' "$FLOCK_BIN" >&2
     return 1
   fi
-  if ! exec 9>"$LOCK_FILE"; then
-    printf '安全锁不可用：无法打开锁文件：%s\n' "$LOCK_FILE" >&2
+  if ! command -v "$MKDIR_BIN" >/dev/null 2>&1; then
+    printf '安全锁不可用：找不到 mkdir：%s\n' "$MKDIR_BIN" >&2
+    return 1
+  fi
+  if [[ -L "$LOCK_DIR" ]]; then
+    printf '安全锁不可用：LOCK_DIR 不得是符号链接：%s\n' "$LOCK_DIR" >&2
+    return 1
+  fi
+  if [[ ! -e "$LOCK_DIR" ]]; then
+    old_umask="$(umask)"
+    umask 077
+    "$MKDIR_BIN" -m 700 -- "$LOCK_DIR" || mkdir_status=$?
+    umask "$old_umask"
+    if ((mkdir_status != 0)) &&
+      [[ ! -d "$LOCK_DIR" || -L "$LOCK_DIR" || ! -O "$LOCK_DIR" ]]; then
+      printf '安全锁不可用：无法安全创建锁目录：%s\n' "$LOCK_DIR" >&2
+      return 1
+    fi
+  fi
+  if [[ ! -d "$LOCK_DIR" || -L "$LOCK_DIR" || ! -O "$LOCK_DIR" ]]; then
+    printf '安全锁不可用：LOCK_DIR 必须是真实且由当前用户所有的目录：%s\n' \
+      "$LOCK_DIR" >&2
+    return 1
+  fi
+  if ! exec 9<"$LOCK_DIR"; then
+    printf '安全锁不可用：无法只读打开锁目录：%s\n' "$LOCK_DIR" >&2
     return 1
   fi
   if ! "$FLOCK_BIN" -n 9; then
     printf '拒绝操作：另一个 body-height 生命周期操作正在进行（锁：%s）。\n' \
-      "$LOCK_FILE" >&2
+      "$LOCK_DIR" >&2
     return 1
   fi
 }

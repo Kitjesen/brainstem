@@ -7,6 +7,7 @@ TEST_BASH_BIN="$(command -v bash)"
 TEST_PYTHON_BIN="$(command -v "${PYTHON_BIN_FOR_TESTS:-python3}")"
 TEST_CAT_BIN="$(command -v cat)"
 TEST_BASENAME_BIN="$(command -v basename)"
+TEST_MKDIR_BIN="$(command -v mkdir)"
 FIXTURE="$(mktemp -d)"
 trap 'rm -rf -- "$FIXTURE"' EXIT
 
@@ -241,6 +242,18 @@ printf 'flock:%s\n' "$*" >>"$CALL_LOG"
 [[ "${LOCK_BUSY:-0}" == 1 ]] && exit 1
 EOF
 
+  cat >"$FAKE_BIN/mkdir" <<'EOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+printf 'mkdir:%s\n' "$*" >>"$CALL_LOG"
+if (($# != 4)) ||
+  [[ "$1" != -m || "$2" != 700 || "$3" != -- || "$4" != "$LOCK_DIR" ]]; then
+  printf 'unexpected mkdir argv: %s\n' "$*" >&2
+  exit 97
+fi
+exec "$REAL_MKDIR_BIN" "$@"
+EOF
+
   chmod +x "$FAKE_BIN"/*
   ln -s "$TEST_BASH_BIN" "$FAKE_BIN/bash"
   ln -s "$TEST_CAT_BIN" "$FAKE_BIN/cat"
@@ -255,7 +268,7 @@ reset_fixture() {
   CALL_LOG="$CASE_DIR/calls.log"
   RUN_MARKER="$CASE_DIR/systemd-run.called"
   CANDIDATE_MARKER="$CASE_DIR/candidate.active"
-  LOCK_FILE="$CASE_DIR/bodyheight.lock"
+  LOCK_DIR="$CASE_DIR/han-dog-bodyheight.lock.d"
   DART_BIN="$CASE_DIR/dart"
   PYTHON_BIN="$TEST_PYTHON_BIN"
   IMU_PORT="$CASE_DIR/imu"
@@ -315,7 +328,7 @@ run_service() {
     LD_LIBRARY_PATH=/opt/onnxruntime/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu \
     START_TIMEOUT_SECONDS="$START_TIMEOUT_SECONDS" \
     STOP_TIMEOUT_SECONDS="$STOP_TIMEOUT_SECONDS" \
-    LOCK_FILE="$LOCK_FILE" \
+    LOCK_DIR="$LOCK_DIR" \
     SYSTEMCTL_BIN="$FAKE_SYSTEMCTL" \
     SYSTEMD_RUN_BIN="$FAKE_SYSTEMD_RUN" \
     SUDO_BIN="$FAKE_BIN/sudo" \
@@ -324,6 +337,7 @@ run_service() {
     SHA256SUM_BIN="$FAKE_BIN/sha256sum" \
     SLEEP_BIN="$FAKE_BIN/sleep" \
     FLOCK_BIN="$FAKE_BIN/flock" \
+    MKDIR_BIN="$FAKE_BIN/mkdir" \
     CALL_LOG="$CALL_LOG" \
     RUN_MARKER="$RUN_MARKER" \
     CANDIDATE_MARKER="$CANDIDATE_MARKER" \
@@ -335,6 +349,7 @@ run_service() {
     READINESS_PORT="$READINESS_PORT" \
     SS_FAIL="$SS_FAIL" \
     LOCK_BUSY="$LOCK_BUSY" \
+    REAL_MKDIR_BIN="$TEST_MKDIR_BIN" \
     SYSTEMD_RUN_FAIL="$SYSTEMD_RUN_FAIL" \
     EXPECTED_LAUNCH_PROFILE="$EXPECTED_LAUNCH_PROFILE" \
     EXPECTED_MODEL_PATH="$EXPECTED_MODEL_PATH" \
@@ -354,9 +369,10 @@ test_help() {
 }
 
 test_hermetic_command_resolution() {
-  local name resolved expected rejected_status
+  local name resolved expected rejected_status legacy_lock_name
+  legacy_lock_name='LOCK_''FILE'
   reset_fixture
-  for name in sudo systemctl systemd-run ss journalctl sha256sum sleep flock; do
+  for name in sudo systemctl systemd-run ss journalctl sha256sum sleep flock mkdir; do
     resolved="$(PATH="$FAKE_BIN" "$TEST_BASH_BIN" -c 'command -v "$1"' -- "$name")"
     expected="$FAKE_BIN/$name"
     if [[ "$resolved" == "$expected" ]]; then
@@ -365,10 +381,15 @@ test_hermetic_command_resolution() {
       fail "literal $name resolved outside fixture: $resolved"
     fi
   done
-  if ! grep -Eq '/(usr/)?(local/)?(s?bin)/(sudo|systemctl|systemd-run|ss|journalctl|sha256sum|sleep|flock)([\"[:space:]]|$)' "$SERVICE_SCRIPT"; then
+  if ! grep -Eq '/(usr/)?(local/)?(s?bin)/(sudo|systemctl|systemd-run|ss|journalctl|sha256sum|sleep|flock|mkdir)([\"[:space:]]|$)' "$SERVICE_SCRIPT"; then
     pass "production helper contains no absolute operational command path"
   else
     fail "production helper contains an absolute operational command path"
+  fi
+  if ! grep -Eq "$legacy_lock_name|exec[[:space:]]+9(>|>>|<>)" "$SERVICE_SCRIPT"; then
+    pass "production helper has no output lock FD or legacy lock-file variable"
+  else
+    fail "production helper retains an unsafe output lock FD or legacy lock-file variable"
   fi
   set +e
   PATH="$FAKE_BIN" \
@@ -553,6 +574,39 @@ test_busy_lock_blocks_mutations() {
   done
 }
 
+test_safe_lock_directory_validation() {
+  local target_contents
+  reset_fixture
+  printf '%s\n' 'do-not-modify' >"$CASE_DIR/lock-target"
+  ln -s "$CASE_DIR/lock-target" "$LOCK_DIR"
+  run_service stop
+  assert_status 1 "symlink lock directory fails closed"
+  target_contents="$(<"$CASE_DIR/lock-target")"
+  if [[ "$target_contents" == do-not-modify ]]; then
+    pass "symlink target is not truncated or modified"
+  else
+    fail "symlink target was modified: $target_contents"
+  fi
+  assert_log_absent '^(mkdir|flock|sudo|systemctl):' "symlink lock path invokes no lock or lifecycle command"
+
+  reset_fixture
+  LOCK_DIR="$CASE_DIR/wrong-name.lock.d"
+  run_service restore-master
+  assert_status 1 "wrong lock directory basename fails closed"
+  assert_file_absent "$LOCK_DIR" "wrong lock directory is never created"
+  assert_log_absent '^(mkdir|flock|sudo|systemctl):' "wrong lock basename invokes no lock or lifecycle command"
+
+  reset_fixture
+  run_service stop
+  assert_status 0 "safe absent lock directory is created for mutation"
+  if [[ -d "$LOCK_DIR" && ! -L "$LOCK_DIR" ]]; then
+    pass "created lock path is a real directory"
+  else
+    fail "safe lock directory was not created correctly"
+  fi
+  assert_log_line "mkdir:-m 700 -- $LOCK_DIR" "lock directory creation uses restrictive exact argv"
+}
+
 test_ss_failure_fails_closed() {
   reset_fixture
   SS_FAIL=1
@@ -645,6 +699,7 @@ test_h18_launch_command
 test_readiness_timeout_is_explicitly_unsafe
 test_identity_and_format_validation
 test_busy_lock_blocks_mutations
+test_safe_lock_directory_validation
 test_ss_failure_fails_closed
 test_stop_and_restore_exact_targets
 test_state_handling
