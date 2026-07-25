@@ -4,6 +4,10 @@
 
 import 'package:vector_math/vector_math.dart';
 
+abstract interface class BodyHeightAxisInput {
+  Stream<double> get bodyHeightAxis;
+}
+
 /// 手柄控制器抽象：提供方向、按钮流。
 abstract class Gamepad {
   /// 行走方向流：(x=前后, y=左右, z=旋转)

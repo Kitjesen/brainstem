@@ -11,7 +11,7 @@ import 'gamepad.dart';
 
 final _log = Logger('han_dog.controller');
 
-class RealController implements Gamepad {
+class RealController implements Gamepad, BodyHeightAxisInput {
   final String portName;
   late SerialPortController<Never, YunZhuoState> port;
   final hz = RealFrequency();
@@ -22,8 +22,12 @@ class RealController implements Gamepad {
 
   Stream<YunZhuoState> get stateStream => _stateController.stream;
 
+  @override
+  Stream<double> get bodyHeightAxis =>
+      bodyHeightAxisWithWatchdog(stateStream.map((state) => state.rightStick.y));
+
   // CH1  右摇杆左右 (rightStick.x) → 叠加到旋转轴（yaw 精细控制）
-  // CH2  右摇杆上下 (rightStick.y) → 保留，待步态/姿态扩展
+  // CH2  右摇杆上下 (rightStick.y) → 上推为正；仅提供标准化输入，不负责死区、积分、profile 或 FSM
   // CH8  LT 两档    → 精确模式（速度 × 0.5）
   // CH12 RT 两档    → 冲刺模式（速度 × 1.5）
   // CH16 R2 两档    → 策略切换
@@ -168,6 +172,14 @@ class RealController implements Gamepad {
 
 T _defaultDecayCurve<T>(T s0, double t) => s0;
 
+Stream<double> bodyHeightAxisWithWatchdog(Stream<double> input) {
+  final sharedInput = input.share();
+  return Rx.merge<double>([
+    sharedInput,
+    sharedInput.debounceTime(const Duration(milliseconds: 150)).map((_) => 0.0),
+  ]);
+}
+
 /// 纯函数：输入控制流 -> 输出"超时后衰减到 0"的控制流
 Stream<T> watchdogDecay<T>(
   Stream<T> control$, {
@@ -179,18 +191,44 @@ Stream<T> watchdogDecay<T>(
   assert(steps > 0);
   decayCurve ??= _defaultDecayCurve;
 
-  Stream<T> decayFrom(T start) {
-    // 每 stepPeriod 输出一次，共 steps 次：start*(steps-1)/steps ... 0
-    return Stream<int>.periodic(stepPeriod, (i) => i).take(steps).map((i) {
-      final k = (steps - 1 - i) / steps; // 0.9 ... 0
-      return decayCurve!(start, k);
-    });
-  }
-
-  return control$.switchMap(
-    (cmd) => Rx.concat<T>([
-      Stream.value(cmd), // 立刻输出
-      Stream<void>.value(null).delay(timeout).switchMap((_) => decayFrom(cmd)),
-    ]),
+  return Stream<T>.multi(
+    (output) {
+      Timer? timeoutTimer;
+      Timer? decayTimer;
+      var sourceDone = false;
+      late final StreamSubscription<T> subscription;
+      subscription = control$.listen(
+        (cmd) {
+          timeoutTimer?.cancel();
+          decayTimer?.cancel();
+          output.addSync(cmd);
+          timeoutTimer = Timer(timeout, () {
+            timeoutTimer = null;
+            var index = 0;
+            decayTimer = Timer.periodic(stepPeriod, (timer) {
+              final k = (steps - 1 - index) / steps;
+              output.addSync(decayCurve!(cmd, k));
+              index++;
+              if (index == steps) {
+                timer.cancel();
+                decayTimer = null;
+                if (sourceDone) output.closeSync();
+              }
+            });
+          });
+        },
+        onError: output.addErrorSync,
+        onDone: () {
+          sourceDone = true;
+          if (timeoutTimer == null && decayTimer == null) output.closeSync();
+        },
+      );
+      output.onCancel = () {
+        timeoutTimer?.cancel();
+        decayTimer?.cancel();
+        return subscription.cancel();
+      };
+    },
+    isBroadcast: control$.isBroadcast,
   );
 }
