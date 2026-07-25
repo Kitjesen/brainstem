@@ -9,8 +9,9 @@ helpers:
 - `scripts/bodyheight_grpc.py` inspects the running service and submits a
   body-height command with telemetry confirmation.
 
-The first version must not expose motor enable, stand, walk, sit, or velocity
-commands.
+The first version must not expose motor enable, stand, or sit commands. It does
+expose a bounded velocity command, because velocity is part of the H15/H18
+policy contract.
 
 ## Robot-side service helper
 
@@ -54,6 +55,8 @@ changes or installs systemd unit files.
 ```text
 status
 set-height METRES
+set-velocity [--vx METRES_PER_SECOND] [--vy METRES_PER_SECOND]
+             [--yaw RADIANS_PER_SECOND]
 watch-height
 ```
 
@@ -69,11 +72,25 @@ active profile, and the latest height telemetry. `set-height`:
 2. requires the active profile to be `thunder_h15` or `thunder_h18`;
 3. calls only `SetBodyHeight`;
 4. reads the history stream and confirms that
-   `body_height_command` reaches the requested value within a timeout;
+`body_height_command` reaches the requested value within a timeout;
 5. exits non-zero when the server returned success but control arbitration
    silently rejected the command.
 
-The helper contains no motor-enable or locomotion command.
+The profiles initialize body height to `0.35 m` and velocity to
+`[0.0, 0.0, 0.0]`. `set-height` still requires an explicit value; omitting the
+command leaves the profile default unchanged. For `set-velocity`, omitted axes
+default to zero, but at least one axis must be written explicitly so that a
+bare command cannot move the FSM from `Standing` to `Walking`.
+
+`set-velocity` calls the existing `Walk(Vector3)` RPC. It accepts only finite
+values inside the active profile ranges (`vx=-2.5..2.5 m/s`,
+`vy=-1.0..1.0 m/s`, `yaw=-1.0..1.0 rad/s`) and requires the CMS state to be
+`Standing` or `Walking`. It then confirms the resulting `History.command.walk`
+vector. There is no confirmation flag or interactive prompt.
+
+The helper contains no motor-enable, stand-up, or sit-down command. Sending a
+velocity while motors are already enabled may move the robot; the helper states
+that fact in its help text but does not add an extra acknowledgement option.
 
 ## Failure handling
 
@@ -90,7 +107,9 @@ Both tools fail closed:
 Implementation is test-first:
 
 - Python unit tests use fake stubs for range validation, profile validation,
-  successful telemetry confirmation, and silent arbitration rejection.
+  successful height/velocity telemetry confirmation, default zero values for
+  omitted velocity axes, bare velocity-command refusal, and silent arbitration
+  rejection.
 - Shell tests exercise argument parsing and refusal paths with command fakes.
 - `bash -n` validates shell syntax.
 - Existing Dart tests and H15/H18 ONNX smoke tests remain unchanged and must
