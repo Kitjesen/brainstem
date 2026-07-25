@@ -80,3 +80,74 @@ No unattended or remote motor motion is part of automated validation. Complete e
 8. Repeat separately for H15 and H18, restarting the process between profiles. Save logs, selected profile, model hash, and abort/accept result.
 
 The remote development server has no verified robot/CAN attachment, so this branch can prove the no-motion software preflight and MuJoCo chain only. Final motor-enabled acceptance must be performed by an onsite operator under this gate.
+
+## Operator helper scripts
+
+Two editable helpers replace the long service and gRPC commands. Neither
+helper enables motors or sends stand-up/sit-down commands.
+
+### Robot-side service lifecycle
+
+Run these commands on the robot from the body-height checkout:
+
+```bash
+cd /home/bsrl1/brainstem-bodyheightctrl
+
+./scripts/bodyheight_service.sh status
+./scripts/bodyheight_service.sh start h15
+./scripts/bodyheight_service.sh logs
+./scripts/bodyheight_service.sh logs --follow
+./scripts/bodyheight_service.sh stop
+./scripts/bodyheight_service.sh restore-master
+```
+
+Use `start h18` for H18. `start` verifies that `han_dog.service` is already
+stopped, the candidate service and port `13145` are free, the selected profile
+matches the ONNX filename/hash, and the required IMU/Yunzhuo devices exist. It
+never stops the production service automatically.
+
+Before manually stopping production or running `stop`, disable the motors and
+place the robot on reliable support. Starting the candidate opens its hardware
+interfaces, but the helper itself does not call motor enable or a motion RPC.
+If readiness times out, treat the candidate as potentially still active; do
+not restore production until `stop` and `status` confirm that it and the port
+are clear.
+
+### Local gRPC commands
+
+The direct robot endpoint is the default:
+
+```powershell
+python scripts/bodyheight_grpc.py status
+python scripts/bodyheight_grpc.py set-height 0.32
+python scripts/bodyheight_grpc.py set-velocity --vx 0.1
+```
+
+When using the existing SSH tunnel, select its local endpoint explicitly:
+
+```powershell
+python scripts/bodyheight_grpc.py `
+  --target 127.0.0.1:13146 `
+  status
+```
+
+The robot service still listens on `13145`; `13146` is only the chosen local
+tunnel port.
+
+`set-height` requires an explicit target. If it is not called, both policies
+start with the profile default `0.35 m`. For `set-velocity`, at least one axis
+must be present; omitted axes default to zero:
+
+```powershell
+python scripts/bodyheight_grpc.py set-velocity --vx 0.1
+# sends vx=0.1 m/s, vy=0.0 m/s, yaw=0.0 rad/s
+```
+
+There is no confirmation flag. A velocity command is accepted only in
+`Standing` or `Walking`, and it may move the robot if motors are already
+enabled. Height and velocity values are checked against the active H15/H18
+profile. The client opens the history stream before sending a changed target
+and only reports `confirmed` after matching later telemetry. If the requested
+value is already active, it reports `already active` without sending a
+redundant RPC. A silently rejected arbitration command returns a non-zero exit
+status instead of being reported as successful.

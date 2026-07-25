@@ -31,7 +31,7 @@ the verified `.190` robot:
 
 - candidate repository: `/home/bsrl1/brainstem-bodyheightctrl`
 - Dart: `/home/bsrl1/flutter/bin/dart`
-- candidate unit: `han-dog-bodyheight`
+- candidate unit: `han-dog-bodyheight.service`
 - production unit: `han_dog.service`
 - gRPC port: `13145`
 - profile directory: `han_dog/profiles`
@@ -39,14 +39,23 @@ the verified `.190` robot:
 `start` validates the requested profile, ONNX file and SHA-256 hash, Dart
 executable, IMU device, profile JSON, and port availability. It refuses to
 continue while the production service is active or while port `13145` is
-occupied. It launches a transient systemd service with an explicit working
+occupied. Profile JSON is parsed structurally, duplicate keys are rejected,
+and the configured model hash must match the file. Lifecycle mutations share
+a host-wide non-blocking lock so two helper processes cannot switch services
+concurrently. It launches a transient systemd service with an explicit working
 directory and environment, but it never invokes a motor-control RPC.
 
-`stop` only stops the candidate service. It warns that stopping an active
-controller is unsafe and therefore requires an explicit confirmation flag.
+`stop` only stops the candidate service. It prints a prominent warning that
+stopping an active controller is unsafe, but it has no confirmation flag or
+interactive prompt.
 `restore-master` first proves that the candidate process has stopped and the
 port is free, then starts the existing production service. Neither operation
 changes or installs systemd unit files.
+
+If startup readiness cannot be confirmed, the helper does not automatically
+stop the candidate. It reports that the process may still own IMU/PCAN/port
+resources and instructs the operator to disable motors, support the robot,
+stop the candidate, and re-check status before restoring production.
 
 ## Local gRPC helper
 
