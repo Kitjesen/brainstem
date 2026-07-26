@@ -16,6 +16,7 @@ class RealControlDog {
   final RealImu imu;
   final RealJoint joint;
   final Gamepad controller;
+  final RobotProfile? initialProfile;
   JointsMatrix inferKp;
   JointsMatrix inferKd;
   JointsMatrix standUpKp;
@@ -32,6 +33,9 @@ class RealControlDog {
   void Function(bool enabled)? onMotorEnableChanged;
 
   final List<StreamSubscription<Object?>> _subscriptions = [];
+  Timer? _bodyHeightTimer;
+  double _bodyHeightAxis = 0;
+  double? _bodyHeightCommand;
 
   RealControlDog({
     required this.brain,
@@ -45,10 +49,12 @@ class RealControlDog {
     required this.sitDownKp,
     required this.sitDownKd,
     required this.controller,
+    this.initialProfile,
     this.velocityCommandMin = (-3.0, -3.0, -3.0),
     this.velocityCommandMax = (3.0, 3.0, 3.0),
   }) {
     _validateVelocityBounds(velocityCommandMin, velocityCommandMax);
+    _configureBodyHeightControl();
 
     // 监听 CMS 状态变化，自动设置对应的 kp/kd
     _subscriptions.add(
@@ -87,12 +93,14 @@ class RealControlDog {
       }
     }
 
-    void sendCommand(A action, String label) {
-      if (!arbiter.command(action, ControlSource.yunzhuo)) {
+    bool sendCommand(A action, String label) {
+      final accepted = arbiter.command(action, ControlSource.yunzhuo);
+      if (!accepted) {
         _log.warning(
           'YUNZHUO $label rejected — arbiter owner: ${arbiter.owner}',
         );
       }
+      return accepted;
     }
 
     _subscriptions.add(
@@ -188,6 +196,22 @@ class RealControlDog {
     _subscriptions.add(
       controller.idle.listen(
         (_) {
+          final profile = initialProfile;
+          if (profile?.observationType == 'bodyHeight' &&
+              arbiter.state is Standing) {
+            _log.info('R1 → reset body height');
+            final accepted = sendCommand(
+              A.setBodyHeight(profile!.bodyHeightCommand),
+              'reset body height(R1)',
+            );
+            if (accepted) {
+              _bodyHeightAxis = 0;
+              _bodyHeightCommand = profile.bodyHeightCommand;
+            } else {
+              _log.warning('R1 body-height reset rejected; input preserved');
+            }
+            return;
+          }
           _log.info('R1 → standUp');
           sendCommand(const A.standUp(), 'standUp(R1)');
         },
@@ -212,6 +236,12 @@ class RealControlDog {
     _subscriptions.add(
       controller.switchProfile.listen(
         (_) {
+          if (initialProfile?.observationType == 'bodyHeight') {
+            _log.warning(
+              'R2 profile switch ignored in body-height remote mode',
+            );
+            return;
+          }
           if (arbiter.state is! Grounded && arbiter.state is! Standing) {
             _log.warning(
               'R2 profile switch rejected: must be grounded or standing (${arbiter.state})',
@@ -231,6 +261,86 @@ class RealControlDog {
         onDone: () => _log.warning('Controller switchProfile stream closed'),
       ),
     );
+  }
+
+  void _configureBodyHeightControl() {
+    final profile = initialProfile;
+    if (profile?.observationType != 'bodyHeight') return;
+
+    final defaultHeight = profile!.bodyHeightCommand;
+    final minHeight = profile.minBodyHeightCommand;
+    final maxHeight = profile.maxBodyHeightCommand;
+    if (!defaultHeight.isFinite ||
+        !minHeight.isFinite ||
+        !maxHeight.isFinite ||
+        minHeight > maxHeight ||
+        defaultHeight < minHeight ||
+        defaultHeight > maxHeight) {
+      throw ArgumentError(
+        'Body-height profile bounds must be finite, ordered, and contain '
+        'the default command',
+      );
+    }
+    final bodyHeightController = controller;
+    if (bodyHeightController is! BodyHeightAxisInput) {
+      throw ArgumentError.value(
+        controller,
+        'controller',
+        'must implement BodyHeightAxisInput for a body-height profile',
+      );
+    }
+
+    _bodyHeightCommand = defaultHeight;
+    _subscriptions.add(
+      bodyHeightController.bodyHeightAxis.listen(
+        (axis) {
+          if (!axis.isFinite) {
+            _bodyHeightAxis = 0;
+            _log.warning('Non-finite body-height axis ignored');
+            return;
+          }
+          final normalized = axis.abs() < 0.10 ? 0.0 : axis.clamp(-1.0, 1.0);
+          if (_bodyHeightAxis == 0 && normalized != 0) {
+            final appliedHeight = brain.bodyHeightCommand;
+            if (appliedHeight.isFinite) {
+              _bodyHeightCommand = appliedHeight
+                  .clamp(minHeight, maxHeight)
+                  .toDouble();
+            } else {
+              _log.warning(
+                'Non-finite applied body height ignored during handover',
+              );
+            }
+          }
+          if (normalized != 0 && arbiter.state is Standing) {
+            arbiter.command(A.walk(Vector3.zero()), ControlSource.yunzhuo);
+          }
+          _bodyHeightAxis = normalized.toDouble();
+        },
+        onError: (Object error, StackTrace st) {
+          _log.severe('Controller bodyHeightAxis stream error', error, st);
+          if (!_disposed) {
+            arbiter.fault('Controller bodyHeightAxis stream error: $error');
+          }
+        },
+        onDone: () => _log.warning('Controller bodyHeightAxis stream closed'),
+      ),
+    );
+    _bodyHeightTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
+      if (_bodyHeightAxis == 0 || _disposed || arbiter.state is! Walking) {
+        return;
+      }
+      const tickSeconds = 0.020;
+      const rateMetersPerSecond = 0.02;
+      final next =
+          (_bodyHeightCommand! +
+                  _bodyHeightAxis * rateMetersPerSecond * tickSeconds)
+              .clamp(minHeight, maxHeight)
+              .toDouble();
+      if (arbiter.command(A.setBodyHeight(next), ControlSource.yunzhuo)) {
+        _bodyHeightCommand = next;
+      }
+    });
   }
 
   /// 切换策略时更新全部增益参数。
@@ -285,6 +395,8 @@ class RealControlDog {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _bodyHeightTimer?.cancel();
+    _bodyHeightTimer = null;
     for (final sub in _subscriptions) {
       sub.cancel();
     }

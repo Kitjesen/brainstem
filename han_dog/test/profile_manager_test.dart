@@ -24,8 +24,9 @@ RobotProfile _profile(
   String name,
   JointsMatrix pose,
   JointsMatrix kp,
-  JointsMatrix kd,
-) => RobotProfile(
+  JointsMatrix kd, {
+  String observationType = 'standard',
+}) => RobotProfile(
   name: name,
   modelPath: 'model/$name.onnx',
   standingPose: pose,
@@ -36,6 +37,10 @@ RobotProfile _profile(
   standUpKd: kd,
   sitDownKp: kp,
   sitDownKd: kd,
+  observationType: observationType,
+  bodyHeightCommand: observationType == 'bodyHeight' ? 0.40 : 0.35,
+  minBodyHeightCommand: 0.20,
+  maxBodyHeightCommand: 0.54,
 );
 
 void main() {
@@ -241,6 +246,119 @@ void main() {
 
     await pm.toggle();
     expect(pm.currentName, 'alpha');
+  });
+
+  test('switchTo rejects entering a body-height profile', () async {
+    final pm = ProfileManager(
+      profiles: {
+        ...profiles,
+        'height': _profile(
+          'height',
+          _pose2,
+          _kp2,
+          _kd2,
+          observationType: 'bodyHeight',
+        ),
+      },
+      brain: brain,
+      initial: 'alpha',
+    );
+
+    await expectLater(
+      () => pm.switchTo('height'),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Body-height profile changes require a service restart',
+        ),
+      ),
+    );
+  });
+
+  test('switchTo rejects leaving a body-height profile', () async {
+    final pm = ProfileManager(
+      profiles: {
+        ...profiles,
+        'height': _profile(
+          'height',
+          _pose2,
+          _kp2,
+          _kd2,
+          observationType: 'bodyHeight',
+        ),
+      },
+      brain: brain,
+      initial: 'height',
+    );
+
+    await expectLater(
+      () => pm.switchTo('alpha'),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'Body-height profile changes require a service restart',
+        ),
+      ),
+    );
+  });
+
+  test('switchTo current body-height profile is a no-op', () async {
+    final height = _profile(
+      'height',
+      _pose2,
+      _kp2,
+      _kd2,
+      observationType: 'bodyHeight',
+    );
+    final pm = ProfileManager(
+      profiles: {...profiles, 'height': height},
+      brain: brain,
+      initial: 'height',
+    );
+
+    await pm.switchTo('height');
+
+    expect(pm.currentName, 'height');
+    verifyNever(
+      () => brain.switchProfile(
+        observationBuilder: any(named: 'observationBuilder'),
+        standingPose: any(named: 'standingPose'),
+        sittingPose: any(named: 'sittingPose'),
+        modelPath: any(named: 'modelPath'),
+        standUpCounts: any(named: 'standUpCounts'),
+        sitDownCounts: any(named: 'sitDownCounts'),
+        inputName: any(named: 'inputName'),
+        bodyHeightCommand: any(named: 'bodyHeightCommand'),
+        minBodyHeightCommand: any(named: 'minBodyHeightCommand'),
+        maxBodyHeightCommand: any(named: 'maxBodyHeightCommand'),
+      ),
+    );
+  });
+
+  test('toggle skips body-height profiles', () async {
+    final pm = ProfileManager(
+      profiles: {
+        'alpha': profiles['alpha']!,
+        'height': _profile(
+          'height',
+          _pose2,
+          _kp2,
+          _kd2,
+          observationType: 'bodyHeight',
+        ),
+        'beta': profiles['beta']!,
+      },
+      brain: brain,
+      gains: gains,
+      controlDog: controlDog,
+      initial: 'alpha',
+    );
+
+    await pm.toggle();
+
+    expect(pm.currentName, 'beta');
   });
 
   test(

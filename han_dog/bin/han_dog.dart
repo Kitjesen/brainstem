@@ -312,6 +312,17 @@ Future<void> _run() async {
   RealControlDog? controlDog;
   ProfileManager? profileManager;
   late final UnifiedCmsServer cmsService;
+  final selectedController = controller;
+  if (selectedController != null &&
+      defaultProfile.observationType == 'bodyHeight' &&
+      selectedController is! BodyHeightAxisInput) {
+    _log.warning(
+      'Selected controller does not support body-height input; '
+      'falling back to gRPC-only mode',
+    );
+    selectedController.dispose();
+    controller = null;
+  }
   if (controller != null) {
     controlDog = RealControlDog(
       brain: brain,
@@ -327,6 +338,7 @@ Future<void> _run() async {
       velocityCommandMin: defaultProfile.velocityCommandMin,
       velocityCommandMax: defaultProfile.velocityCommandMax,
       controller: controller,
+      initialProfile: defaultProfile,
     );
 
     // ──── 4b. 策略管理 ───────────────────────────────────────────
@@ -344,57 +356,64 @@ Future<void> _run() async {
   } else {
     _log.info('No controller — motor enable via gRPC only');
     // ──── Xbox 热插检测（每 3 秒扫描，接入后自动初始化）─────────
-    _controllerHotplugTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (controller != null) {
+    if (defaultProfile.observationType == 'bodyHeight') {
+      _log.info('Xbox hot-plug disabled: body-height input is not supported');
+    } else {
+      _controllerHotplugTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+        if (controller != null) {
+          _controllerHotplugTimer?.cancel();
+          return;
+        }
+        // 先检查设备节点存在再尝试打开，避免 SEVERE 日志噪音
+        if (!File(_cfg.xboxDevice).existsSync()) return;
+        final xbox = XboxController(_cfg.xboxDevice, config: xboxConfig);
+        if (!xbox.open()) {
+          xbox.dispose();
+          return;
+        }
         _controllerHotplugTimer?.cancel();
-        return;
-      }
-      // 先检查设备节点存在再尝试打开，避免 SEVERE 日志噪音
-      if (!File(_cfg.xboxDevice).existsSync()) return;
-      final xbox = XboxController(_cfg.xboxDevice, config: xboxConfig);
-      if (!xbox.open()) {
-        xbox.dispose();
-        return;
-      }
-      _controllerHotplugTimer?.cancel();
-      controller = xbox;
-      _log.info('Xbox hot-plugged: ${_cfg.xboxDevice}');
-      controlDog = RealControlDog(
-        brain: brain,
-        imu: imu,
-        joint: joint,
-        arbiter: arbiter,
-        inferKd: defaultProfile.inferKd,
-        inferKp: defaultProfile.inferKp,
-        standUpKd: defaultProfile.standUpKd,
-        standUpKp: defaultProfile.standUpKp,
-        sitDownKd: defaultProfile.sitDownKd,
-        sitDownKp: defaultProfile.sitDownKp,
-        velocityCommandMin: defaultProfile.velocityCommandMin,
-        velocityCommandMax: defaultProfile.velocityCommandMax,
-        controller: xbox,
-      );
-      final pm = ProfileManager(
-        profiles: profiles,
-        brain: brain,
-        controlDog: controlDog!,
-        initial: defaultProfile.name,
-      );
-      profileManager = pm;
-      cmsService.profileManager = pm;
-      controlDog!.onProfileSwitch = () => pm.toggle();
-      controlDog!.onMotorEnableChanged = (enabled) {
-        motorOutputEnabled = enabled;
-      };
-      _profileReloadTimer ??= Timer.periodic(const Duration(seconds: 30), (_) {
-        pm.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
-          _log.warning('Profile hot-reload failed', e, st);
+        controller = xbox;
+        _log.info('Xbox hot-plugged: ${_cfg.xboxDevice}');
+        controlDog = RealControlDog(
+          brain: brain,
+          imu: imu,
+          joint: joint,
+          arbiter: arbiter,
+          inferKd: defaultProfile.inferKd,
+          inferKp: defaultProfile.inferKp,
+          standUpKd: defaultProfile.standUpKd,
+          standUpKp: defaultProfile.standUpKp,
+          sitDownKd: defaultProfile.sitDownKd,
+          sitDownKp: defaultProfile.sitDownKp,
+          velocityCommandMin: defaultProfile.velocityCommandMin,
+          velocityCommandMax: defaultProfile.velocityCommandMax,
+          controller: xbox,
+          initialProfile: defaultProfile,
+        );
+        final pm = ProfileManager(
+          profiles: profiles,
+          brain: brain,
+          controlDog: controlDog!,
+          initial: defaultProfile.name,
+        );
+        profileManager = pm;
+        cmsService.profileManager = pm;
+        controlDog!.onProfileSwitch = () => pm.toggle();
+        controlDog!.onMotorEnableChanged = (enabled) {
+          motorOutputEnabled = enabled;
+        };
+        _profileReloadTimer ??= Timer.periodic(const Duration(seconds: 30), (
+          _,
+        ) {
+          pm.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
+            _log.warning('Profile hot-reload failed', e, st);
+          });
         });
+        _log.info(
+          'Xbox hot-plug: ProfileManager ready: ${profiles.keys.join(", ")}',
+        );
       });
-      _log.info(
-        'Xbox hot-plug: ProfileManager ready: ${profiles.keys.join(", ")}',
-      );
-    });
+    }
   }
 
   // ──── 4c. 策略热加载（每 30s 扫描 profileDir）────────────────
