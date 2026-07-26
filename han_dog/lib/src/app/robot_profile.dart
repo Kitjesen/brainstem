@@ -14,6 +14,8 @@ class RobotProfile {
   final String modelPath;
   final String? inputName;
   final JointsMatrix standingPose;
+  final JointsMatrix standUpPose;
+  final JointsMatrix policyDefaultPose;
   final JointsMatrix sittingPose;
   final int standUpCounts;
   final int sitDownCounts;
@@ -39,6 +41,8 @@ class RobotProfile {
     required this.modelPath,
     this.inputName,
     required this.standingPose,
+    JointsMatrix? standUpPose,
+    JointsMatrix? policyDefaultPose,
     required this.sittingPose,
     this.standUpCounts = 150,
     this.sitDownCounts = 150,
@@ -57,7 +61,8 @@ class RobotProfile {
     this.maxBodyHeightCommand = 0.54,
     this.velocityCommandMin = (-3.0, -3.0, -3.0),
     this.velocityCommandMax = (3.0, 3.0, 3.0),
-  });
+  }) : standUpPose = standUpPose ?? standingPose,
+       policyDefaultPose = policyDefaultPose ?? standingPose;
 
   factory RobotProfile.fromJson(Map<String, dynamic> json) {
     final inputValue = json['inputName'];
@@ -126,12 +131,22 @@ class RobotProfile {
       }
     }
 
+    final standingPose = _joints16(json, 'standingPose');
+    final standUpPose = json.containsKey('standUpPose')
+        ? _joints16(json, 'standUpPose')
+        : standingPose;
+    final policyDefaultPose = json.containsKey('policyDefaultPose')
+        ? _joints16(json, 'policyDefaultPose')
+        : standingPose;
+
     return RobotProfile(
       name: _reqString(json, 'name'),
       description: json['description'] as String? ?? '',
       modelPath: _reqString(json, 'modelPath'),
       inputName: inputValue as String?,
-      standingPose: _joints16(json, 'standingPose'),
+      standingPose: standingPose,
+      standUpPose: standUpPose,
+      policyDefaultPose: policyDefaultPose,
       sittingPose: _joints16(json, 'sittingPose'),
       standUpCounts: (json['standUpCounts'] as num?)?.toInt() ?? 150,
       sitDownCounts: (json['sitDownCounts'] as num?)?.toInt() ?? 150,
@@ -295,13 +310,13 @@ class RobotProfile {
   ObservationBuilder toObservationBuilder() {
     return switch (observationType) {
       'standard' => StandardObservationBuilder(
-        standingPose: standingPose,
+        standingPose: policyDefaultPose,
         imuGyroscopeScale: imuGyroscopeScale,
         jointVelocityScale: jointVelocityScale,
         actionScale: actionScale,
       ),
       'bodyHeight' => BodyHeightObservationBuilder(
-        standingPose: standingPose,
+        standingPose: policyDefaultPose,
         imuGyroscopeScale: imuGyroscopeScale,
         jointVelocityScale: jointVelocityScale,
         actionScale: actionScale,

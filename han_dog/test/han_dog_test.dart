@@ -6,6 +6,7 @@ import 'package:han_dog/src/control_arbiter.dart';
 import 'package:han_dog_brain/han_dog_brain.dart'
     show A, BodyHeightObservationBuilder, M, StandardObservationBuilder;
 import 'package:mocktail/mocktail.dart';
+import 'package:skinny_dog_algebra/skinny_dog_algebra.dart' show JointsMatrix;
 import 'package:test/test.dart';
 
 class _MockM extends Mock implements M {}
@@ -202,6 +203,89 @@ void main() {
       expect(profile.modelPath, 'model.onnx');
       expect(profile.description, '');
       expect(profile.standUpCounts, 150);
+    });
+
+    test('legacy standingPose supplies both pose roles', () {
+      final json = validJson()
+        ..['standingPose'] = List.generate(16, (i) => i.toDouble());
+
+      final profile = RobotProfile.fromJson(json);
+
+      expect(profile.standUpPose.values, profile.standingPose.values);
+      expect(profile.policyDefaultPose.values, profile.standingPose.values);
+    });
+
+    test('constructor defaults both pose roles to standingPose', () {
+      final standingPose = JointsMatrix.fromList(
+        List.generate(16, (i) => i.toDouble()),
+      );
+      final otherPose = JointsMatrix.zero();
+
+      final profile = RobotProfile(
+        name: 'constructor-test',
+        modelPath: 'model.onnx',
+        standingPose: standingPose,
+        sittingPose: otherPose,
+        inferKp: otherPose,
+        inferKd: otherPose,
+        standUpKp: otherPose,
+        standUpKd: otherPose,
+        sitDownKp: otherPose,
+        sitDownKd: otherPose,
+      );
+
+      expect(profile.standUpPose.values, standingPose.values);
+      expect(profile.policyDefaultPose.values, standingPose.values);
+    });
+
+    test('explicit stand-up and policy default poses remain independent', () {
+      final json = validJson()
+        ..['standingPose'] = List.filled(16, 1.0)
+        ..['standUpPose'] = List.filled(16, 2.0)
+        ..['policyDefaultPose'] = List.filled(16, 3.0);
+
+      final profile = RobotProfile.fromJson(json);
+
+      expect(profile.standingPose.values, List.filled(16, 1.0));
+      expect(profile.standUpPose.values, List.filled(16, 2.0));
+      expect(profile.policyDefaultPose.values, List.filled(16, 3.0));
+    });
+
+    test('observation builders use policyDefaultPose as their zero point', () {
+      for (final observationType in ['standard', 'bodyHeight']) {
+        final json = validJson()
+          ..['observationType'] = observationType
+          ..['standingPose'] = List.filled(16, 1.0)
+          ..['standUpPose'] = List.filled(16, 2.0)
+          ..['policyDefaultPose'] = List.filled(16, 3.0);
+
+        final builder = RobotProfile.fromJson(json).toObservationBuilder();
+
+        expect(
+          builder.standingPose.values,
+          List.filled(16, 3.0),
+          reason: observationType,
+        );
+      }
+    });
+
+    test('split pose fields require exactly 16 finite numbers', () {
+      for (final field in ['standUpPose', 'policyDefaultPose']) {
+        final shortJson = validJson()..[field] = List.filled(15, 0.0);
+        expect(
+          () => RobotProfile.fromJson(shortJson),
+          throwsFormatException,
+          reason: '$field short length',
+        );
+
+        final nanJson = validJson()
+          ..[field] = List.generate(16, (i) => i == 7 ? double.nan : 0.0);
+        expect(
+          () => RobotProfile.fromJson(nanJson),
+          throwsFormatException,
+          reason: '$field NaN',
+        );
+      }
     });
 
     test('description field defaults to empty string', () {
