@@ -15,6 +15,7 @@ from scipy.spatial.transform import Rotation as R
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOF_IDS = [7,8,9, 11,12,13, 15,16,17, 19,20,21, 10,14,18,22]
 DOF_VEL = [6,7,8, 10,11,12, 14,15,16, 18,19,20, 9,13,17,21]
+HANDOVER_INTERVALS = 100
 
 class Profile(NamedTuple):
     observation_type: str
@@ -27,6 +28,8 @@ class Profile(NamedTuple):
     stand_up_pose: np.ndarray
     policy_default_pose: np.ndarray
     action_scale: np.ndarray
+    stand_up_kp: np.ndarray
+    stand_up_kd: np.ndarray
     infer_kp: np.ndarray
     infer_kd: np.ndarray
     model_path: Path
@@ -87,6 +90,8 @@ def parse_profile(raw, repo_root=REPO_ROOT):
         stand_up_pose=stand_up_pose,
         policy_default_pose=policy_default_pose,
         action_scale=_vector(raw["actionScale"], "actionScale", 4),
+        stand_up_kp=_vector(raw["standUpKp"], "standUpKp", 16),
+        stand_up_kd=_vector(raw["standUpKd"], "standUpKd", 16),
         infer_kp=_vector(raw["inferKp"], "inferKp", 16),
         infer_kd=_vector(raw["inferKd"], "inferKd", 16),
         model_path=model_path.resolve(),
@@ -185,6 +190,25 @@ def policy_target(action, profile):
     action = _vector(action, "policyAction", 16)
     return profile.policy_default_pose + _scaled_action(action, profile.action_scale)
 
+
+class HandoverControl(NamedTuple):
+    alpha: float
+    target: np.ndarray
+    kp: np.ndarray
+    kd: np.ndarray
+
+
+def handover_control(frame_index, action, profile):
+    phase = float(np.clip(frame_index / HANDOVER_INTERVALS, 0.0, 1.0))
+    alpha = phase * phase * (3.0 - 2.0 * phase)
+    target = policy_target(action, profile)
+    return HandoverControl(
+        alpha=alpha,
+        target=profile.stand_up_pose + alpha * (target - profile.stand_up_pose),
+        kp=profile.stand_up_kp + alpha * (profile.infer_kp - profile.stand_up_kp),
+        kd=profile.stand_up_kd + alpha * (profile.infer_kd - profile.stand_up_kd),
+    )
+
 def run(args):
     profile = load_profile(args.profile, REPO_ROOT)
     model_path = Path(args.model) if args.model else profile.model_path
@@ -212,6 +236,9 @@ def run(args):
     data.qvel[:] = 0.
     mujoco.mj_forward(model, data)
     target = profile.stand_up_pose.copy()
+    kp = profile.stand_up_kp.copy()
+    kd = profile.stand_up_kd.copy()
+    policy_frame = 0
     action = np.zeros(16, dtype=np.float32)
     last_action = np.zeros(16, dtype=np.float32)
     history = initialize_history(get_obs(data, velocity_command, last_action, profile, height), history_size)
@@ -242,11 +269,12 @@ def run(args):
                 validate_step(observation, action, float(data.qpos[2]), args.min_trunk_height)
                 max_action_seen = max(max_action_seen, float(np.max(np.abs(action))))
                 last_action = action.copy()
-                if step > 100:
-                    target = policy_target(action, profile)
+                control = handover_control(policy_frame, action, profile)
+                target, kp, kd = control.target, control.kp, control.kd
+                policy_frame += 1
             q, dq = data.qpos[DOF_IDS], data.qvel[DOF_VEL]
-            leg_tau = profile.infer_kp[:12] * (target[:12]-q[:12]) - profile.infer_kd[:12]*dq[:12]
-            wheel_tau = profile.infer_kp[12:] * (target[12:]-q[12:]) + profile.infer_kd[12:] * (target[12:]-dq[12:])
+            leg_tau = kp[:12] * (target[:12]-q[:12]) - kd[:12]*dq[:12]
+            wheel_tau = kp[12:] * (target[12:]-q[12:]) + kd[12:] * (target[12:]-dq[12:])
             torque = np.clip(np.concatenate([leg_tau,wheel_tau]), -120., 120.)
             validate_step(np.concatenate([data.qpos,data.qvel]), torque, float(data.qpos[2]), args.min_trunk_height)
             data.ctrl[:] = torque

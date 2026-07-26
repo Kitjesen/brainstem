@@ -817,11 +817,21 @@ $\mathbf{b}_{\mathrm{contact}}$ & 12 & 足端接触布尔量 \\
 
 \subsection{动作空间与缩放}
 
-策略网络输出 12 个腿关节的位置增量。原始网络输出 $\mathbf{a} \in [-1, 1]^{12}$ 经缩放后变为目标关节角度：
+策略关节位置观测以 Profile 的 \texttt{policyDefaultPose} 为训练零点；策略动作也必须用同一个零点反归一化：
 
 \begin{equation}
-q_{\mathrm{target},i} = a_i \times \mathrm{actionScale}_i + q_{\mathrm{stand},i}
+q_{\mathrm{relative},i}
+= q_{\mathrm{actual},i} - q_{\mathrm{policyDefault},i}
 \end{equation}
+\begin{equation}
+q_{\mathrm{target},i}
+= q_{\mathrm{policyDefault},i}
++ a_i \times \mathrm{actionScale}_i
+\end{equation}
+
+\texttt{policyDefaultPose} 是策略训练接口的一部分，不一定等于机器人安全站起时的物理姿态 \texttt{standUpPose}。例如，某腿的 \texttt{standUpPose} 可为
+\texttt{[0.1, -0.8, 1.8]}，而该腿的 \texttt{policyDefaultPose} 仍使用训练值
+\texttt{[0.0, -1.1, 2.6]}。
 
 \subsection{Sim-to-Real}
 
@@ -1061,21 +1071,26 @@ ORIX 全部 16 个关节的编号和 URDF 名称：
 
 \section{典型姿态}
 
-\subsection{站立姿态 (Standing Pose)}
+\subsection{物理站姿与策略零点}
 
-站立姿态定义了机器人正常直立时所有关节的目标角度：
+Profile 使用两个语义明确的姿态字段：
+\begin{itemize}
+  \item \texttt{standUpPose}：站起、回站和 gesture 使用的物理目标；
+  \item \texttt{policyDefaultPose}：策略关节相对观测和动作反归一化使用的训练零点。
+\end{itemize}
+旧字段 \texttt{standingPose} 仅用于向后兼容：缺少 \texttt{standUpPose} 时，
+\texttt{standUpPose} 单独回退到 \texttt{standingPose}；缺少
+\texttt{policyDefaultPose} 时，\texttt{policyDefaultPose} 单独回退到
+\texttt{standingPose}。因此只含 \texttt{standingPose} 的旧 Profile 行为不变，
+而新 Profile 可以安全地将物理站姿与策略训练零点分开。
 
 \begin{lstlisting}[style=cpp]
-// 站立姿态（12 个关节）
-double standing_pose[12] = {
-     0.0, -0.65,  1.5,    // FR: hip, thigh, calf
-     0.0,  0.65, -1.5,    // FL: hip, thigh, calf
-     0.0, -0.65,  1.5,    // RR: hip, thigh, calf
-     0.0,  0.65, -1.5,    // RL: hip, thigh, calf
-};
+// 同一条腿的示例；实际 Profile 为完整关节数组
+standUpPose:       [0.1, -0.8, 1.8]  // 物理安全站姿
+policyDefaultPose: [0.0, -1.1, 2.6]  // ONNX 训练零点
 \end{lstlisting}
 
-\warning{注意左右对称：FR 和 RR 的符号相同，FL 和 RL 的符号相同（镜像关系）。}
+\warning{不得用 \texttt{standUpPose} 替换策略零点，否则 observation 和动作目标都会偏离 ONNX 训练接口。}
 
 \section{PD 控制参数}
 
@@ -1187,7 +1202,7 @@ Walking & \texttt{sit\_down()} & 先 StandUp 再 SitDown & Grounded \\
 \endhead
 触发 & \texttt{dog.stand\_up()} \\
 耗时 & 150 ticks $\times$ 20ms = \textbf{3 秒} \\
-过程 & 从当前姿态线性插值到 standingPose \\
+过程 & 从当前姿态线性插值到 standUpPose \\
 \bottomrule
 \end{longtable}
 
@@ -1213,7 +1228,7 @@ Walking & \texttt{sit\_down()} & 先 StandUp 再 SitDown & Grounded \\
 \endhead
 触发 & \texttt{dog.sit\_down()} \\
 耗时 & 150 ticks $\times$ 20ms = \textbf{3 秒} \\
-过程 & 从 standingPose 线性插值到 sittingPose (全零) \\
+过程 & 从 standUpPose 线性插值到 sittingPose (全零) \\
 \bottomrule
 \end{longtable}
 
@@ -1704,11 +1719,19 @@ Profile 是机器狗的运动参数集合。自定义 Profile 的 JSON 文件结
   "description": "自定义策略",
   "modelPath": "model/my_policy.onnx",
   "standingPose": [0.0, -0.65, 1.5, 0.0, ...],
+  "standUpPose": [0.1, -0.8, 1.8, 0.0, ...],
+  "policyDefaultPose": [0.0, -1.1, 2.6, 0.0, ...],
   "sittingPose": [0.0, 0.0, 0.0, 0.0, ...],
   "inferKp": [...], "inferKd": [...],
+  "standUpKp": [...], "standUpKd": [...],
   "actionScale": [0.125, 0.25, 0.25, 5.0]
 }
 \end{lstlisting}
+
+\texttt{standUpPose} 和 \texttt{policyDefaultPose} 都是可选的兼容扩展：
+前者缺失时回退到 \texttt{standingPose}，后者缺失时也独立回退到
+\texttt{standingPose}。建议新 Profile 显式填写两者；仅在两种语义确实相同时
+才给出相同数组。
 
 部署和切换：
 

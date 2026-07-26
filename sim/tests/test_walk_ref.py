@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import math
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -30,6 +31,8 @@ def profile_dict(**overrides):
         "actionScale": [0.125, 0.25, 0.25, 5.0],
         "inferKp": [100.0] * 16,
         "inferKd": [15.0] * 16,
+        "standUpKp": [40.0] * 16,
+        "standUpKd": [5.0] * 16,
         "modelPath": "model/policy.onnx",
     }
     profile.update(overrides)
@@ -38,10 +41,15 @@ def profile_dict(**overrides):
 
 class ProfileContractTest(unittest.TestCase):
     def test_profile_resolves_model_from_repo_root(self):
-        with tempfile.TemporaryDirectory() as temp:
-            profile_path = Path(temp) / "profile.json"
-            profile_path.write_text(json.dumps(profile_dict()), encoding="utf-8")
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", encoding="utf-8", delete=False
+        ) as stream:
+            json.dump(profile_dict(), stream)
+            profile_path = Path(stream.name)
+        try:
             profile = walk_ref.load_profile(profile_path, REPO_ROOT)
+        finally:
+            os.unlink(profile_path)
         self.assertEqual(profile.observation_type, "bodyHeight")
         self.assertEqual(profile.frame_dim, 58)
         self.assertEqual(profile.model_path, REPO_ROOT / "model" / "policy.onnx")
@@ -50,6 +58,8 @@ class ProfileContractTest(unittest.TestCase):
         np.testing.assert_array_equal(
             profile.policy_default_pose, np.arange(16) + 200.0
         )
+        np.testing.assert_array_equal(profile.stand_up_kp, np.full(16, 40.0))
+        np.testing.assert_array_equal(profile.stand_up_kd, np.full(16, 5.0))
 
     def test_legacy_pose_feeds_both_explicit_roles(self):
         raw = profile_dict()
@@ -105,6 +115,39 @@ class ObservationContractTest(unittest.TestCase):
         np.testing.assert_array_equal(relative[12:], np.zeros(4))
         np.testing.assert_array_equal(target, profile.policy_default_pose)
         self.assertFalse(np.array_equal(target, profile.stand_up_pose))
+
+    def test_handover_uses_101_smoothstep_samples_and_caps(self):
+        profile = walk_ref.parse_profile(profile_dict(), REPO_ROOT)
+        action = np.ones(16)
+        policy = walk_ref.policy_target(action, profile)
+
+        frame0 = walk_ref.handover_control(0, action, profile)
+        frame50 = walk_ref.handover_control(50, action, profile)
+        frame100 = walk_ref.handover_control(100, action, profile)
+        capped = walk_ref.handover_control(101, action, profile)
+
+        self.assertEqual(frame0.alpha, 0.0)
+        np.testing.assert_array_equal(frame0.target, profile.stand_up_pose)
+        np.testing.assert_array_equal(frame0.kp, profile.stand_up_kp)
+        np.testing.assert_array_equal(frame0.kd, profile.stand_up_kd)
+
+        self.assertEqual(frame50.alpha, 0.5)
+        np.testing.assert_allclose(
+            frame50.target, (profile.stand_up_pose + policy) / 2.0
+        )
+        np.testing.assert_allclose(
+            frame50.kp, (profile.stand_up_kp + profile.infer_kp) / 2.0
+        )
+        np.testing.assert_allclose(
+            frame50.kd, (profile.stand_up_kd + profile.infer_kd) / 2.0
+        )
+
+        for frame in (frame100, capped):
+            self.assertEqual(frame.alpha, 1.0)
+            np.testing.assert_allclose(frame.target, policy)
+            np.testing.assert_array_equal(frame.kp, profile.infer_kp)
+            np.testing.assert_array_equal(frame.kd, profile.infer_kd)
+            np.testing.assert_allclose(frame.target[12:], policy[12:])
 
     def test_body_height_is_raw_final_scalar(self):
         groups = [

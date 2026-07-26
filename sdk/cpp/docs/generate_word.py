@@ -595,8 +595,14 @@ try {
 
     set_heading(doc, "3.2.3 动作空间与缩放", 3)
     doc.add_paragraph(
-        "策略网络输出 12 个腿关节的位置增量。原始网络输出 a in [-1, 1]^12 经缩放后变为"
-        "目标关节角度：q_target_i = a_i * actionScale_i + q_stand_i"
+        "策略关节位置观测以 Profile 的 policyDefaultPose 为训练零点，策略动作也必须用"
+        "同一个零点反归一化：q_relative_i = q_actual_i - q_policyDefault_i；"
+        "q_target_i = q_policyDefault_i + a_i * actionScale_i。"
+    )
+    doc.add_paragraph(
+        "policyDefaultPose 是策略训练接口的一部分，不一定等于安全站起时的物理姿态 "
+        "standUpPose。例如，某腿的 standUpPose 可为 [0.1, -0.8, 1.8]，而该腿的 "
+        "policyDefaultPose 仍使用训练值 [0.0, -1.1, 2.6]。"
     )
 
     set_heading(doc, "3.2.4 Sim-to-Real", 3)
@@ -750,17 +756,24 @@ try {
     ])
 
     set_heading(doc, "5.4 典型姿态", 2)
-    doc.add_paragraph("站立姿态（Standing Pose）定义了机器人正常直立时所有关节的目标角度：")
+    doc.add_paragraph(
+        "Profile 使用 standUpPose 表示站起、回站和 gesture 的物理目标，使用 "
+        "policyDefaultPose 表示策略关节相对观测和动作反归一化的训练零点。"
+    )
+    doc.add_paragraph(
+        "旧 standingPose 仅用于向后兼容：缺少 standUpPose 时，standUpPose 单独回退到 "
+        "standingPose；缺少 policyDefaultPose 时，policyDefaultPose 单独回退到 "
+        "standingPose。因此只含 standingPose 的旧 Profile 行为不变。"
+    )
     code_block(doc, """\
-// 站立姿态（12 个关节）
-double standing_pose[12] = {
-     0.0, -0.65,  1.5,    // FR: hip, thigh, calf
-     0.0,  0.65, -1.5,    // FL: hip, thigh, calf
-     0.0, -0.65,  1.5,    // RR: hip, thigh, calf
-     0.0,  0.65, -1.5,    // RL: hip, thigh, calf
-};\
+// 同一条腿的示例；实际 Profile 为完整关节数组
+standUpPose:       [0.1, -0.8, 1.8]  // 物理安全站姿
+policyDefaultPose: [0.0, -1.1, 2.6]  // ONNX 训练零点\
 """)
-    warning_box(doc, "注意左右对称：FR 和 RR 的符号相同，FL 和 RL 的符号相同（镜像关系）。")
+    warning_box(
+        doc,
+        "不得用 standUpPose 替换策略零点，否则 observation 和动作目标都会偏离 ONNX 训练接口。",
+    )
 
     set_heading(doc, "5.5 PD 控制参数", 2)
     doc.add_paragraph("推理阶段（行走时）的 PD 参数：")
@@ -841,7 +854,7 @@ dog.clear_motor_fault({0, 1, 2, 3});\
     add_table(doc, ["项目", "说明"], [
         ["触发", "dog.stand_up()"],
         ["耗时", "150 ticks x 20ms = 3 秒"],
-        ["过程", "从当前姿态线性插值到 standingPose"],
+        ["过程", "从当前姿态线性插值到 standUpPose"],
     ])
 
     set_heading(doc, "6.2.2 Standing -> Walking（开始行走）", 3)
@@ -855,7 +868,7 @@ dog.clear_motor_fault({0, 1, 2, 3});\
     add_table(doc, ["项目", "说明"], [
         ["触发", "dog.sit_down()"],
         ["耗时", "150 ticks x 20ms = 3 秒"],
-        ["过程", "从 standingPose 线性插值到 sittingPose (全零)"],
+        ["过程", "从 standUpPose 线性插值到 sittingPose (全零)"],
     ])
 
     set_heading(doc, "6.3 非法操作处理", 2)
@@ -1266,11 +1279,19 @@ int main() {
   "description": "自定义策略",
   "modelPath": "model/my_policy.onnx",
   "standingPose": [0.0, -0.65, 1.5, 0.0, ...],
+  "standUpPose": [0.1, -0.8, 1.8, 0.0, ...],
+  "policyDefaultPose": [0.0, -1.1, 2.6, 0.0, ...],
   "sittingPose": [0.0, 0.0, 0.0, 0.0, ...],
   "inferKp": [...], "inferKd": [...],
+  "standUpKp": [...], "standUpKd": [...],
   "actionScale": [0.125, 0.25, 0.25, 5.0]
 }\
 """)
+    doc.add_paragraph(
+        "standUpPose 和 policyDefaultPose 都是可选的兼容扩展：前者缺失时回退到 "
+        "standingPose，后者缺失时也独立回退到 standingPose。建议新 Profile 显式填写"
+        "两者；仅在两种语义确实相同时才给出相同数组。"
+    )
     doc.add_paragraph("部署和切换：")
     code_block(doc, """\
 # 上传到机器狗
