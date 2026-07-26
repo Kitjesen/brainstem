@@ -1,6 +1,7 @@
 export 'src/app/motor_health.dart';
 export 'src/app/profile_manager.dart';
 export 'src/app/robot_profile.dart';
+export 'src/body_height_handover.dart';
 export 'src/control_arbiter.dart';
 export 'src/real_imu.dart';
 export 'src/real_joint.dart';
