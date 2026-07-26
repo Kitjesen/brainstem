@@ -89,6 +89,14 @@ Future<void> _run() async {
   _log.info(
     'Default profile: ${defaultProfile.name} (model=${defaultProfile.modelPath})',
   );
+  final bodyHeightHandover = defaultProfile.observationType == 'bodyHeight'
+      ? BodyHeightHandover(
+          standUpKp: defaultProfile.standUpKp,
+          standUpKd: defaultProfile.standUpKd,
+          inferKp: defaultProfile.inferKp,
+          inferKd: defaultProfile.inferKd,
+        )
+      : null;
   final historySize = await _resolveHistorySize(defaultProfile);
   final modelInputName = await _resolveInputName(defaultProfile);
   _log.info(
@@ -254,7 +262,10 @@ Future<void> _run() async {
   // ──── 4a. Motor health manager ─────────────────────────────
   final motorHealth = MotorHealthManager(
     joint: joint,
-    requestFault: (reason) => arbiter.fault(reason),
+    requestFault: (reason) {
+      bodyHeightHandover?.cancel();
+      arbiter.fault(reason);
+    },
   );
   _subs.add(
     motorHealth.healthStream.listen((event) {
@@ -282,26 +293,34 @@ Future<void> _run() async {
   );
 
   var motorOutputEnabled = false;
+  final actionDispatcher = MotorActionDispatcher(
+    handover: bodyHeightHandover,
+    gateAction: motorHealth.gateAction,
+    sendAction: joint.trySendAction,
+    setGains: (kp, kd) {
+      joint.kpExt = kp;
+      joint.kdExt = kd;
+    },
+  );
 
   // 推理输出 → 电机动作 (gated through MotorHealthManager)
   _subs.add(
     brain.nextActionStream.listen(
       (action) {
-        if (!motorOutputEnabled) return;
-
-        if (arbiter.state is Grounded) {
-          joint.sendAction(joint.position.discardFoot());
-          return;
-        }
-
-        final gated = motorHealth.gateAction(action, joint.position);
-        joint.sendAction(gated);
+        actionDispatcher.dispatch(
+          outputEnabled: motorOutputEnabled,
+          grounded: arbiter.state is Grounded,
+          policyAction: action,
+          measuredPosition: joint.position,
+        );
       },
       onError: (Object error, StackTrace st) {
+        bodyHeightHandover?.cancel();
         _log.severe('Inference stream error: $error', error, st);
         arbiter.fault('Inference stream error: $error');
       },
       onDone: () {
+        bodyHeightHandover?.cancel();
         _log.severe('Inference stream closed unexpectedly');
         arbiter.fault('Inference stream closed');
       },
@@ -339,6 +358,8 @@ Future<void> _run() async {
       velocityCommandMax: defaultProfile.velocityCommandMax,
       controller: controller,
       initialProfile: defaultProfile,
+      bodyHeightHandover: bodyHeightHandover,
+      motorOutputInitiallyEnabled: motorOutputEnabled,
     );
 
     // ──── 4b. 策略管理 ───────────────────────────────────────────
@@ -389,6 +410,8 @@ Future<void> _run() async {
           velocityCommandMax: defaultProfile.velocityCommandMax,
           controller: xbox,
           initialProfile: defaultProfile,
+          bodyHeightHandover: bodyHeightHandover,
+          motorOutputInitiallyEnabled: motorOutputEnabled,
         );
         final pm = ProfileManager(
           profiles: profiles,

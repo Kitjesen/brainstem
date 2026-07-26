@@ -61,8 +61,8 @@ final class BodyHeightHandover {
   }
 
   void restartFrom(JointsMatrix measuredPosition) {
-    if (!isSuspended) {
-      throw StateError('Body-height handover is not suspended');
+    if (!blocksControllerCommands) {
+      throw StateError('Body-height handover is not active');
     }
     _startAction = measuredPosition.discardFoot();
     _frameIndex = 0;

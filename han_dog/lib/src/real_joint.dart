@@ -151,14 +151,17 @@ class RealJoint implements JointService, MotorService {
             _cachedOmegas = null;
             frequencyWatches[legId * 4 + targetId - 1].add(1);
             _reportController.add((legId * 4 + targetId - 1, state));
-            final jointIdx =
-                targetId <= 3 ? legId * 3 + (targetId - 1) : 12 + legId;
-            _motorFaultController.add(MotorFaultEvent(
-              jointIndex: jointIdx,
-              errors: state.errors.errors,
-              status: state.status,
-              temperature: state.temperature,
-            ));
+            final jointIdx = targetId <= 3
+                ? legId * 3 + (targetId - 1)
+                : 12 + legId;
+            _motorFaultController.add(
+              MotorFaultEvent(
+                jointIndex: jointIdx,
+                errors: state.errors.errors,
+                status: state.status,
+                temperature: state.temperature,
+              ),
+            );
           default:
         }
       },
@@ -231,17 +234,28 @@ class RealJoint implements JointService, MotorService {
   JointsMatrix kdExt = .zero();
 
   @override
-  void sendAction(JointsMatrix action) => realActionExt(action);
+  void sendAction(JointsMatrix action) {
+    realActionExt(action);
+  }
 
+  /// Backward-compatible void sender used by existing examples.
   void realActionExt(JointsMatrix action) {
+    trySendAction(action);
+  }
+
+  /// Returns true only when a finite command is accepted into all CAN queues.
+  bool trySendAction(JointsMatrix action) {
     // 最后一道安全门：NaN/Inf 绝不能到达 CAN 总线。
     if (action.hasNonFinite || kpExt.hasNonFinite || kdExt.hasNonFinite) {
-      _log.severe('realActionExt rejected: non-finite values detected '
-          '(action=${action.hasNonFinite}, kp=${kpExt.hasNonFinite}, '
-          'kd=${kdExt.hasNonFinite})');
-      return;
+      _log.severe(
+        'realActionExt rejected: non-finite values detected '
+        '(action=${action.hasNonFinite}, kp=${kpExt.hasNonFinite}, '
+        'kd=${kdExt.hasNonFinite})',
+      );
+      return false;
     }
     _realActionExt(action, kpExt, kdExt);
+    return true;
   }
 
   void _realActionExt(JointsMatrix a, JointsMatrix kp, JointsMatrix kd) {
@@ -323,15 +337,17 @@ class RealJoint implements JointService, MotorService {
     // 用每条腿的 PcanController 监听 getter 响应
     final legSubs = <StreamSubscription<RSState>>[];
     for (int legId = 0; legId < 4; legId++) {
-      legSubs.add(pcans[legId].state.listen((state) {
-        if (state is RSStateGetter && state.getter is RSGetterVbus) {
-          final canId = state.canId;
-          final voltage = (state.getter as RSGetterVbus).value;
-          // canId 1-3 → leg joints, canId 4 → foot
-          final idx = canId <= 3 ? legId * 3 + (canId - 1) : 12 + legId;
-          if (idx >= 0 && idx < 16) voltages[idx] = voltage;
-        }
-      }));
+      legSubs.add(
+        pcans[legId].state.listen((state) {
+          if (state is RSStateGetter && state.getter is RSGetterVbus) {
+            final canId = state.canId;
+            final voltage = (state.getter as RSGetterVbus).value;
+            // canId 1-3 → leg joints, canId 4 → foot
+            final idx = canId <= 3 ? legId * 3 + (canId - 1) : 12 + legId;
+            if (idx >= 0 && idx < 16) voltages[idx] = voltage;
+          }
+        }),
+      );
     }
 
     // 发送 getter 请求
@@ -359,7 +375,9 @@ class RealJoint implements JointService, MotorService {
     _disposed = true;
     _log.info('RealJoint disposing');
     for (final sub in subscriptions) {
-      try { sub.cancel(); } catch (_) {}
+      try {
+        sub.cancel();
+      } catch (_) {}
     }
     _reportController.close();
     _motorFaultController.close();

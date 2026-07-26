@@ -7,6 +7,7 @@ export 'src/real_imu.dart';
 export 'src/real_joint.dart';
 export 'src/gamepad.dart';
 export 'src/linux_joystick.dart';
+export 'src/motor_action_dispatcher.dart';
 export 'src/real_controller.dart';
 export 'src/real_control_dog.dart';
 export 'src/xbox_controller.dart';

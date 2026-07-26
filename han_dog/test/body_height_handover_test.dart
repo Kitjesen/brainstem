@@ -98,6 +98,30 @@ void main() {
     expect(restarted.action.values, fresh.discardFoot().values);
   });
 
+  test('restart refreshes any active phase but rejects idle', () {
+    final requested = buildHandover()..requestFrom(startAction);
+    final freshRequested = JointsMatrix.fromList(List<double>.filled(16, 0.20));
+    requested.restartFrom(freshRequested);
+    expect(
+      requested.preview(policyAction).action.values,
+      freshRequested.discardFoot().values,
+    );
+
+    final running = buildHandover()
+      ..requestFrom(startAction)
+      ..begin()
+      ..markApplied();
+    final freshRunning = JointsMatrix.fromList(List<double>.filled(16, 0.30));
+    running.restartFrom(freshRunning);
+    expect(running.preview(policyAction).frameIndex, 0);
+    expect(
+      running.preview(policyAction).action.values,
+      freshRunning.discardFoot().values,
+    );
+
+    expect(() => buildHandover().restartFrom(startAction), throwsStateError);
+  });
+
   test('request captures qStart before Walking is confirmed', () {
     final handover = buildHandover();
     handover.requestFrom(startAction);

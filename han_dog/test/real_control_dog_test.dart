@@ -77,7 +77,19 @@ void main() {
     (double, double, double) velocityCommandMin = (-3.0, -3.0, -3.0),
     (double, double, double) velocityCommandMax = (3.0, 3.0, 3.0),
     RobotProfile? initialProfile,
+    BodyHeightHandover? bodyHeightHandover,
+    bool motorOutputInitiallyEnabled = true,
   }) {
+    final selectedHandover =
+        bodyHeightHandover ??
+        (initialProfile?.observationType == 'bodyHeight'
+            ? BodyHeightHandover(
+                standUpKp: standUpKp,
+                standUpKd: standUpKd,
+                inferKp: inferKp,
+                inferKd: inferKd,
+              )
+            : null);
     return RealControlDog(
       brain: brain,
       arbiter: arbiter,
@@ -93,6 +105,8 @@ void main() {
       velocityCommandMin: velocityCommandMin,
       velocityCommandMax: velocityCommandMax,
       initialProfile: initialProfile,
+      bodyHeightHandover: selectedHandover,
+      motorOutputInitiallyEnabled: motorOutputInitiallyEnabled,
     );
   }
 
@@ -128,6 +142,7 @@ void main() {
     when(() => joint.enable()).thenAnswer((_) async {});
     when(() => joint.disable()).thenAnswer((_) async {});
     when(() => joint.disable(clearErrors: true)).thenAnswer((_) async {});
+    when(() => joint.position).thenReturn(JointsMatrix.zero());
 
     when(() => arbiter.stateStream).thenAnswer((_) => stateCtrl.stream);
     when(() => arbiter.state).thenReturn(const Zero());
@@ -187,6 +202,12 @@ void main() {
           sitDownKp: sitDownKp,
           sitDownKd: sitDownKd,
           initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: BodyHeightHandover(
+            standUpKp: standUpKp,
+            standUpKd: standUpKd,
+            inferKp: inferKp,
+            inferKd: inferKd,
+          ),
         ),
         throwsArgumentError,
       );
@@ -373,57 +394,57 @@ void main() {
       dog.dispose();
     });
 
-    test(
-      'rejected Standing R1 reset preserves the active axis and baseline',
-      () {
-        fakeAsync((async) {
-          when(
-            () => controller.bodyHeightAxis,
-          ).thenAnswer((_) => bodyHeightCtrl.stream);
-          when(
-            () => arbiter.state,
-          ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
-          when(() => brain.bodyHeightCommand).thenReturn(0.50);
-          when(() => arbiter.command(any(), any())).thenReturn(false);
-          final dog = buildDog(
-            initialProfile: profile(observationType: 'bodyHeight'),
-          );
+    test('rejected height reset does not send walk or buffer the axis', () {
+      fakeAsync((async) {
+        when(
+          () => controller.bodyHeightAxis,
+        ).thenAnswer((_) => bodyHeightCtrl.stream);
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        when(() => arbiter.command(any(), any())).thenReturn(false);
+        final handover = BodyHeightHandover(
+          standUpKp: standUpKp,
+          standUpKd: standUpKd,
+          inferKp: inferKp,
+          inferKd: inferKd,
+        );
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
 
-          bodyHeightCtrl.add(1.0);
-          async.flushMicrotasks();
-          idleCtrl.add(true);
-          async.flushMicrotasks();
+        bodyHeightCtrl.add(1.0);
+        async.flushMicrotasks();
 
-          final reset =
-              verify(
-                    () => arbiter.command(
-                      captureAny(that: isA<CmdSetBodyHeight>()),
-                      ControlSource.yunzhuo,
-                    ),
-                  ).captured.single
-                  as CmdSetBodyHeight;
-          expect(reset.meters, 0.40);
+        verify(
+          () => arbiter.command(
+            any(that: isA<CmdSetBodyHeight>()),
+            ControlSource.yunzhuo,
+          ),
+        ).called(1);
+        verifyNever(
+          () =>
+              arbiter.command(any(that: isA<CmdWalk>()), ControlSource.yunzhuo),
+        );
+        expect(handover.blocksControllerCommands, isFalse);
 
-          clearInteractions(arbiter);
-          when(
-            () => arbiter.state,
-          ).thenReturn(Walking(Stream<History>.empty().listen((_) {})));
-          when(() => arbiter.command(any(), any())).thenReturn(true);
-          async.elapse(const Duration(milliseconds: 20));
+        clearInteractions(arbiter);
+        when(
+          () => arbiter.state,
+        ).thenReturn(Walking(Stream<History>.empty().listen((_) {})));
+        when(() => arbiter.command(any(), any())).thenReturn(true);
+        async.elapse(const Duration(milliseconds: 20));
 
-          final resumed =
-              verify(
-                    () => arbiter.command(
-                      captureAny(that: isA<CmdSetBodyHeight>()),
-                      ControlSource.yunzhuo,
-                    ),
-                  ).captured.single
-                  as CmdSetBodyHeight;
-          expect(resumed.meters, closeTo(0.5004, 1e-12));
-          dog.dispose();
-        });
-      },
-    );
+        verifyNever(
+          () => arbiter.command(
+            any(that: isA<CmdSetBodyHeight>()),
+            ControlSource.yunzhuo,
+          ),
+        );
+        dog.dispose();
+      });
+    });
 
     test('Transitioning does not integrate body height', () {
       fakeAsync((async) {
@@ -600,6 +621,676 @@ void main() {
 
       expect(switchCount, 0);
       dog.dispose();
+    });
+  });
+
+  group('body-height handover lifecycle', () {
+    BodyHeightHandover newHandover() => BodyHeightHandover(
+      standUpKp: standUpKp,
+      standUpKd: standUpKd,
+      inferKp: inferKp,
+      inferKd: inferKd,
+    );
+
+    void stubBodyHeightAxis() {
+      when(
+        () => controller.bodyHeightAxis,
+      ).thenAnswer((_) => bodyHeightCtrl.stream);
+    }
+
+    test('left stick requests zero-speed handover and captures qStart', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        final measured = JointsMatrix.fromList(
+          List<double>.generate(16, (index) => index / 20),
+        );
+        final later = JointsMatrix.fromList(List<double>.filled(16, 0.75));
+        final policy = JointsMatrix.fromList(List<double>.filled(16, 0.25));
+        when(() => joint.position).thenReturn(measured);
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+
+        final commands = verify(
+          () => arbiter.command(captureAny(), ControlSource.yunzhuo),
+        ).captured.cast<A>();
+        expect(commands, hasLength(2));
+        expect((commands.first as CmdSetBodyHeight).meters, 0.40);
+        expect((commands.last as CmdWalk).direction, Vector3.zero());
+        expect(handover.isRequested, isTrue);
+
+        when(() => joint.position).thenReturn(later);
+        stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
+        async.flushMicrotasks();
+
+        final frame0 = handover.preview(policy);
+        expect(handover.isRunning, isTrue);
+        expect(frame0.action.values, measured.discardFoot().values);
+        dog.dispose();
+      });
+    });
+
+    test('right stick requests the same frozen zero-speed handover', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        bodyHeightCtrl.add(1.0);
+        async.flushMicrotasks();
+
+        final commands = verify(
+          () => arbiter.command(captureAny(), ControlSource.yunzhuo),
+        ).captured.cast<A>();
+        expect(commands, hasLength(2));
+        expect((commands.first as CmdSetBodyHeight).meters, 0.40);
+        expect((commands.last as CmdWalk).direction, Vector3.zero());
+        expect(handover.isRequested, isTrue);
+        dog.dispose();
+      });
+    });
+
+    test('requested handover blocks later speed and height inputs', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        clearInteractions(arbiter);
+
+        directionCtrl.add(Vector3(1, 0, 0));
+        bodyHeightCtrl.add(-1.0);
+        async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 40));
+
+        verifyNever(() => arbiter.command(any(), ControlSource.yunzhuo));
+        expect(handover.isRequested, isTrue);
+        dog.dispose();
+      });
+    });
+
+    test(
+      'state matrix preserves only requested Standing and active Walking',
+      () {
+        fakeAsync((async) {
+          stubBodyHeightAxis();
+          when(
+            () => arbiter.state,
+          ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+          final handover = newHandover();
+          final dog = buildDog(
+            initialProfile: profile(observationType: 'bodyHeight'),
+            bodyHeightHandover: handover,
+          );
+
+          directionCtrl.add(Vector3(0.5, 0, 0));
+          async.flushMicrotasks();
+          stateCtrl.add(Standing(Stream<History>.empty().listen((_) {})));
+          async.flushMicrotasks();
+          expect(handover.isRequested, isTrue);
+
+          stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
+          async.flushMicrotasks();
+          expect(handover.isRunning, isTrue);
+
+          stateCtrl.add(Standing(Stream<History>.empty().listen((_) {})));
+          async.flushMicrotasks();
+          expect(handover.blocksControllerCommands, isFalse);
+          dog.dispose();
+        });
+      },
+    );
+
+    test('unexpected Transitioning and Grounded cancel the handover', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        stateCtrl.add(
+          Transitioning(
+            const Command.standUp(),
+            Stream<History>.empty().listen((_) {}),
+            null,
+          ),
+        );
+        async.flushMicrotasks();
+        expect(handover.blocksControllerCommands, isFalse);
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        stateCtrl.add(Grounded(Stream<History>.empty().listen((_) {})));
+        async.flushMicrotasks();
+        expect(handover.blocksControllerCommands, isFalse);
+        dog.dispose();
+      });
+    });
+
+    test('disable suspends and re-enable in Walking recaptures frame zero', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        final first = JointsMatrix.fromList(List<double>.filled(16, 0.10));
+        final fresh = JointsMatrix.fromList(List<double>.filled(16, 0.30));
+        final policy = JointsMatrix.fromList(List<double>.filled(16, 0.50));
+        when(() => joint.position).thenReturn(first);
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+        final enableEvents = <bool>[];
+        dog.onMotorEnableChanged = enableEvents.add;
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
+        async.flushMicrotasks();
+        handover.markApplied();
+
+        enabledCtrl.add(false);
+        async.flushMicrotasks();
+        expect(handover.isSuspended, isTrue);
+
+        when(() => joint.position).thenReturn(fresh);
+        when(
+          () => arbiter.state,
+        ).thenReturn(Walking(Stream<History>.empty().listen((_) {})));
+        enabledCtrl.add(true);
+        async.flushMicrotasks();
+
+        expect(handover.preview(policy).frameIndex, 0);
+        expect(
+          handover.preview(policy).action.values,
+          fresh.discardFoot().values,
+        );
+        expect(enableEvents, [false, true]);
+        dog.dispose();
+      });
+    });
+
+    test('L1, L2, and R1 cancel before their existing commands', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        standupCtrl.add(true);
+        async.flushMicrotasks();
+        expect(handover.blocksControllerCommands, isFalse);
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        sitdownCtrl.add(true);
+        async.flushMicrotasks();
+        expect(handover.blocksControllerCommands, isFalse);
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        idleCtrl.add(true);
+        async.flushMicrotasks();
+        expect(handover.blocksControllerCommands, isFalse);
+        dog.dispose();
+      });
+    });
+
+    test(
+      'completion does not replay old height input and new commands resume',
+      () {
+        fakeAsync((async) {
+          stubBodyHeightAxis();
+          when(
+            () => arbiter.state,
+          ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+          final handover = newHandover();
+          final dog = buildDog(
+            initialProfile: profile(observationType: 'bodyHeight'),
+            bodyHeightHandover: handover,
+          );
+
+          bodyHeightCtrl.add(1.0);
+          async.flushMicrotasks();
+          when(
+            () => arbiter.state,
+          ).thenReturn(Walking(Stream<History>.empty().listen((_) {})));
+          stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
+          async.flushMicrotasks();
+          for (
+            var sample = 0;
+            sample <= BodyHeightHandover.intervalCount;
+            sample++
+          ) {
+            handover.markApplied();
+          }
+          clearInteractions(arbiter);
+
+          async.elapse(const Duration(milliseconds: 40));
+          verifyNever(() => arbiter.command(any(), ControlSource.yunzhuo));
+
+          directionCtrl.add(Vector3(0.5, 0, 0));
+          bodyHeightCtrl.add(1.0);
+          async.flushMicrotasks();
+          async.elapse(const Duration(milliseconds: 20));
+
+          verify(
+            () => arbiter.command(
+              any(
+                that: isA<CmdWalk>().having(
+                  (command) => command.direction.x,
+                  'forward speed',
+                  0.5,
+                ),
+              ),
+              ControlSource.yunzhuo,
+            ),
+          ).called(1);
+          final height =
+              verify(
+                    () => arbiter.command(
+                      captureAny(that: isA<CmdSetBodyHeight>()),
+                      ControlSource.yunzhuo,
+                    ),
+                  ).captured.single
+                  as CmdSetBodyHeight;
+          expect(height.meters, closeTo(0.4004, 1e-12));
+          dog.dispose();
+        });
+      },
+    );
+
+    test('red button suspends and closes the motor output gate', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+        final enableEvents = <bool>[];
+        dog.onMotorEnableChanged = enableEvents.add;
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        redCtrl.add(true);
+        async.flushMicrotasks();
+
+        expect(handover.isSuspended, isTrue);
+        expect(enableEvents, [false]);
+        verify(() => joint.disable(clearErrors: true)).called(1);
+        dog.dispose();
+      });
+    });
+
+    test('accepted height reset followed by rejected walk cancels request', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        when(
+          () => arbiter.command(
+            any(that: isA<CmdSetBodyHeight>()),
+            ControlSource.yunzhuo,
+          ),
+        ).thenReturn(true);
+        when(
+          () =>
+              arbiter.command(any(that: isA<CmdWalk>()), ControlSource.yunzhuo),
+        ).thenReturn(false);
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        bodyHeightCtrl.add(1.0);
+        async.flushMicrotasks();
+
+        verify(
+          () => arbiter.command(
+            any(that: isA<CmdSetBodyHeight>()),
+            ControlSource.yunzhuo,
+          ),
+        ).called(1);
+        verify(
+          () =>
+              arbiter.command(any(that: isA<CmdWalk>()), ControlSource.yunzhuo),
+        ).called(1);
+        expect(handover.blocksControllerCommands, isFalse);
+        dog.dispose();
+      });
+    });
+
+    test('idle state matrix remains idle for every CMS state', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+        final states = <S>[
+          Standing(Stream<History>.empty().listen((_) {})),
+          Walking(Stream<History>.empty().listen((_) {})),
+          Transitioning(
+            const Command.standUp(),
+            Stream<History>.empty().listen((_) {}),
+            null,
+          ),
+          Grounded(Stream<History>.empty().listen((_) {})),
+          const Zero(),
+        ];
+
+        for (final state in states) {
+          stateCtrl.add(state);
+          async.flushMicrotasks();
+          expect(handover.blocksControllerCommands, isFalse);
+        }
+        dog.dispose();
+      });
+    });
+
+    test('Zero and state-stream faults cancel active handovers', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        stateCtrl.add(const Zero());
+        async.flushMicrotasks();
+        expect(handover.blocksControllerCommands, isFalse);
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
+        async.flushMicrotasks();
+        expect(handover.isRunning, isTrue);
+        stateCtrl.addError(StateError('synthetic state fault'));
+        async.flushMicrotasks();
+        expect(handover.blocksControllerCommands, isFalse);
+        dog.dispose();
+      });
+    });
+
+    test('running Walking and suspended Walking preserve their phase', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
+        async.flushMicrotasks();
+        stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
+        async.flushMicrotasks();
+        expect(handover.isRunning, isTrue);
+
+        enabledCtrl.add(false);
+        async.flushMicrotasks();
+        stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
+        async.flushMicrotasks();
+        expect(handover.isSuspended, isTrue);
+
+        stateCtrl.add(Grounded(Stream<History>.empty().listen((_) {})));
+        async.flushMicrotasks();
+        expect(handover.blocksControllerCommands, isFalse);
+        dog.dispose();
+      });
+    });
+
+    test('disable while requested suspends before Walking confirmation', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        expect(handover.isRequested, isTrue);
+        enabledCtrl.add(false);
+        async.flushMicrotasks();
+
+        expect(handover.isSuspended, isTrue);
+        dog.dispose();
+      });
+    });
+
+    test('disabled idle state cannot capture a stale handover start pose', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        enabledCtrl.add(false);
+        async.flushMicrotasks();
+        clearInteractions(arbiter);
+        clearInteractions(joint);
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        bodyHeightCtrl.add(1.0);
+        async.flushMicrotasks();
+        stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
+        async.flushMicrotasks();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Walking(Stream<History>.empty().listen((_) {})));
+        when(
+          () => joint.position,
+        ).thenReturn(JointsMatrix.fromList(List<double>.filled(16, 0.75)));
+        enabledCtrl.add(true);
+        async.flushMicrotasks();
+
+        expect(handover.blocksControllerCommands, isFalse);
+        verifyNever(() => arbiter.command(any(), ControlSource.yunzhuo));
+        verifyNever(() => joint.position);
+        dog.dispose();
+      });
+    });
+
+    test('re-enable outside Walking cancels instead of recapturing', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        enabledCtrl.add(false);
+        async.flushMicrotasks();
+        clearInteractions(joint);
+        enabledCtrl.add(true);
+        async.flushMicrotasks();
+
+        expect(handover.blocksControllerCommands, isFalse);
+        verifyNever(() => joint.position);
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        enabledCtrl.add(false);
+        async.flushMicrotasks();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Grounded(Stream<History>.empty().listen((_) {})));
+        clearInteractions(joint);
+        enabledCtrl.add(true);
+        async.flushMicrotasks();
+
+        expect(handover.blocksControllerCommands, isFalse);
+        verifyNever(() => joint.position);
+        dog.dispose();
+      });
+    });
+
+    test('safety buttons cancel before their command is submitted', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+        final blockedAtSubmission = <String, bool>{};
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        when(
+          () => arbiter.command(
+            any(that: isA<CmdStandUp>()),
+            ControlSource.yunzhuo,
+          ),
+        ).thenAnswer((_) {
+          blockedAtSubmission['L1'] = handover.blocksControllerCommands;
+          return true;
+        });
+        standupCtrl.add(true);
+        async.flushMicrotasks();
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        when(
+          () => arbiter.command(
+            any(that: isA<CmdSitDown>()),
+            ControlSource.yunzhuo,
+          ),
+        ).thenAnswer((_) {
+          blockedAtSubmission['L2'] = handover.blocksControllerCommands;
+          return true;
+        });
+        sitdownCtrl.add(true);
+        async.flushMicrotasks();
+
+        directionCtrl.add(Vector3(0.5, 0, 0));
+        async.flushMicrotasks();
+        when(
+          () => arbiter.command(
+            any(that: isA<CmdSetBodyHeight>()),
+            ControlSource.yunzhuo,
+          ),
+        ).thenAnswer((_) {
+          blockedAtSubmission['R1'] = handover.blocksControllerCommands;
+          return true;
+        });
+        idleCtrl.add(true);
+        async.flushMicrotasks();
+
+        expect(blockedAtSubmission, {'L1': false, 'L2': false, 'R1': false});
+        dog.dispose();
+      });
+    });
+
+    test('body height stays at 0.40 throughout the frozen takeover', () {
+      fakeAsync((async) {
+        stubBodyHeightAxis();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
+        final handover = newHandover();
+        final dog = buildDog(
+          initialProfile: profile(observationType: 'bodyHeight'),
+          bodyHeightHandover: handover,
+        );
+
+        bodyHeightCtrl.add(1.0);
+        async.flushMicrotasks();
+        when(
+          () => arbiter.state,
+        ).thenReturn(Walking(Stream<History>.empty().listen((_) {})));
+        stateCtrl.add(Walking(Stream<History>.empty().listen((_) {})));
+        async.flushMicrotasks();
+        bodyHeightCtrl.add(-1.0);
+        async.flushMicrotasks();
+        async.elapse(const Duration(seconds: 1));
+
+        final commands = verify(
+          () => arbiter.command(
+            captureAny(that: isA<CmdSetBodyHeight>()),
+            ControlSource.yunzhuo,
+          ),
+        ).captured.cast<CmdSetBodyHeight>();
+        expect(commands, hasLength(1));
+        expect(commands.single.meters, 0.40);
+        expect(handover.isRunning, isTrue);
+        dog.dispose();
+      });
     });
   });
 

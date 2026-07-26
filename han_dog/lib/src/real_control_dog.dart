@@ -17,6 +17,7 @@ class RealControlDog {
   final RealJoint joint;
   final Gamepad controller;
   final RobotProfile? initialProfile;
+  final BodyHeightHandover? bodyHeightHandover;
   JointsMatrix inferKp;
   JointsMatrix inferKd;
   JointsMatrix standUpKp;
@@ -36,6 +37,7 @@ class RealControlDog {
   Timer? _bodyHeightTimer;
   double _bodyHeightAxis = 0;
   double? _bodyHeightCommand;
+  bool _motorOutputEnabled;
 
   RealControlDog({
     required this.brain,
@@ -50,9 +52,11 @@ class RealControlDog {
     required this.sitDownKd,
     required this.controller,
     this.initialProfile,
+    this.bodyHeightHandover,
+    bool motorOutputInitiallyEnabled = false,
     this.velocityCommandMin = (-3.0, -3.0, -3.0),
     this.velocityCommandMax = (3.0, 3.0, 3.0),
-  }) {
+  }) : _motorOutputEnabled = motorOutputInitiallyEnabled {
     _validateVelocityBounds(velocityCommandMin, velocityCommandMax);
     _configureBodyHeightControl();
 
@@ -60,11 +64,18 @@ class RealControlDog {
     _subscriptions.add(
       arbiter.stateStream.listen(
         (state) {
+          final handover = bodyHeightHandover;
           switch (state) {
             case Walking():
-              joint.kpExt = inferKp;
-              joint.kdExt = inferKd;
+              if (handover?.isRequested == true) {
+                handover!.begin();
+              }
+              if (handover?.blocksControllerCommands != true) {
+                joint.kpExt = inferKp;
+                joint.kdExt = inferKd;
+              }
             case Transitioning(:final target):
+              _cancelBodyHeightHandover();
               if (target is StandUpCommand) {
                 joint.kpExt = standUpKp;
                 joint.kdExt = standUpKd;
@@ -72,11 +83,17 @@ class RealControlDog {
                 joint.kpExt = sitDownKp;
                 joint.kdExt = sitDownKd;
               }
-            case Standing() || Grounded() || Zero():
-              break;
+            case Standing():
+              if (handover?.blocksControllerCommands == true &&
+                  handover?.isRequested != true) {
+                _cancelBodyHeightHandover();
+              }
+            case Grounded() || Zero():
+              _cancelBodyHeightHandover();
           }
         },
         onError: (Object error, StackTrace st) {
+          _cancelBodyHeightHandover();
           _log.severe('State stream error', error, st);
         },
         onDone: () {
@@ -87,6 +104,7 @@ class RealControlDog {
 
     // 遥控器事件 → 通过仲裁器发送（ControlSource.yunzhuo）
     void onStreamError(Object error, StackTrace st, String name) {
+      _cancelBodyHeightHandover();
       _log.severe('Controller $name stream error', error, st);
       if (!_disposed) {
         arbiter.fault('Controller $name stream error: $error');
@@ -128,11 +146,20 @@ class RealControlDog {
               .clamp(velocityCommandMin.$3, velocityCommandMax.$3)
               .toDouble();
 
+          final handover = bodyHeightHandover;
+          if (handover?.blocksControllerCommands == true) {
+            return;
+          }
+
           if (vx == 0 && vy == 0 && yaw == 0) {
             // 摇杆归零：发 walk(0,0,0) 让策略减速，保持 Walking 状态。
             if (arbiter.state is Walking) {
               sendCommand(A.walk(Vector3.zero()), 'walk(zero)');
             }
+            return;
+          }
+          if (handover != null && arbiter.state is Standing) {
+            _requestBodyHeightHandover();
             return;
           }
           // Keep every physical-controller command inside the policy envelope.
@@ -151,6 +178,7 @@ class RealControlDog {
     _subscriptions.add(
       controller.standup.listen(
         (_) {
+          _cancelBodyHeightHandover();
           _log.info('L1 → standUp');
           sendCommand(const A.standUp(), 'standUp');
         },
@@ -161,6 +189,7 @@ class RealControlDog {
     _subscriptions.add(
       controller.sitdown.listen(
         (_) {
+          _cancelBodyHeightHandover();
           _log.info('L2 → sitDown');
           sendCommand(const A.sitDown(), 'sitDown');
         },
@@ -174,7 +203,19 @@ class RealControlDog {
           _log.info('H enable=$enabled');
           if (enabled) {
             joint.enable();
+            _motorOutputEnabled = true;
+            final handover = bodyHeightHandover;
+            if (handover?.blocksControllerCommands == true) {
+              if (arbiter.state is Walking) {
+                handover!.restartFrom(joint.position);
+              } else {
+                _cancelBodyHeightHandover();
+              }
+            }
           } else {
+            _motorOutputEnabled = false;
+            _bodyHeightAxis = 0;
+            bodyHeightHandover?.suspend();
             joint.disable();
           }
           onMotorEnableChanged?.call(enabled);
@@ -187,7 +228,11 @@ class RealControlDog {
       controller.red.listen(
         (_) {
           _log.info('红键 → disable motors + clear errors');
+          _motorOutputEnabled = false;
+          _bodyHeightAxis = 0;
+          bodyHeightHandover?.suspend();
           joint.disable(clearErrors: true);
+          onMotorEnableChanged?.call(false);
         },
         onError: (Object e, StackTrace st) => onStreamError(e, st, 'red'),
         onDone: () => _log.warning('Controller red stream closed'),
@@ -196,6 +241,8 @@ class RealControlDog {
     _subscriptions.add(
       controller.idle.listen(
         (_) {
+          final canceledPendingWalk = bodyHeightHandover?.isRequested == true;
+          _cancelBodyHeightHandover();
           final profile = initialProfile;
           if (profile?.observationType == 'bodyHeight' &&
               arbiter.state is Standing) {
@@ -209,6 +256,12 @@ class RealControlDog {
               _bodyHeightCommand = profile.bodyHeightCommand;
             } else {
               _log.warning('R1 body-height reset rejected; input preserved');
+            }
+            if (canceledPendingWalk) {
+              sendCommand(
+                const A.standUp(),
+                'standUp after cancelled body-height request(R1)',
+              );
             }
             return;
           }
@@ -266,6 +319,9 @@ class RealControlDog {
   void _configureBodyHeightControl() {
     final profile = initialProfile;
     if (profile?.observationType != 'bodyHeight') return;
+    if (bodyHeightHandover == null) {
+      throw ArgumentError.notNull('bodyHeightHandover');
+    }
 
     final defaultHeight = profile!.bodyHeightCommand;
     final minHeight = profile.minBodyHeightCommand;
@@ -281,25 +337,40 @@ class RealControlDog {
         'the default command',
       );
     }
-    final bodyHeightController = controller;
-    if (bodyHeightController is! BodyHeightAxisInput) {
+    if (controller is! BodyHeightAxisInput) {
       throw ArgumentError.value(
         controller,
         'controller',
         'must implement BodyHeightAxisInput for a body-height profile',
       );
     }
+    final bodyHeightController = controller as BodyHeightAxisInput;
 
     _bodyHeightCommand = defaultHeight;
     _subscriptions.add(
       bodyHeightController.bodyHeightAxis.listen(
         (axis) {
+          final handover = bodyHeightHandover!;
+          if (handover.blocksControllerCommands) {
+            _bodyHeightAxis = 0;
+            return;
+          }
           if (!axis.isFinite) {
             _bodyHeightAxis = 0;
             _log.warning('Non-finite body-height axis ignored');
             return;
           }
           final normalized = axis.abs() < 0.10 ? 0.0 : axis.clamp(-1.0, 1.0);
+          final state = arbiter.state;
+          if (state is! Walking && state is! Standing) {
+            _bodyHeightAxis = 0;
+            return;
+          }
+          if (normalized != 0 && state is Standing) {
+            _bodyHeightAxis = 0;
+            _requestBodyHeightHandover();
+            return;
+          }
           if (_bodyHeightAxis == 0 && normalized != 0) {
             final appliedHeight = brain.bodyHeightCommand;
             if (appliedHeight.isFinite) {
@@ -312,12 +383,10 @@ class RealControlDog {
               );
             }
           }
-          if (normalized != 0 && arbiter.state is Standing) {
-            arbiter.command(A.walk(Vector3.zero()), ControlSource.yunzhuo);
-          }
           _bodyHeightAxis = normalized.toDouble();
         },
         onError: (Object error, StackTrace st) {
+          _cancelBodyHeightHandover();
           _log.severe('Controller bodyHeightAxis stream error', error, st);
           if (!_disposed) {
             arbiter.fault('Controller bodyHeightAxis stream error: $error');
@@ -327,6 +396,10 @@ class RealControlDog {
       ),
     );
     _bodyHeightTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
+      if (bodyHeightHandover!.blocksControllerCommands) {
+        _bodyHeightAxis = 0;
+        return;
+      }
       if (_bodyHeightAxis == 0 || _disposed || arbiter.state is! Walking) {
         return;
       }
@@ -341,6 +414,56 @@ class RealControlDog {
         _bodyHeightCommand = next;
       }
     });
+  }
+
+  bool _requestBodyHeightHandover() {
+    final profile = initialProfile;
+    final handover = bodyHeightHandover;
+    if (profile?.observationType != 'bodyHeight' || handover == null) {
+      return false;
+    }
+    if (!_motorOutputEnabled) {
+      _bodyHeightAxis = 0;
+      _log.fine('Body-height handover ignored while motor output is disabled');
+      return false;
+    }
+    if (handover.blocksControllerCommands) return false;
+
+    final defaultHeight = profile!.bodyHeightCommand;
+    final heightAccepted = arbiter.command(
+      A.setBodyHeight(defaultHeight),
+      ControlSource.yunzhuo,
+    );
+    if (!heightAccepted) {
+      _log.warning(
+        'YUNZHUO reset body height before handover rejected — '
+        'arbiter owner: ${arbiter.owner}',
+      );
+      handover.cancel();
+      return false;
+    }
+
+    _bodyHeightCommand = defaultHeight;
+    _bodyHeightAxis = 0;
+    handover.requestFrom(joint.position);
+    final walkAccepted = arbiter.command(
+      A.walk(Vector3.zero()),
+      ControlSource.yunzhuo,
+    );
+    if (!walkAccepted) {
+      _log.warning(
+        'YUNZHUO walk(zero) before handover rejected — '
+        'arbiter owner: ${arbiter.owner}',
+      );
+      handover.cancel();
+      return false;
+    }
+    return true;
+  }
+
+  void _cancelBodyHeightHandover() {
+    _bodyHeightAxis = 0;
+    bodyHeightHandover?.cancel();
   }
 
   /// 切换策略时更新全部增益参数。
@@ -395,6 +518,7 @@ class RealControlDog {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _cancelBodyHeightHandover();
     _bodyHeightTimer?.cancel();
     _bodyHeightTimer = null;
     for (final sub in _subscriptions) {
