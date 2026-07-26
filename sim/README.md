@@ -28,13 +28,15 @@ sim/
 
 ```bash
 cd brainstem
-python sim/scripts/walk_ref.py --profile han_dog/profiles/thunder_h15.json --height 0.32 --vx 0.3 --duration 10
+python sim/scripts/walk_ref.py --profile han_dog/profiles/thunder_h15.json --height 0.40 --vx 0.3 --duration 10
 ```
 
-`walk_ref.py` reads observation type, command limits, standing pose, action
-scale, PD gains, and model path from one RobotProfile JSON. Relative model
-paths resolve from the repository root; `--model` overrides that path.
-Commands are finite-checked and clamped to the profile ranges.
+`walk_ref.py` reads the physical `standUpPose`, policy
+`policyDefaultPose`, observation type, command limits, action scale, PD gains,
+and model path from one RobotProfile JSON. Legacy profiles fall back to
+`standingPose` for both pose roles. Relative model paths resolve from the
+repository root; `--model` overrides that path. Commands are finite-checked
+and clamped to the profile ranges.
 
 `bodyHeight` uses an exact 58-value frame; legacy `standard` remains 57.
 The ONNX input dimension automatically selects H15 (58) or H18 (580, ten
@@ -55,7 +57,7 @@ dart run han_dog/bin/server.dart
 # 终端 2: 跑仿真
 python sim/scripts/walk_grpc.py \
   --profile han_dog/profiles/thunder_h15.json \
-  --height 0.32 --vx 0.3 --duration 5
+  --height 0.40 --vx 0.3 --duration 5
 # Use thunder_h18.json when MEDULLA_DEFAULT_PROFILE=thunder_h18.
 ```
 

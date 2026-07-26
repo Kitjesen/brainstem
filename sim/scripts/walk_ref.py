@@ -24,6 +24,8 @@ class Profile(NamedTuple):
     velocity_min: np.ndarray
     velocity_max: np.ndarray
     standing_pose: np.ndarray
+    stand_up_pose: np.ndarray
+    policy_default_pose: np.ndarray
     action_scale: np.ndarray
     infer_kp: np.ndarray
     infer_kd: np.ndarray
@@ -67,11 +69,28 @@ def parse_profile(raw, repo_root=REPO_ROOT):
     model_path = Path(raw["modelPath"])
     if not model_path.is_absolute():
         model_path = Path(repo_root) / model_path
-    return Profile(observation_type, height, min_height, max_height, velocity_min,
-                   velocity_max, _vector(raw["standingPose"], "standingPose", 16),
-                   _vector(raw["actionScale"], "actionScale", 4),
-                   _vector(raw["inferKp"], "inferKp", 16),
-                   _vector(raw["inferKd"], "inferKd", 16), model_path.resolve())
+    standing_pose = _vector(raw["standingPose"], "standingPose", 16)
+    stand_up_pose = _vector(
+        raw.get("standUpPose", standing_pose), "standUpPose", 16
+    )
+    policy_default_pose = _vector(
+        raw.get("policyDefaultPose", standing_pose), "policyDefaultPose", 16
+    )
+    return Profile(
+        observation_type=observation_type,
+        body_height_command=height,
+        min_body_height_command=min_height,
+        max_body_height_command=max_height,
+        velocity_min=velocity_min,
+        velocity_max=velocity_max,
+        standing_pose=standing_pose,
+        stand_up_pose=stand_up_pose,
+        policy_default_pose=policy_default_pose,
+        action_scale=_vector(raw["actionScale"], "actionScale", 4),
+        infer_kp=_vector(raw["inferKp"], "inferKp", 16),
+        infer_kd=_vector(raw["inferKd"], "inferKd", 16),
+        model_path=model_path.resolve(),
+    )
 
 def load_profile(path, repo_root=REPO_ROOT):
     with Path(path).open(encoding="utf-8") as stream:
@@ -129,10 +148,15 @@ def validate_step(state, action, trunk_height, min_trunk_height):
     if trunk_height < min_trunk_height:
         raise RuntimeError(f"robot fallen: trunk height {trunk_height:.3f} < {min_trunk_height:.3f}")
 
-def get_obs(data, velocity_command, last_action, profile, height):
-    q = data.qpos[DOF_IDS].astype(np.float64) - profile.standing_pose
-    dq = data.qvel[DOF_VEL].astype(np.float64) * 0.05
+def relative_joint_position(joint_position, profile):
+    q = _vector(joint_position, "jointPosition", 16) - profile.policy_default_pose
     q[-4:] = 0.0
+    return q
+
+
+def get_obs(data, velocity_command, last_action, profile, height):
+    q = relative_joint_position(data.qpos[DOF_IDS], profile)
+    dq = data.qvel[DOF_VEL].astype(np.float64) * 0.05
     imu_quat = data.sensor("orientation").data[[1,2,3,0]].astype(np.float64)
     imu_rotation = R.from_quat(imu_quat)
     gravity = imu_rotation.apply(np.array([0.,0.,-1.]), inverse=True)
@@ -155,6 +179,11 @@ def _scaled_action(action, scales):
         scaled[index:index+3] = action[index:index+3] * scales[:3]
     scaled[12:] = action[12:] * scales[3]
     return scaled
+
+
+def policy_target(action, profile):
+    action = _vector(action, "policyAction", 16)
+    return profile.policy_default_pose + _scaled_action(action, profile.action_scale)
 
 def run(args):
     profile = load_profile(args.profile, REPO_ROOT)
@@ -179,10 +208,10 @@ def run(args):
     print(f"Command: height={height:.3f}, velocity=({vx:.3f}, {vy:.3f}, {vyaw:.3f})")
     data.qpos[:3] = [0.,0.,0.5]
     data.qpos[3:7] = [1.,0.,0.,0.]
-    data.qpos[DOF_IDS] = profile.standing_pose
+    data.qpos[DOF_IDS] = profile.stand_up_pose
     data.qvel[:] = 0.
     mujoco.mj_forward(model, data)
-    target = profile.standing_pose.copy()
+    target = profile.stand_up_pose.copy()
     action = np.zeros(16, dtype=np.float32)
     last_action = np.zeros(16, dtype=np.float32)
     history = initialize_history(get_obs(data, velocity_command, last_action, profile, height), history_size)
@@ -214,7 +243,7 @@ def run(args):
                 max_action_seen = max(max_action_seen, float(np.max(np.abs(action))))
                 last_action = action.copy()
                 if step > 100:
-                    target = profile.standing_pose + _scaled_action(action, profile.action_scale)
+                    target = policy_target(action, profile)
             q, dq = data.qpos[DOF_IDS], data.qvel[DOF_VEL]
             leg_tau = profile.infer_kp[:12] * (target[:12]-q[:12]) - profile.infer_kd[:12]*dq[:12]
             wheel_tau = profile.infer_kp[12:] * (target[12:]-q[12:]) + profile.infer_kd[12:] * (target[12:]-dq[12:])

@@ -25,6 +25,8 @@ def profile_dict(**overrides):
         "velocityCommandMin": [-2.5, -1.0, -1.0],
         "velocityCommandMax": [2.5, 1.0, 1.0],
         "standingPose": list(range(16)),
+        "standUpPose": [100.0 + value for value in range(16)],
+        "policyDefaultPose": [200.0 + value for value in range(16)],
         "actionScale": [0.125, 0.25, 0.25, 5.0],
         "inferKp": [100.0] * 16,
         "inferKd": [15.0] * 16,
@@ -43,6 +45,23 @@ class ProfileContractTest(unittest.TestCase):
         self.assertEqual(profile.observation_type, "bodyHeight")
         self.assertEqual(profile.frame_dim, 58)
         self.assertEqual(profile.model_path, REPO_ROOT / "model" / "policy.onnx")
+        np.testing.assert_array_equal(profile.standing_pose, np.arange(16))
+        np.testing.assert_array_equal(profile.stand_up_pose, np.arange(16) + 100.0)
+        np.testing.assert_array_equal(
+            profile.policy_default_pose, np.arange(16) + 200.0
+        )
+
+    def test_legacy_pose_feeds_both_explicit_roles(self):
+        raw = profile_dict()
+        del raw["standUpPose"]
+        del raw["policyDefaultPose"]
+
+        profile = walk_ref.parse_profile(raw, REPO_ROOT)
+
+        np.testing.assert_array_equal(profile.stand_up_pose, profile.standing_pose)
+        np.testing.assert_array_equal(
+            profile.policy_default_pose, profile.standing_pose
+        )
 
     def test_standard_profile_keeps_57_dimension(self):
         profile = walk_ref.parse_profile(
@@ -66,9 +85,27 @@ class ProfileContractTest(unittest.TestCase):
     def test_invalid_profile_vector_length_fails(self):
         with self.assertRaisesRegex(ValueError, "standingPose"):
             walk_ref.parse_profile(profile_dict(standingPose=[0.0] * 15), REPO_ROOT)
+        with self.assertRaisesRegex(ValueError, "standUpPose"):
+            walk_ref.parse_profile(profile_dict(standUpPose=[0.0] * 15), REPO_ROOT)
+        with self.assertRaisesRegex(ValueError, "policyDefaultPose"):
+            walk_ref.parse_profile(
+                profile_dict(policyDefaultPose=[0.0] * 15), REPO_ROOT
+            )
 
 
 class ObservationContractTest(unittest.TestCase):
+    def test_policy_zero_drives_observation_and_action_target(self):
+        profile = walk_ref.parse_profile(profile_dict(), REPO_ROOT)
+        measured = profile.policy_default_pose + 0.25
+
+        relative = walk_ref.relative_joint_position(measured, profile)
+        target = walk_ref.policy_target(np.zeros(16), profile)
+
+        np.testing.assert_allclose(relative[:12], np.full(12, 0.25))
+        np.testing.assert_array_equal(relative[12:], np.zeros(4))
+        np.testing.assert_array_equal(target, profile.policy_default_pose)
+        self.assertFalse(np.array_equal(target, profile.stand_up_pose))
+
     def test_body_height_is_raw_final_scalar(self):
         groups = [
             np.arange(3),

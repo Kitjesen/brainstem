@@ -56,7 +56,7 @@ dart run han_dog/bin/server.dart
 H18 uses the same command with `MEDULLA_DEFAULT_PROFILE=thunder_h18`. In another terminal:
 
 ```bash
-python sim/scripts/walk_grpc.py --profile han_dog/profiles/thunder_h15.json --height 0.32 --vx 0.3 --duration 5
+python sim/scripts/walk_grpc.py --profile han_dog/profiles/thunder_h15.json --height 0.40 --vx 0.3 --duration 5
 ```
 
 The validation run on 2026-07-22 completed the full `Grounded -> StandUp -> SetBodyHeight -> Walk -> Tick -> Dart ONNX -> MuJoCo PD` chain:
@@ -75,7 +75,7 @@ No unattended or remote motor motion is part of automated validation. Complete e
 3. Assign a second operator to the physical emergency stop. Confirm that disable cuts motor output before any policy command.
 4. With motor output disabled, inspect all 16 reported joint positions and signs against the order `FR, FL, RR, RL`, each as `hip, thigh, calf`, followed by four wheels.
 5. Confirm IMU projected gravity is approximately `[0, 0, -1]` while level and that sensor/control frequency is stable at 50 Hz.
-6. Enable only while supported, command zero velocity at `0.35 m`, and stop immediately on a sign/order mismatch, non-finite value, unexpected motion, lost sensor reporting, or joint-limit/fault event.
+6. Before enabling, verify telemetry reports the expected `0.40 m` current/target height. Enable only while supported, command zero velocity at `0.40 m`, and stop immediately on a sign/order mismatch, non-finite value, unexpected motion, lost sensor reporting, or joint-limit/fault event.
 7. Exercise height only in a narrow `0.30..0.40 m` window, then forward velocity no higher than `0.1 m/s`. Expand toward the training envelope only after reviewing logs and measured tracking.
 8. Repeat separately for H15 and H18, restarting the process between profiles. Save logs, selected profile, model hash, and abort/accept result.
 
@@ -119,7 +119,7 @@ The direct robot endpoint is the default:
 
 ```powershell
 python scripts/bodyheight_grpc.py status
-python scripts/bodyheight_grpc.py set-height 0.32
+python scripts/bodyheight_grpc.py set-height 0.40
 python scripts/bodyheight_grpc.py set-velocity --vx 0.1
 ```
 
@@ -135,8 +135,10 @@ The robot service still listens on `13145`; `13146` is only the chosen local
 tunnel port.
 
 `set-height` requires an explicit target. If it is not called, both policies
-start with the profile default `0.35 m`. For `set-velocity`, at least one axis
-must be present; omitted axes default to zero:
+start with the profile default `0.40 m`. Before the first motor enable, confirm
+that status/history telemetry reports the expected current and target height.
+For `set-velocity`, at least one axis must be present; omitted axes default to
+zero:
 
 ```powershell
 python scripts/bodyheight_grpc.py set-velocity --vx 0.1

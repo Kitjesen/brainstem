@@ -22,7 +22,21 @@
     },
     "standingPose": {
       "type": "array",
-      "description": "站立姿态关节角度 (rad)，16 个值，顺序: FR髋腿膝足 FL髋腿膝足 RR髋腿膝足 RL髋腿膝足。",
+      "description": "兼容站姿字段，16 个关节角度 (rad)。缺少 standUpPose 或 policyDefaultPose 时分别回退到此值。顺序: FR髋腿膝足 FL髋腿膝足 RR髋腿膝足 RL髋腿膝足。",
+      "items": { "type": "number" },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "standUpPose": {
+      "type": "array",
+      "description": "可选物理站姿，供 StandUp、R1/L1 和 gesture 使用；缺失时回退到 standingPose。",
+      "items": { "type": "number" },
+      "minItems": 16,
+      "maxItems": 16
+    },
+    "policyDefaultPose": {
+      "type": "array",
+      "description": "可选策略训练零点，供 observation 和 ONNX action 反归一化使用；缺失时回退到 standingPose。",
       "items": { "type": "number" },
       "minItems": 16,
       "maxItems": 16
@@ -102,7 +116,7 @@
     },
     "actionScale": {
       "type": "array",
-      "description": "动作缩放系数，4 个值。target = action_output * actionScale + standingPose。",
+      "description": "动作缩放系数，4 个值。target = action_output * actionScale + policyDefaultPose。",
       "items": { "type": "number" },
       "minItems": 4,
       "maxItems": 4

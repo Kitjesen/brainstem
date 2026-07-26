@@ -1149,12 +1149,15 @@ sitting_pose = [0, 0, 0, 0,   # FR
 \texttt{actionScale} 是 RL 策略输出到实际弧度的缩放系数。策略输出值经过以下变换得到目标关节角度：
 
 \[
-q_{\text{target}} = \text{action\_output} \times \text{actionScale} + \text{standingPose}
+q_{\text{target}} = \text{action\_output} \times \text{actionScale} + \text{policyDefaultPose}
 \]
 
 \subsection{站立姿态}
 
-站立姿态（Standing Pose）是机器狗正常直立时所有关节的目标角度。站起过程会从坐姿线性插值到站立姿态，约 3 秒完成。站立姿态和 PD 增益参数均通过 Profile JSON 文件配置，用户可以根据自己的需要调整。
+Profile 使用 \texttt{standUpPose} 作为站起、回站和 gesture 的物理目标，使用
+\texttt{policyDefaultPose} 作为 observation 和策略动作反归一化的训练零点。
+兼容字段 \texttt{standingPose} 在任一显式字段缺失时作为其回退值。站起过程会从
+坐姿线性插值到物理站姿，约 3 秒完成。
 
 \subsection{PD 控制接口}
 
@@ -1309,14 +1312,14 @@ Walking & \texttt{sit\_down()} & 先 StandUp 再 SitDown & Grounded \\
 触发 & \texttt{dog.stand\_up()} \\
 中间状态 & Transitioning (StandUp) \\
 耗时 & 150 ticks $\times$ 20ms = \textbf{3 秒} \\
-过程 & 从当前姿态线性插值到 standingPose \\
+过程 & 从当前姿态线性插值到 standUpPose \\
 PD 参数 & 由 Profile 配置决定（过渡阶段使用较高刚度，确保平稳） \\
 \bottomrule
 \end{longtable}
 
 站起过程是一段 150 帧的线性插值动画：
 
-站起过程分为 150 帧，按线性插值平滑过渡：第 0 帧为当前坐姿（sittingPose），第 75 帧为中间过渡态（50\% 位置），第 150 帧为完全站立姿态（standingPose）。
+站起过程分为 150 帧，按线性插值平滑过渡：第 0 帧为当前坐姿（sittingPose），第 75 帧为中间过渡态（50\% 位置），第 150 帧为完全物理站立姿态（standUpPose）。
 
 \subsection{Standing $\to$ Walking（开始行走）}
 
@@ -1358,7 +1361,7 @@ PD 参数 & 由 Profile 配置决定（过渡阶段使用较高刚度，确保�
 \midrule
 \endhead
 触发 & \texttt{dog.walk()} 无参数，或发送全零后超时自动触发 Idle \\
-中间状态 & Transitioning (StandUp)，从当前行走姿态插值到 standingPose \\
+中间状态 & Transitioning (StandUp)，从当前行走姿态插值到 standUpPose \\
 耗时 & \textasciitilde 3 秒 \\
 \bottomrule
 \end{longtable}
@@ -1375,7 +1378,7 @@ PD 参数 & 由 Profile 配置决定（过渡阶段使用较高刚度，确保�
 触发 & \texttt{dog.sit\_down()} \\
 中间状态 & Transitioning (SitDown) \\
 耗时 & 150 ticks $\times$ 20ms = \textbf{3 秒} \\
-过程 & 从 standingPose 线性插值到 sittingPose (全零) \\
+过程 & 从 standUpPose 线性插值到 sittingPose (全零) \\
 \bottomrule
 \end{longtable}
 
@@ -1984,6 +1987,8 @@ Profile 是 JSON 文件，存放在机器狗的 \texttt{profiles/} 目录下。�
   "description": "自定义策略",
   "modelPath": "model/my_policy.onnx",
   "standingPose": [0.0, -0.65, 1.5, 0.0, ...],
+  "standUpPose": [0.0, -0.65, 1.5, 0.0, ...],
+  "policyDefaultPose": [0.0, -0.65, 1.5, 0.0, ...],
   "sittingPose": [0.0, 0.0, 0.0, 0.0, ...],
   "inferKp": [...], "inferKd": [...],
   "standUpKp": [...], "standUpKd": [...],
