@@ -392,6 +392,53 @@ void main() {
     expect(brain.bodyHeightCommand, 0.54);
   });
 
+  test('Brain keeps physical stand pose separate from policy default', () {
+    final physicalStand = JointsMatrix.fromList(List.filled(16, 0.4));
+    final policyDefault = JointsMatrix.fromList(List.filled(16, -0.7));
+    final observationBuilder = BodyHeightObservationBuilder(
+      standingPose: policyDefault,
+    );
+    final brain = Brain(
+      imu: imu,
+      joint: joint,
+      clock: clock,
+      standingPose: physicalStand,
+      sittingPose: JointsMatrix.zero(),
+      observationBuilder: observationBuilder,
+    );
+    addTearDown(brain.dispose);
+
+    expect(brain.standUp.standingPose.values, physicalStand.values);
+    expect(
+      brain.walk.observationBuilder.standingPose.values,
+      policyDefault.values,
+    );
+    expect(brain.standingPose.values, physicalStand.values);
+  });
+
+  test('Brain.shareMemory falls back to the observation builder pose', () {
+    final policyDefault = JointsMatrix.fromList(List.filled(16, -0.7));
+    final observationBuilder = BodyHeightObservationBuilder(
+      standingPose: policyDefault,
+    );
+
+    final brain = Brain.shareMemory(
+      historySize: 1,
+      imu: imu,
+      joint: joint,
+      clock: clock,
+      standUpCounts: 1,
+      sitDownCounts: 1,
+      observationBuilder: observationBuilder,
+      sittingPose: JointsMatrix.zero(),
+      memory: memory,
+      bodyHeightCommandProvider: () => 0.35,
+    );
+
+    expect(brain.standUp.standingPose.values, policyDefault.values);
+    expect(brain.standingPose.values, policyDefault.values);
+  });
+
   test(
     'Brain keeps idle and transition height history on the active target',
     () {

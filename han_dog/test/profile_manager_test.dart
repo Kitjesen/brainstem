@@ -26,10 +26,16 @@ RobotProfile _profile(
   JointsMatrix kp,
   JointsMatrix kd, {
   String observationType = 'standard',
+  JointsMatrix? standUpPose,
+  JointsMatrix? policyDefaultPose,
+  (double, double, double)? velocityCommandMin,
+  (double, double, double)? velocityCommandMax,
 }) => RobotProfile(
   name: name,
   modelPath: 'model/$name.onnx',
   standingPose: pose,
+  standUpPose: standUpPose,
+  policyDefaultPose: policyDefaultPose,
   sittingPose: JointsMatrix.zero(),
   inferKp: kp,
   inferKd: kd,
@@ -41,6 +47,8 @@ RobotProfile _profile(
   bodyHeightCommand: observationType == 'bodyHeight' ? 0.40 : 0.35,
   minBodyHeightCommand: 0.20,
   maxBodyHeightCommand: 0.54,
+  velocityCommandMin: velocityCommandMin ?? (-3.0, -3.0, -3.0),
+  velocityCommandMax: velocityCommandMax ?? (3.0, 3.0, 3.0),
 );
 
 void main() {
@@ -143,6 +151,49 @@ void main() {
         maxBodyHeightCommand: 0.54,
       ),
     ).called(1);
+  });
+
+  test('switchTo routes physical and policy poses separately', () async {
+    final physicalStand = JointsMatrix.fromList(List.filled(16, 0.4));
+    final policyDefault = JointsMatrix.fromList(List.filled(16, -0.7));
+    final beta = _profile(
+      'beta',
+      _pose2,
+      _kp2,
+      _kd2,
+      standUpPose: physicalStand,
+      policyDefaultPose: policyDefault,
+    );
+    final pm = ProfileManager(
+      profiles: {...profiles, 'beta': beta},
+      brain: brain,
+      initial: 'alpha',
+    );
+
+    await pm.switchTo('beta');
+
+    final capturedBuilders = verify(
+      () => brain.switchProfile(
+        observationBuilder: captureAny(named: 'observationBuilder'),
+        standingPose: physicalStand,
+        sittingPose: any(named: 'sittingPose'),
+        modelPath: any(named: 'modelPath'),
+        standUpCounts: any(named: 'standUpCounts'),
+        sitDownCounts: any(named: 'sitDownCounts'),
+        inputName: any(named: 'inputName'),
+        bodyHeightCommand: any(named: 'bodyHeightCommand'),
+        minBodyHeightCommand: any(named: 'minBodyHeightCommand'),
+        maxBodyHeightCommand: any(named: 'maxBodyHeightCommand'),
+      ),
+    ).captured;
+    final builder = capturedBuilders.single as ObservationBuilder;
+    expect(builder.standingPose.values, policyDefault.values);
+
+    final capturedLibraries = verify(
+      () => brain.gestureLibrary = captureAny(),
+    ).captured;
+    final library = capturedLibraries.single as GestureLibrary;
+    expect(library.standingPose.values, physicalStand.values);
   });
 
   test('switchTo updates GainManager gains', () async {
@@ -405,6 +456,129 @@ void main() {
       ).called(1);
     },
   );
+
+  test('gain failure transactionally restores the previous profile', () async {
+    final previousPhysical = JointsMatrix.fromList(List.filled(16, 0.4));
+    final previousPolicy = JointsMatrix.fromList(List.filled(16, -0.7));
+    final nextPhysical = JointsMatrix.fromList(List.filled(16, 0.5));
+    final nextPolicy = JointsMatrix.fromList(List.filled(16, -0.6));
+    final previousLibrary = GestureLibrary(standingPose: previousPhysical)
+      ..registerDefaults();
+    when(() => brain.gestureLibrary).thenReturn(previousLibrary);
+    var gainSwitches = 0;
+    when(
+      () => gains.switchGains(
+        inferKp: any(named: 'inferKp'),
+        inferKd: any(named: 'inferKd'),
+        standUpKp: any(named: 'standUpKp'),
+        standUpKd: any(named: 'standUpKd'),
+        sitDownKp: any(named: 'sitDownKp'),
+        sitDownKd: any(named: 'sitDownKd'),
+      ),
+    ).thenAnswer((_) {
+      gainSwitches++;
+      if (gainSwitches == 1) throw Exception('gain switch failed');
+    });
+    var faulted = false;
+    final pm = ProfileManager(
+      profiles: {
+        'alpha': _profile(
+          'alpha',
+          _pose1,
+          _kp1,
+          _kd1,
+          standUpPose: previousPhysical,
+          policyDefaultPose: previousPolicy,
+          velocityCommandMin: (-1.0, -2.0, -3.0),
+          velocityCommandMax: (1.0, 2.0, 3.0),
+        ),
+        'beta': _profile(
+          'beta',
+          _pose2,
+          _kp2,
+          _kd2,
+          standUpPose: nextPhysical,
+          policyDefaultPose: nextPolicy,
+          velocityCommandMin: (-4.0, -5.0, -6.0),
+          velocityCommandMax: (4.0, 5.0, 6.0),
+        ),
+      },
+      brain: brain,
+      gains: gains,
+      controlDog: controlDog,
+      onFault: (_) => faulted = true,
+      initial: 'alpha',
+    );
+
+    await expectLater(() => pm.switchTo('beta'), throwsException);
+
+    final targetBuilders = verify(
+      () => brain.switchProfile(
+        observationBuilder: captureAny(named: 'observationBuilder'),
+        standingPose: nextPhysical,
+        sittingPose: any(named: 'sittingPose'),
+        modelPath: 'model/beta.onnx',
+        standUpCounts: any(named: 'standUpCounts'),
+        sitDownCounts: any(named: 'sitDownCounts'),
+        inputName: any(named: 'inputName'),
+        bodyHeightCommand: any(named: 'bodyHeightCommand'),
+        minBodyHeightCommand: any(named: 'minBodyHeightCommand'),
+        maxBodyHeightCommand: any(named: 'maxBodyHeightCommand'),
+      ),
+    ).captured;
+    final previousBuilders = verify(
+      () => brain.switchProfile(
+        observationBuilder: captureAny(named: 'observationBuilder'),
+        standingPose: previousPhysical,
+        sittingPose: any(named: 'sittingPose'),
+        modelPath: 'model/alpha.onnx',
+        standUpCounts: any(named: 'standUpCounts'),
+        sitDownCounts: any(named: 'sitDownCounts'),
+        inputName: any(named: 'inputName'),
+        bodyHeightCommand: any(named: 'bodyHeightCommand'),
+        minBodyHeightCommand: any(named: 'minBodyHeightCommand'),
+        maxBodyHeightCommand: any(named: 'maxBodyHeightCommand'),
+      ),
+    ).captured;
+    expect(targetBuilders, hasLength(1));
+    expect(
+      (targetBuilders.single as ObservationBuilder).standingPose.values,
+      nextPolicy.values,
+    );
+    expect(previousBuilders, hasLength(1));
+    expect(
+      (previousBuilders.single as ObservationBuilder).standingPose.values,
+      previousPolicy.values,
+    );
+
+    verify(
+      () => gains.switchGains(
+        inferKp: _kp1,
+        inferKd: _kd1,
+        standUpKp: _kp1,
+        standUpKd: _kd1,
+        sitDownKp: _kp1,
+        sitDownKd: _kd1,
+      ),
+    ).called(1);
+    verify(
+      () => controlDog.switchVelocityBounds(
+        velocityCommandMin: (-1.0, -2.0, -3.0),
+        velocityCommandMax: (1.0, 2.0, 3.0),
+      ),
+    ).called(1);
+    final capturedLibraries = verify(
+      () => brain.gestureLibrary = captureAny(),
+    ).captured;
+    expect(capturedLibraries, hasLength(2));
+    expect(
+      (capturedLibraries.first as GestureLibrary).standingPose.values,
+      nextPhysical.values,
+    );
+    expect(identical(capturedLibraries.last, previousLibrary), isTrue);
+    expect(faulted, isFalse);
+    expect(pm.currentName, 'alpha');
+  });
 
   test('switchTo while already switching throws StateError', () async {
     // brain.switchProfile hangs until we release the completer

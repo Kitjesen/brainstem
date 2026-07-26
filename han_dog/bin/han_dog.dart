@@ -142,7 +142,7 @@ Future<void> _run() async {
     imu: imu,
     joint: joint,
     clock: clock,
-    standingPose: defaultProfile.standingPose,
+    standingPose: defaultProfile.standUpPose,
     observationBuilder: defaultProfile.toObservationBuilder(),
     bodyHeightCommand: defaultProfile.bodyHeightCommand,
     minBodyHeightCommand: defaultProfile.minBodyHeightCommand,

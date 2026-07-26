@@ -74,37 +74,22 @@ class ProfileManager {
     }
     final prevName = _current;
     final prevProfile = _profiles[prevName]!;
+    final prevGestureLibrary = brain.gestureLibrary;
+    var brainSwitched = false;
     _log.info('Switching profile: $prevName → $name');
 
     _switching = true;
     try {
       // 1. Brain：替换行为 + 加载模型
-      await brain.switchProfile(
-        observationBuilder: p.toObservationBuilder(),
-        standingPose: p.standingPose,
-        sittingPose: p.sittingPose,
-        modelPath: p.modelPath,
-        inputName: p.inputName,
-        bodyHeightCommand: p.bodyHeightCommand,
-        minBodyHeightCommand: p.minBodyHeightCommand,
-        maxBodyHeightCommand: p.maxBodyHeightCommand,
-        standUpCounts: p.standUpCounts,
-        sitDownCounts: p.sitDownCounts,
-      );
+      await _switchBrain(p);
+      brainSwitched = true;
 
-      // 2. GestureLibrary（保存旧值以便回滚）
-      final prevGestureLibrary = brain.gestureLibrary;
-      brain.gestureLibrary = GestureLibrary(standingPose: p.standingPose)
+      // 2. GestureLibrary
+      brain.gestureLibrary = GestureLibrary(standingPose: p.standUpPose)
         ..registerDefaults();
 
       // 3. GainManager（gRPC 服务用）
-      try {
-        _switchGains(p);
-      } catch (_) {
-        // 增益切换失败：回滚 GestureLibrary 到切换前的状态
-        brain.gestureLibrary = prevGestureLibrary;
-        rethrow;
-      }
+      _switchGains(p);
 
       _current = name;
       _log.info('Switched to profile: $name (model=${p.modelPath})');
@@ -115,10 +100,11 @@ class ProfileManager {
         st,
       );
       try {
+        if (brainSwitched) {
+          await _switchBrain(prevProfile);
+        }
         _switchGains(prevProfile);
-        brain.gestureLibrary = GestureLibrary(
-          standingPose: prevProfile.standingPose,
-        )..registerDefaults();
+        brain.gestureLibrary = prevGestureLibrary;
         _log.info('Rollback to "$prevName" succeeded');
       } catch (rollbackE, rollbackSt) {
         // Rollback failed: gains and gestureLibrary may be in an
@@ -140,6 +126,19 @@ class ProfileManager {
       _switching = false;
     }
   }
+
+  Future<void> _switchBrain(RobotProfile p) => brain.switchProfile(
+    observationBuilder: p.toObservationBuilder(),
+    standingPose: p.standUpPose,
+    sittingPose: p.sittingPose,
+    modelPath: p.modelPath,
+    inputName: p.inputName,
+    bodyHeightCommand: p.bodyHeightCommand,
+    minBodyHeightCommand: p.minBodyHeightCommand,
+    maxBodyHeightCommand: p.maxBodyHeightCommand,
+    standUpCounts: p.standUpCounts,
+    sitDownCounts: p.sitDownCounts,
+  );
 
   void _switchGains(RobotProfile p) {
     gains?.switchGains(

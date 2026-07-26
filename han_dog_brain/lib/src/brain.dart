@@ -14,7 +14,7 @@ class Brain {
   final ImuService imu;
   final JointService joint;
   final double Function() _bodyHeightCommandProvider;
-  JointsMatrix get standingPose => walk.observationBuilder.standingPose;
+  JointsMatrix get standingPose => standUp.standingPose;
   double get bodyHeightCommand => walk.bodyHeightCommand;
   set bodyHeightCommand(double value) {
     walk.bodyHeightCommand = value;
@@ -38,6 +38,7 @@ class Brain {
     required int standUpCounts,
     required int sitDownCounts,
     required ObservationBuilder observationBuilder,
+    JointsMatrix? standingPose,
     required JointsMatrix sittingPose,
     required this.memory,
     required double Function() bodyHeightCommandProvider,
@@ -67,7 +68,7 @@ class Brain {
          joint: joint,
          memory: memory,
          bodyHeightCommandProvider: bodyHeightCommandProvider,
-         standingPose: observationBuilder.standingPose,
+         standingPose: standingPose ?? observationBuilder.standingPose,
          counts: standUpCounts,
        ),
        walk = .new(
@@ -128,6 +129,7 @@ class Brain {
       bodyHeightCommandProvider: currentBodyHeightCommand,
       sitDownCounts: sitDownCounts,
       observationBuilder: builder,
+      standingPose: standingPose,
       sittingPose: sittingPose,
       bodyHeightCommand: safeBodyHeightCommand,
       minBodyHeightCommand: minBodyHeightCommand,

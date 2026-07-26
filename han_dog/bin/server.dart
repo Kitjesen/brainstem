@@ -84,7 +84,7 @@ Future<void> main() async {
   //   final imu   = CanImuService(canInterface: 'can0');
   //   final joint = CanJointService(canInterface: 'can0');
   //   final motor = CanMotorService(canInterface: 'can0');
-  final sim = SimSensorService(standingPose: defaultProfile.standingPose);
+  final sim = SimSensorService(standingPose: defaultProfile.standUpPose);
 
   // ── 时钟 ──────────────────────────────────────────────────
   //
@@ -104,7 +104,7 @@ Future<void> main() async {
     imu: sim,
     joint: sim,
     clock: clock,
-    standingPose: defaultProfile.standingPose,
+    standingPose: defaultProfile.standUpPose,
     observationBuilder: defaultProfile.toObservationBuilder(),
     bodyHeightCommand: defaultProfile.bodyHeightCommand,
     minBodyHeightCommand: defaultProfile.minBodyHeightCommand,
