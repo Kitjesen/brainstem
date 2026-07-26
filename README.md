@@ -59,6 +59,15 @@ H15 和 H18 使用相同的训练命令范围。gRPC 服务会按照当前 profi
 
 默认机身高度为 `0.40 m`。上述范围是训练包络和运行时硬限幅，不代表首次实机测试应直接使用边界值；首次体高验收建议保持零速度，并从 `0.40 m` 附近的小幅命令开始。首次使能前必须通过状态/遥测核对当前体高命令和预期目标均为 `0.40 m`。
 
+H15/H18 的云卓遥控模式保留左摇杆速度控制，右摇杆上/下以
+`0.02 m/s` 连续调节体高，死区为 `0.10`。机器人在 `Standing` 中首次收到
+非零速度或体高输入时，先把速度和体高固定为
+`(0, 0, 0)` / `0.40 m`，再经过 100 个实际成功下发的 20 ms 间隔
+（101 个样本，约 2 秒）从当前实测关节位置平滑接管到策略输出；动作、
+轮速目标、Kp 和 Kd 使用同一个 smoothstep。接管期间新的速度/体高摇杆输入
+被丢弃而不是缓存。断使能会暂停接管，再次使能时仅在仍处于 `Walking`
+的情况下从新的实测位置重新开始。
+
 如果同一台机器人已经运行过 master 策略，且 CAN 接线、IMU 安装、关节零位、固件和遥控器安全链路均未改变，则 `bodyheightctrl` 只需做差异验证：H15/H18 模型与 profile 加载、`SetBodyHeight` 链路、零速度体高跟踪及小速度稳定性。只有硬件配置发生变化或出现异常时，才需要重新执行完整硬件检查。
 
 体高策略接口、模型哈希、H15/H18 验证结果和真机安全门详见 [`docs/BODYHEIGHTCTRL.md`](docs/BODYHEIGHTCTRL.md)。
@@ -210,9 +219,9 @@ MotorService.sendAction() → CAN 总线 / MuJoCo
 obs[0:3]   = gyroscope × 0.25          (body frame 角速度)
 obs[3:6]   = projectedGravity          (body frame 重力投影)
 obs[6:9]   = command [vx, vy, vyaw]    (速度命令)
-obs[9:25]  = jointPosition - standing  (关节位置偏差，foot 归零)
+obs[9:25]  = jointPosition - policyDefaultPose  (关节位置偏差，foot 归零)
 obs[25:41] = jointVelocity × 0.05      (关节速度)
-obs[41:57] = (lastAction - standing) / actionScale  (上一步动作)
+obs[41:57] = (lastAction - policyDefaultPose) / actionScale  (上一步动作)
 obs[57]    = bodyHeightCommand in metres             (仅体高策略)
 ```
 
@@ -323,6 +332,12 @@ YUNZHUO 遥控器通过 SBUS 协议（CH340 USB 串口），udev 规则映射到
 
 遥控器可选——未接时以 gRPC-only 模式启动。摇杆速度强关联：松手即归零，无衰减。
 
+当启动 profile 为 H15/H18（`observationType = bodyHeight`）时，使用独立的
+体高遥控映射：左摇杆速度和 L1/L2 保持不变，右摇杆 Y 调节体高，R1 在
+`Standing` 时把体高重置为 `0.40 m`、在 `Walking` 时返回 `Standing`；
+R2 被拒绝，不能热切换 H15/H18。请先停止候选服务，再用
+`./scripts/bodyheight_service.sh start h15` 或 `start h18` 重新选择策略。
+
 ---
 
 ## 策略配置 (Profile)
@@ -334,6 +349,8 @@ YUNZHUO 遥控器通过 SBUS 协议（CH340 USB 串口），udev 规则映射到
   "name": "default",
   "modelPath": "model/policy_260106.onnx",
   "standingPose": [-0.1, -0.8, 1.8, 0.1, 0.8, -1.8, ...],
+  "standUpPose": [-0.1, -0.8, 1.8, 0.1, 0.8, -1.8, ...],
+  "policyDefaultPose": [-0.1, -1.1, 2.6, 0.1, 1.1, -2.6, ...],
   "sittingPose": [0, 0, 0, ...],
   "standUpCounts": 150,
   "sitDownCounts": 150,
@@ -345,7 +362,14 @@ YUNZHUO 遥控器通过 SBUS 协议（CH340 USB 串口），udev 规则映射到
 }
 ```
 
-支持运行时热切换（Grounded 状态下通过 gRPC `SwitchProfile` 或遥控器 R2）。
+`standingPose` 是旧 profile 的兼容字段。缺少 `standUpPose` 时，物理站起目标
+单独回退到 `standingPose`；缺少 `policyDefaultPose` 时，策略观测/动作零点
+也单独回退到 `standingPose`。新 profile 应显式区分两者：
+`standUpPose` 用于 L1/R1/gesture 的物理目标，`policyDefaultPose` 必须与
+ONNX 训练时的 observation 和 action 零点一致。
+
+标准 57 维策略支持在 `Grounded` 状态下通过 gRPC `SwitchProfile` 或遥控器
+R2 热切换。H15/H18 体高策略维度不同，禁止热切换，必须重启服务。
 
 ---
 

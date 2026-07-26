@@ -38,9 +38,42 @@ d632413aa9ddf16b6c795377bdbbef69c454ba1cc77f8acb7d560f381cd84296  model/thunder_
 sha256sum model/thunder_h15_model10400.onnx model/thunder_h18_model5000.onnx
 ```
 
-The committed ranges and transforms match the archived Isaac Lab training configuration: height `0.20..0.54 m`, velocity `vx=-2.5..2.5`, `vy=-1.0..1.0`, `yaw=-1.0..1.0`, and training standing pose `[-0.1,-1.1,2.6, 0.1,1.1,-2.6, 0.1,1.1,-2.6, -0.1,-1.1,2.6, 0,0,0,0]`.
+The committed ranges and transforms match the archived Isaac Lab training configuration: height `0.20..0.54 m`, velocity `vx=-2.5..2.5`, `vy=-1.0..1.0`, `yaw=-1.0..1.0`, and policy training zero `[-0.1,-1.1,2.6, 0.1,1.1,-2.6, 0.1,1.1,-2.6, -0.1,-1.1,2.6, 0,0,0,0]`.
 
 H15 and H18 have different history tensor sizes. Select one at process startup; switching between them requires a restart. The model shape check deliberately rejects a mismatched live switch before replacing the active policy.
+
+### Pose roles
+
+Profiles keep the legacy `standingPose` field for compatibility, but new
+profiles separate two meanings:
+
+- `standUpPose` is the physical target used by L1/R1 and gestures.
+- `policyDefaultPose` is the Isaac/ONNX training zero used for joint-position
+  observations and action conversion.
+
+Each optional field falls back independently to `standingPose`, so legacy
+profiles retain their old behavior. H15/H18 explicitly use the master-verified
+physical stand pose in `standUpPose` and the trained `±1.1/±2.6` zero in
+`policyDefaultPose`.
+
+### Body-height remote takeover
+
+For H15/H18 only, the left stick continues to command velocity and the right
+stick Y axis changes height at `0.02 m/s` with a `0.10` deadzone. The default is
+`0.40 m`, clamped to `0.20..0.54 m`.
+
+The first non-zero speed or height input received in `Standing` requests
+`Walking(0,0,0)` and freezes the height at `0.40 m`. The runtime then blends
+from the measured joint position to the live policy target over 100 actual
+successful 20 ms output intervals (101 samples, approximately two seconds).
+Leg actions, wheel targets, Kp, and Kd use the same smoothstep coefficient.
+Speed and height inputs received during takeover are discarded, not replayed
+afterward. Motor disable pauses the takeover; re-enable while still `Walking`
+recaptures the measured pose and restarts frame 0.
+
+L1, L2, R1, a state exit, a controller/inference error, or a motor fault
+cancels the takeover. R2 is rejected in body-height mode; stop the candidate
+service and restart it with `start h15` or `start h18` to change policy.
 
 ## Simulation launch
 
@@ -104,7 +137,9 @@ cd /home/bsrl1/brainstem-bodyheightctrl
 Use `start h18` for H18. `start` verifies that `han_dog.service` is already
 stopped, the candidate service and port `13145` are free, the selected profile
 matches the ONNX filename/hash, and the required IMU/Yunzhuo devices exist. It
-never stops the production service automatically.
+never stops the production service automatically. Starting the service only
+opens the interfaces and gRPC endpoint: it does not enable motors and does not
+send stand-up, walking, velocity, or height motion commands.
 
 Before manually stopping production or running `stop`, disable the motors and
 place the robot on reliable support. Starting the candidate opens its hardware
