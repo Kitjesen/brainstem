@@ -65,6 +65,8 @@ class HanDogConfig {
       Platform.environment['HAN_DOG_YUNZHUO_PORT'] ?? '/dev/yunzhuo';
   String get xboxDevice =>
       Platform.environment['HAN_DOG_XBOX_DEVICE'] ?? '/dev/input/js0';
+  String get nc500HidrawDevice =>
+      Platform.environment['HAN_DOG_NC500_HIDRAW_DEVICE'] ?? '/dev/hidraw0';
   String get xboxConfigPath =>
       Platform.environment['HAN_DOG_XBOX_CONFIG'] ?? 'han_dog/config/xbox.json';
 

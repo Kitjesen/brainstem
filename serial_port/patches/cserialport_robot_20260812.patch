@@ -1,0 +1,30 @@
+diff --git a/src/SerialPortUnixBase.cpp b/src/SerialPortUnixBase.cpp
+index 15b9d4b..5397976 100644
+--- a/src/SerialPortUnixBase.cpp
++++ b/src/SerialPortUnixBase.cpp
+@@ -54,6 +54,8 @@ CSerialPortUnixBase::CSerialPortUnixBase(const char *portName)
+     : CSerialPortAsyncBase(portName)
+     , m_serialPortFileLock(new itas109::ILockFile())
+ {
++    m_pipefd[0] = -1;
++    m_pipefd[1] = -1;
+     if (-1 == pipe(m_pipefd))
+     {
+         perror("pipe");
+@@ -66,6 +68,16 @@ CSerialPortUnixBase::~CSerialPortUnixBase()
+     {
+         closePort();
+     }
++    if (m_pipefd[0] >= 0)
++    {
++        close(m_pipefd[0]);
++        m_pipefd[0] = -1;
++    }
++    if (m_pipefd[1] >= 0)
++    {
++        close(m_pipefd[1]);
++        m_pipefd[1] = -1;
++    }
+ }
+
+ int CSerialPortUnixBase::uartSet(int fd, int baudRate, itas109::Parity parity, itas109::DataBits dataBits, itas109::StopBits stopbits, itas109::FlowControl flowControl)

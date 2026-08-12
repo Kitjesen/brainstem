@@ -1,8 +1,6 @@
 {
   "comment": "Xbox 手柄配置 — 所有仿真/真机手柄脚本共用",
-
   "deadzone": 0.08,
-
   "axes": {
     "left_stick_x": 0,
     "left_stick_y": 1,
@@ -11,12 +9,11 @@
     "lt": 2,
     "rt": 5
   },
-
   "buttons": {
-    "a": 0,
-    "b": 1,
-    "x": 2,
-    "y": 3,
+    "a": 1,
+    "b": 0,
+    "x": 3,
+    "y": 2,
     "lb": 4,
     "rb": 5,
     "back": 6,
@@ -24,7 +21,6 @@
     "left_stick": 8,
     "right_stick": 9
   },
-
   "actions": {
     "standup": "a",
     "sitdown": "x",
@@ -32,17 +28,15 @@
     "quit": "b",
     "set_zero": "back"
   },
-
   "speed": {
-    "vx_scale": 1.0,
-    "vy_scale": 1.0,
-    "vyaw_scale": 1.0,
+    "vx_scale": 0.7,
+    "vy_scale": 0.5,
+    "vyaw_scale": 0.7,
     "lt_multiplier": 0.5,
-    "rt_multiplier": 1.5,
+    "rt_multiplier": 1.0,
     "lt_threshold": 0.3,
     "rt_threshold": 0.3
   },
-
   "stick": {
     "left_y_invert": true,
     "right_x_invert": true,

@@ -54,6 +54,9 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   /// Walk rate limiting.
   DateTime? _lastWalkAt;
   static const _minWalkInterval = Duration(milliseconds: 18);
+  static const _walkStopEpsilon = 0.001;
+  double _lastWalkX = 0.0;
+  double _lastWalkY = 0.0;
 
   /// SetZero lock.
   bool _zeroing = false;
@@ -69,6 +72,26 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   /// 最近一次运动命令（walk/standUp/sitDown）的时间戳。
   DateTime? _lastCommandAt;
   DateTime? get lastCommandAt => _lastCommandAt;
+
+  static const _enableJointLimitRad = 3.14;
+  static const _enableJointNames = [
+    'FR Hip',
+    'FR Thigh',
+    'FR Calf',
+    'FL Hip',
+    'FL Thigh',
+    'FL Calf',
+    'RR Hip',
+    'RR Thigh',
+    'RR Calf',
+    'RL Hip',
+    'RL Thigh',
+    'RL Calf',
+    'FR Foot',
+    'FL Foot',
+    'RR Foot',
+    'RL Foot',
+  ];
 
   /// 仿真模式 listenImu 用的默认四元数。
   static final _identityQ = Quaternion.identity();
@@ -87,8 +110,8 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     this.robotType = proto.RobotType.MINI,
     this.imuStreamFactory,
     this.jointStreamFactory,
-  })  : _brain = brain,
-        _m = m;
+  }) : _brain = brain,
+       _m = m;
 
   proto.Duration _elapsed() =>
       proto.Duration.fromDart(DateTime.now().difference(_startTime));
@@ -102,6 +125,11 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.Empty> enable(ServiceCall call, proto.Empty request) async {
+    final blockReason = _enableBlockReason();
+    if (blockReason != null) {
+      _log.warning('Motors enable blocked: $blockReason');
+      throw GrpcError.failedPrecondition('Motors enable blocked: $blockReason');
+    }
     await motor?.enable();
     onMotorEnableChanged?.call(true);
     _log.info('Motors enabled');
@@ -114,6 +142,48 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     onMotorEnableChanged?.call(false);
     _log.info('Motors disabled');
     return proto.Empty();
+  }
+
+  String? _enableBlockReason() {
+    if (mode != CmsMode.hardware) return null;
+    final j = joint;
+    if (j == null) return 'joint controller unavailable';
+
+    final offline = <String>[];
+    final unsafe = <String>[];
+    for (var i = 0; i < _enableJointNames.length; i++) {
+      final name = _enableJointNames[i];
+      if (!j.isOnline(i)) {
+        offline.add(name);
+        continue;
+      }
+      final report = j.getReport(i);
+      if (report == null) {
+        offline.add(name);
+        continue;
+      }
+
+      final status = report.status.value;
+      if (status == 1 || status == 3) {
+        unsafe.add('$name status=${report.status}');
+      }
+      if (report.errors.errors.isNotEmpty) {
+        unsafe.add('$name errors=${report.errors.errors.join(",")}');
+      }
+      if (i < 12) {
+        final position = report.position;
+        if (!position.isFinite || position.abs() > _enableJointLimitRad) {
+          unsafe.add('$name position=${position.toStringAsFixed(3)}rad');
+        }
+      }
+      if (!report.velocity.isFinite || !report.torque.isFinite) {
+        unsafe.add('$name non-finite velocity/torque');
+      }
+    }
+
+    if (offline.isNotEmpty) return 'offline joints: ${offline.join(", ")}';
+    if (unsafe.isNotEmpty) return 'unsafe joints: ${unsafe.join("; ")}';
+    return null;
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -130,15 +200,19 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     final a = arbiter;
     if (a != null) {
       if (!a.command(action, ControlSource.grpc)) {
-        _log.warning('${action.runtimeType} rejected: ${a.owner} has priority'
-            '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
+        _log.warning(
+          '${action.runtimeType} rejected: ${a.owner} has priority'
+          '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}',
+        );
         return; // 静默忽略，不抛异常
       }
     } else {
       _m.add(action);
     }
-    _log.finest('${action.runtimeType} dispatched'
-        '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}');
+    _log.finest(
+      '${action.runtimeType} dispatched'
+      '${sinceMs != null ? " (${sinceMs}ms since last cmd)" : ""}',
+    );
     gains?.applyCommand(action);
   }
 
@@ -149,7 +223,8 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   @override
   Future<proto.Empty> walk(ServiceCall call, proto.Vector3 request) async {
     final now = DateTime.now();
-    if (_lastWalkAt != null && now.difference(_lastWalkAt!) < _minWalkInterval) {
+    if (_lastWalkAt != null &&
+        now.difference(_lastWalkAt!) < _minWalkInterval) {
       // 频率过高：静默忽略而非报错，避免客户端崩溃
       return proto.Empty();
     }
@@ -173,6 +248,8 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
       return proto.Empty();
     }
     _dispatch(A.walk(dir));
+    _lastWalkX = dir.x;
+    _lastWalkY = dir.y;
     return proto.Empty();
   }
 
@@ -184,13 +261,22 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
       return proto.Empty();
     }
     _dispatch(const A.standUp());
+    _lastWalkX = 0.0;
+    _lastWalkY = 0.0;
     _log.info('StandUp command received');
     return proto.Empty();
   }
 
   @override
   Future<proto.Empty> sitDown(ServiceCall call, proto.Empty request) async {
+    if (_lastWalkX.abs() > _walkStopEpsilon ||
+        _lastWalkY.abs() > _walkStopEpsilon) {
+      _log.fine('SitDown ignored: x/y walk velocity is non-zero');
+      return proto.Empty();
+    }
     _dispatch(const A.sitDown());
+    _lastWalkX = 0.0;
+    _lastWalkY = 0.0;
     _log.info('SitDown command received');
     return proto.Empty();
   }
@@ -212,8 +298,7 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   }
 
   /// 获取可用动作列表。
-  List<String> get gestureNames =>
-      _brain.gestureLibrary?.names ?? const [];
+  List<String> get gestureNames => _brain.gestureLibrary?.names ?? const [];
 
   // ═══════════════════════════════════════════════════════════
   //  策略切换
@@ -221,7 +306,9 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.ProfileInfo> getProfile(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     final pm = profileManager;
     if (pm == null) throw GrpcError.unimplemented('Profiles not configured');
     return proto.ProfileInfo(
@@ -234,7 +321,9 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.ProfileInfo> switchProfile(
-      ServiceCall call, proto.ProfileRequest request) async {
+    ServiceCall call,
+    proto.ProfileRequest request,
+  ) async {
     final pm = profileManager;
     if (pm == null) throw GrpcError.unimplemented('Profiles not configured');
     final wasStanding = _m.state is Standing;
@@ -253,7 +342,9 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     // Standing 时切换后，触发 StandUp 过渡到新 standingPose
     if (wasStanding) {
       _dispatch(const A.standUp());
-      _log.info('Profile switched to ${pm.currentName} — transitioning to new pose');
+      _log.info(
+        'Profile switched to ${pm.currentName} — transitioning to new pose',
+      );
     } else {
       _log.info('Profile switched to: ${pm.currentName}');
     }
@@ -316,18 +407,18 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.Timestamp> getStartTime(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     return proto.Timestamp.fromDateTime(_startTime.toUtc());
   }
 
   @override
-  Future<proto.Params> getParams(
-      ServiceCall call, proto.Empty request) async {
+  Future<proto.Params> getParams(ServiceCall call, proto.Empty request) async {
     return proto.Params(
       robot: proto.RobotModel(
         type: robotType,
-        initialJointPosition:
-            proto.Matrix4(values: _brain.standingPose.values),
+        initialJointPosition: proto.Matrix4(values: _brain.standingPose.values),
       ),
     );
   }
@@ -338,14 +429,22 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   proto.CmsState _toCmsState(S s) => switch (s) {
     Zero() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_ZERO),
-    Grounded() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_GROUNDED),
-    Standing() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_STANDING),
-    Walking() => proto.CmsState(kind: proto.CmsStateKind.CMS_STATE_KIND_WALKING),
+    Grounded() => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_GROUNDED,
+    ),
+    Standing() => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_STANDING,
+    ),
+    Walking() => proto.CmsState(
+      kind: proto.CmsStateKind.CMS_STATE_KIND_WALKING,
+    ),
     Transitioning(:final target) => proto.CmsState(
       kind: proto.CmsStateKind.CMS_STATE_KIND_TRANSITIONING,
       transition: switch (target) {
-        StandUpCommand() => proto.CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP,
-        SitDownCommand() => proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
+        StandUpCommand() =>
+          proto.CmsTransitionKind.CMS_TRANSITION_KIND_STAND_UP,
+        SitDownCommand() =>
+          proto.CmsTransitionKind.CMS_TRANSITION_KIND_SIT_DOWN,
         GestureCommand() => proto.CmsTransitionKind.CMS_TRANSITION_KIND_GESTURE,
         _ => proto.CmsTransitionKind.CMS_TRANSITION_KIND_NONE,
       },
@@ -355,13 +454,17 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.CmsState> getCmsState(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     return _toCmsState(_m.state);
   }
 
   @override
   Stream<proto.CmsState> listenCmsState(
-      ServiceCall call, proto.Empty request) async* {
+    ServiceCall call,
+    proto.Empty request,
+  ) async* {
     yield _toCmsState(_m.state);
     yield* _m.stream.map(_toCmsState);
   }
@@ -373,14 +476,15 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   /// 电机清零：把当前位置标记为零点并保存。
   /// 机器人必须处于 Grounded 状态（趴地/放平后再清零）。
   @override
-  Future<proto.Empty> setZero(
-      ServiceCall call, proto.Empty request) async {
+  Future<proto.Empty> setZero(ServiceCall call, proto.Empty request) async {
     if (_m.state is! Grounded) {
       throw GrpcError.failedPrecondition('Must be in Grounded state');
     }
     final j = joint;
     if (j == null) {
-      throw GrpcError.unimplemented('SetZero not available (no joint controller)');
+      throw GrpcError.unimplemented(
+        'SetZero not available (no joint controller)',
+      );
     }
     if (_zeroing) {
       throw GrpcError.resourceExhausted('SetZero already in progress');
@@ -403,44 +507,38 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   // ═══════════════════════════════════════════════════════════
 
   @override
-  Stream<proto.History> listenHistory(
-      ServiceCall call, proto.Empty request) {
+  Stream<proto.History> listenHistory(ServiceCall call, proto.Empty request) {
     return _historyBroadcast.map(
-      (h) => h.toProto(
-        timestamp: _elapsed(),
-        kp: gains?.kp,
-        kd: gains?.kd,
-      ),
+      (h) => h.toProto(timestamp: _elapsed(), kp: gains?.kp, kd: gains?.kd),
     );
   }
 
   @override
-  Stream<proto.Imu> listenImu(
-      ServiceCall call, proto.Empty request) {
+  Stream<proto.Imu> listenImu(ServiceCall call, proto.Empty request) {
     // 硬件模式：使用外部注入的硬件数据流
     final factory = imuStreamFactory;
     if (factory != null) return factory();
 
     // 仿真模式：时钟驱动，读取 ImuService 当前状态
-    return _brain.ts.map((_) => imuSnapshot(
-          _brain.imu,
-          quaternion: simInjector?.quaternion ?? _identityQ,
-          timestamp: _elapsed(),
-        ));
+    return _brain.ts.map(
+      (_) => imuSnapshot(
+        _brain.imu,
+        quaternion: simInjector?.quaternion ?? _identityQ,
+        timestamp: _elapsed(),
+      ),
+    );
   }
 
   @override
-  Stream<proto.Joint> listenJoint(
-      ServiceCall call, proto.Empty request) {
+  Stream<proto.Joint> listenJoint(ServiceCall call, proto.Empty request) {
     // 硬件模式：使用外部注入的硬件数据流
     final factory = jointStreamFactory;
     if (factory != null) return factory();
 
     // 仿真模式：时钟驱动，读取 JointService 当前状态
-    return _brain.ts.map((_) => jointSnapshot(
-          _brain.joint,
-          timestamp: _elapsed(),
-        ));
+    return _brain.ts.map(
+      (_) => jointSnapshot(_brain.joint, timestamp: _elapsed()),
+    );
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -449,7 +547,9 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.Voltage> getVoltage(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     final j = joint;
     if (j == null) {
       throw GrpcError.failedPrecondition(
@@ -462,7 +562,9 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.MotorStatusResponse> getMotorStatus(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     final j = joint;
     if (j == null) {
       throw GrpcError.failedPrecondition(
@@ -473,24 +575,28 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     for (int i = 0; i < 16; i++) {
       final online = j.isOnline(i);
       final report = j.getReport(i);
-      motors.add(proto.MotorState(
-        id: i,
-        online: online,
-        statusCode: report?.status.value ?? 0,
-        temperature: report?.temperature ?? 0.0,
-        voltage: 0.0, // voltage requires async getter, use GetVoltage RPC
-        position: report?.position ?? 0.0,
-        velocity: report?.velocity ?? 0.0,
-        torque: report?.torque ?? 0.0,
-        errors: report?.errors.errors.map((e) => e.index).toList() ?? [],
-      ));
+      motors.add(
+        proto.MotorState(
+          id: i,
+          online: online,
+          statusCode: report?.status.value ?? 0,
+          temperature: report?.temperature ?? 0.0,
+          voltage: 0.0, // voltage requires async getter, use GetVoltage RPC
+          position: report?.position ?? 0.0,
+          velocity: report?.velocity ?? 0.0,
+          torque: report?.torque ?? 0.0,
+          errors: report?.errors.errors.map((e) => e.index).toList() ?? [],
+        ),
+      );
     }
     return proto.MotorStatusResponse(motors: motors);
   }
 
   @override
   Future<proto.Empty> clearMotorFault(
-      ServiceCall call, proto.ClearFaultRequest request) async {
+    ServiceCall call,
+    proto.ClearFaultRequest request,
+  ) async {
     final j = joint;
     if (j == null) {
       throw GrpcError.failedPrecondition(
@@ -523,25 +629,33 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.Empty> setSpeedMode(
-      ServiceCall call, proto.SpeedModeRequest request) async {
+    ServiceCall call,
+    proto.SpeedModeRequest request,
+  ) async {
     throw GrpcError.unimplemented('SetSpeedMode not yet implemented');
   }
 
   @override
   Future<proto.SpeedModeRequest> getSpeedMode(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     throw GrpcError.unimplemented('GetSpeedMode not yet implemented');
   }
 
   @override
   Future<proto.Empty> playGesture(
-      ServiceCall call, proto.GestureRequest request) async {
+    ServiceCall call,
+    proto.GestureRequest request,
+  ) async {
     throw GrpcError.unimplemented('PlayGesture not yet implemented');
   }
 
   @override
   Future<proto.GestureList> listGestures(
-      ServiceCall call, proto.Empty request) async {
+    ServiceCall call,
+    proto.Empty request,
+  ) async {
     throw GrpcError.unimplemented('ListGestures not yet implemented');
   }
 }

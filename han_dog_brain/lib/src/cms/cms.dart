@@ -30,9 +30,7 @@ class M extends Cms<S, A> {
       },
       onDone: () {
         _log.severe('Idle stream closed unexpectedly — clock interrupted?');
-        Future.microtask(
-          () => add(A.fault('Idle stream closed unexpectedly')),
-        );
+        Future.microtask(() => add(A.fault('Idle stream closed unexpectedly')));
       },
     );
   }
@@ -45,12 +43,17 @@ class M extends Cms<S, A> {
       stream = switch (target) {
         StandUpCommand() => _brain.standUp.doing,
         SitDownCommand() => _brain.sitDown.doing,
-        GestureCommand(:final name) => _brain.createGesture(name)?.doing
-            ?? (throw StateError('Unknown gesture: $name')),
+        GestureCommand(:final name) =>
+          _brain.createGesture(name)?.doing ??
+              (throw StateError('Unknown gesture: $name')),
         _ => throw StateError('Invalid transition target: $target'),
       };
     } catch (e, st) {
-      _log.severe('Failed to create transition stream for ${target.runtimeType}', e, st);
+      _log.severe(
+        'Failed to create transition stream for ${target.runtimeType}',
+        e,
+        st,
+      );
       Future.microtask(() => add(A.fault('Transition setup error: $e')));
       return const Stream<History>.empty().listen((_) {});
     }
@@ -63,7 +66,11 @@ class M extends Cms<S, A> {
       _brain.memory.add,
       onError: (Object error, StackTrace st) {
         faulted = true;
-        _log.severe('Transition(${target.runtimeType}) stream error', error, st);
+        _log.severe(
+          'Transition(${target.runtimeType}) stream error',
+          error,
+          st,
+        );
         sub.cancel(); // 阻止后续 onDone
         Future.microtask(() => add(A.fault('Transition error: $error')));
       },
@@ -94,9 +101,7 @@ class M extends Cms<S, A> {
       },
       onDone: () {
         _log.severe('Walk stream closed unexpectedly — clock interrupted?');
-        Future.microtask(
-          () => add(A.fault('Walk stream closed unexpectedly')),
-        );
+        Future.microtask(() => add(A.fault('Walk stream closed unexpectedly')));
       },
     );
   }
@@ -120,7 +125,9 @@ class M extends Cms<S, A> {
   Future<S?> kernel(S s, A a) async {
     final next = await _kernelImpl(s, a);
     if (next != null) {
-      _log.info('FSM ${s.runtimeType} + ${a.runtimeType} → ${next.runtimeType}');
+      _log.info(
+        'FSM ${s.runtimeType} + ${a.runtimeType} → ${next.runtimeType}',
+      );
     }
     return next;
   }
@@ -129,7 +136,9 @@ class M extends Cms<S, A> {
     // ── Zero ────────────────────────────────────────────────
     (Zero(), Init()) => Grounded(_listenIdle()),
     (Zero(), _) => () {
-      _log.warning('${a.runtimeType} ignored: FSM not initialized (call Init first)');
+      _log.warning(
+        '${a.runtimeType} ignored: FSM not initialized (call Init first)',
+      );
       return null;
     }(),
 
@@ -229,47 +238,63 @@ class M extends Cms<S, A> {
     (Walking(), _) => null,
 
     // ── Transitioning (protected) ───────────────────────────
-    (Transitioning(:final target), CmdStandUp() || CmdSitDown() || CmdWalk() || CmdIdle()) => () {
-      _log.warning('${a.runtimeType} rejected: transition in progress (${target.runtimeType})');
-      return null;
-    }(),
+    (Transitioning(target: StandUpCommand(), :final sub), CmdSitDown()) =>
+      () async {
+        _log.info('SitDown interrupts StandUp transition');
+        await sub.cancel();
+        return Transitioning(
+          const Command.sitDown(),
+          _listenTransition(const Command.sitDown()),
+          null,
+        );
+      }(),
+    (
+      Transitioning(:final target),
+      CmdStandUp() || CmdSitDown() || CmdWalk() || CmdIdle(),
+    ) =>
+      () {
+        _log.warning(
+          '${a.runtimeType} rejected: transition in progress (${target.runtimeType})',
+        );
+        return null;
+      }(),
 
     // StandUp 完成，无 pending → Standing
     (
       Transitioning(target: StandUpCommand(), :final sub, pending: null),
       Done(),
-    ) => () async {
-      await sub.cancel();
-      return Standing(_listenIdle());
-    }(),
+    ) =>
+      () async {
+        await sub.cancel();
+        return Standing(_listenIdle());
+      }(),
 
     // StandUp 完成，pending SitDown → 继续坐下
     (
-      Transitioning(target: StandUpCommand(), :final sub, pending: CmdSitDown()),
+      Transitioning(
+        target: StandUpCommand(),
+        :final sub,
+        pending: CmdSitDown(),
+      ),
       Done(),
-    ) => () async {
-      await sub.cancel();
-      return Transitioning(
-        const Command.sitDown(),
-        _listenTransition(const Command.sitDown()),
-        null,
-      );
-    }(),
+    ) =>
+      () async {
+        await sub.cancel();
+        return Transitioning(
+          const Command.sitDown(),
+          _listenTransition(const Command.sitDown()),
+          null,
+        );
+      }(),
 
     // Gesture 完成 → Standing
-    (
-      Transitioning(target: GestureCommand(), :final sub),
-      Done(),
-    ) => () async {
+    (Transitioning(target: GestureCommand(), :final sub), Done()) => () async {
       await sub.cancel();
       return Standing(_listenIdle());
     }(),
 
     // SitDown 完成 → Grounded
-    (
-      Transitioning(target: SitDownCommand(), :final sub),
-      Done(),
-    ) => () async {
+    (Transitioning(target: SitDownCommand(), :final sub), Done()) => () async {
       await sub.cancel();
       return Grounded(_listenIdle());
     }(),
@@ -278,35 +303,38 @@ class M extends Cms<S, A> {
     (
       Transitioning(target: StandUpCommand(), :final sub),
       Fault(:final reason),
-    ) => () async {
-      _log.warning('Fault: $reason — StandUp aborted → SitDown');
-      await sub.cancel();
-      return Transitioning(
-        const Command.sitDown(),
-        _listenTransition(const Command.sitDown()),
-        null,
-      );
-    }(),
+    ) =>
+      () async {
+        _log.warning('Fault: $reason — StandUp aborted → SitDown');
+        await sub.cancel();
+        return Transitioning(
+          const Command.sitDown(),
+          _listenTransition(const Command.sitDown()),
+          null,
+        );
+      }(),
 
     // SitDown 途中故障 → 强制接受 Grounded（避免死循环）
     (
       Transitioning(target: SitDownCommand(), :final sub),
       Fault(:final reason),
-    ) => () async {
-      _log.warning('Fault: $reason — SitDown aborted → forced Grounded');
-      await sub.cancel();
-      return Grounded(_listenIdle());
-    }(),
+    ) =>
+      () async {
+        _log.warning('Fault: $reason — SitDown aborted → forced Grounded');
+        await sub.cancel();
+        return Grounded(_listenIdle());
+      }(),
 
     // Gesture 途中故障 → 安全回到 Standing
     (
       Transitioning(target: GestureCommand(), :final sub),
       Fault(:final reason),
-    ) => () async {
-      _log.warning('Fault: $reason — Gesture aborted → Standing');
-      await sub.cancel();
-      return Standing(_listenIdle());
-    }(),
+    ) =>
+      () async {
+        _log.warning('Fault: $reason — Gesture aborted → Standing');
+        await sub.cancel();
+        return Standing(_listenIdle());
+      }(),
 
     (Transitioning(), _) => null,
   };

@@ -40,12 +40,7 @@ void main() {
 
   group('Idle', () {
     test('emits History with idle command on each clock tick', () async {
-      final idle = Idle(
-        clock: clock,
-        imu: imu,
-        joint: joint,
-        memory: memory,
-      );
+      final idle = Idle(clock: clock, imu: imu, joint: joint, memory: memory);
 
       final results = <History>[];
       final sub = idle.doing.listen(results.add);
@@ -64,22 +59,19 @@ void main() {
     test('nextAction equals memory.latestAction', () async {
       // Set up memory with a known nextAction
       final knownAction = JointsMatrix.fromList(List.filled(16, 0.42));
-      memory.add(History(
-        gyroscope: Vector3.zero(),
-        projectedGravity: Vector3(0, 0, -1),
-        command: const Command.idle(),
-        jointPosition: .zero(),
-        jointVelocity: .zero(),
-        action: .zero(),
-        nextAction: knownAction,
-      ));
-
-      final idle = Idle(
-        clock: clock,
-        imu: imu,
-        joint: joint,
-        memory: memory,
+      memory.add(
+        History(
+          gyroscope: Vector3.zero(),
+          projectedGravity: Vector3(0, 0, -1),
+          command: const Command.idle(),
+          jointPosition: .zero(),
+          jointVelocity: .zero(),
+          action: .zero(),
+          nextAction: knownAction,
+        ),
       );
+
+      final idle = Idle(clock: clock, imu: imu, joint: joint, memory: memory);
 
       final results = <History>[];
       final sub = idle.doing.listen(results.add);
@@ -273,6 +265,28 @@ void main() {
       expect(results[3].nextAction.values[0], closeTo(0.0, 1e-6));
 
       await sub.cancel();
+    });
+  });
+  group('Walk command limits', () {
+    test('clamps every joint using configured physical bounds', () {
+      final walk = Walk(
+        observationBuilder: StandardObservationBuilder(
+          standingPose: .zero(),
+          actionLowerLimits: JointsMatrix.fromList(List.filled(16, -1.0)),
+          actionUpperLimits: JointsMatrix.fromList(List.filled(16, 1.0)),
+        ),
+        clock: clock,
+        imu: imu,
+        joint: joint,
+        memory: memory,
+      );
+
+      final result = walk.clampAction(
+        JointsMatrix.fromList(List.generate(16, (i) => i.isEven ? -2.0 : 2.0)),
+      );
+
+      expect(result.values, List.generate(16, (i) => i.isEven ? -1.0 : 1.0));
+      walk.dispose();
     });
   });
 }

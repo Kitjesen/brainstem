@@ -56,10 +56,10 @@ class Idle extends Behaviour {
   });
 
   Stream<History> get doing => ts.map((_) {
-        inferAction?.call();
-        // 物理目标：保持上一帧的 nextAction（standingPose）
-        return next(command: .idle(), nextAction: memory.latestAction);
-      });
+    inferAction?.call();
+    // 物理目标：保持上一帧的 nextAction（standingPose）
+    return next(command: .idle(), nextAction: memory.latestAction);
+  });
 }
 
 class SitDown extends Behaviour {
@@ -222,9 +222,7 @@ class Walk extends Behaviour {
         final actionDim = outputInfo.dimensions[1];
         if (actionDim != -1 && actionDim != 16) {
           session.dispose();
-          throw StateError(
-            'ONNX output dim=$actionDim, expected 16',
-          );
+          throw StateError('ONNX output dim=$actionDim, expected 16');
         }
       }
       _session = session;
@@ -243,13 +241,22 @@ class Walk extends Behaviour {
     _env.dispose();
   }
 
-  JointsMatrix clampAction(JointsMatrix action) => action; // no-op，和 legacy 一致
+  JointsMatrix clampAction(JointsMatrix action) {
+    final values = List<double>.from(action.values);
+    final lower = observationBuilder.actionLowerLimits.values;
+    final upper = observationBuilder.actionUpperLimits.values;
+    for (var i = 0; i < values.length; i++) {
+      values[i] = values[i].clamp(lower[i], upper[i]).toDouble();
+    }
+    return JointsMatrix.fromList(values);
+  }
 
   JointsMatrix toRealAction(JointsMatrix action) =>
       action * observationBuilder.actionScale + observationBuilder.standingPose;
 
   JointsMatrix fromRealAction(JointsMatrix action) =>
-      (action - observationBuilder.standingPose) / observationBuilder.actionScale;
+      (action - observationBuilder.standingPose) /
+      observationBuilder.actionScale;
 
   Stream<History> doing(Vector3 direction) {
     this.direction = direction;

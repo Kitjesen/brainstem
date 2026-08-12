@@ -90,8 +90,9 @@ void main() {
     when(() => controller.red).thenAnswer((_) => redCtrl.stream);
     when(() => controller.enabled).thenAnswer((_) => enabledCtrl.stream);
     when(() => controller.calibrate).thenAnswer((_) => calibrateCtrl.stream);
-    when(() => controller.switchProfile)
-        .thenAnswer((_) => switchProfileCtrl.stream);
+    when(
+      () => controller.switchProfile,
+    ).thenAnswer((_) => switchProfileCtrl.stream);
 
     when(() => joint.enable()).thenAnswer((_) async {});
     when(() => joint.disable()).thenAnswer((_) async {});
@@ -127,11 +128,13 @@ void main() {
 
     test('Transitioning(StandUp) → standUpKp/standUpKd', () async {
       buildDog();
-      stateCtrl.add(Transitioning(
-        const Command.standUp(),
-        Stream<History>.empty().listen((_) {}),
-        null,
-      ));
+      stateCtrl.add(
+        Transitioning(
+          const Command.standUp(),
+          Stream<History>.empty().listen((_) {}),
+          null,
+        ),
+      );
       await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.kpExt = standUpKp).called(1);
@@ -140,11 +143,13 @@ void main() {
 
     test('Transitioning(SitDown) → sitDownKp/sitDownKd', () async {
       buildDog();
-      stateCtrl.add(Transitioning(
-        const Command.sitDown(),
-        Stream<History>.empty().listen((_) {}),
-        null,
-      ));
+      stateCtrl.add(
+        Transitioning(
+          const Command.sitDown(),
+          Stream<History>.empty().listen((_) {}),
+          null,
+        ),
+      );
       await Future<void>.delayed(Duration.zero);
 
       verify(() => joint.kpExt = sitDownKp).called(1);
@@ -168,10 +173,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
 
       verify(
-        () => arbiter.command(
-          any(that: isA<CmdWalk>()),
-          ControlSource.yunzhuo,
-        ),
+        () => arbiter.command(any(that: isA<CmdWalk>()), ControlSource.yunzhuo),
       ).called(1);
     });
   });
@@ -243,9 +245,9 @@ void main() {
 
   group('calibrate', () {
     test('in Grounded → setZero + save', () async {
-      when(() => arbiter.state).thenReturn(
-        Grounded(Stream<History>.empty().listen((_) {})),
-      );
+      when(
+        () => arbiter.state,
+      ).thenReturn(Grounded(Stream<History>.empty().listen((_) {})));
 
       buildDog();
       calibrateCtrl.add(null);
@@ -257,9 +259,9 @@ void main() {
     });
 
     test('not in Grounded → ignored', () async {
-      when(() => arbiter.state).thenReturn(
-        Standing(Stream<History>.empty().listen((_) {})),
-      );
+      when(
+        () => arbiter.state,
+      ).thenReturn(Standing(Stream<History>.empty().listen((_) {})));
 
       buildDog();
       calibrateCtrl.add(null);
@@ -303,6 +305,50 @@ void main() {
         // Timer should be cancelled — no crash after elapsed
         async.elapse(const Duration(seconds: 10));
       });
+    });
+  });
+  group('lateral command shaping', () {
+    test('starts at 0.3 and is capped at 0.8', () async {
+      final captured = <A>[];
+      when(() => arbiter.command(any(), any())).thenAnswer((invocation) {
+        captured.add(invocation.positionalArguments.first as A);
+        return true;
+      });
+      buildDog();
+
+      for (var i = 0; i < 20; i++) {
+        directionCtrl.add(Vector3(0, 1, 0));
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect((captured.first as CmdWalk).direction.y, closeTo(0.3, 1e-6));
+      expect((captured.last as CmdWalk).direction.y, closeTo(0.8, 1e-6));
+    });
+
+    test('release ramps down before reaching zero', () async {
+      final captured = <A>[];
+      when(() => arbiter.command(any(), any())).thenAnswer((invocation) {
+        captured.add(invocation.positionalArguments.first as A);
+        return true;
+      });
+      when(
+        () => arbiter.state,
+      ).thenReturn(Walking(Stream<History>.empty().listen((_) {})));
+      buildDog();
+      for (var i = 0; i < 20; i++) {
+        directionCtrl.add(Vector3(0, 1, 0));
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      directionCtrl.add(Vector3.zero());
+      await Future<void>.delayed(Duration.zero);
+      expect((captured.last as CmdWalk).direction.y, closeTo(0.75, 1e-6));
+
+      for (var i = 0; i < 20; i++) {
+        directionCtrl.add(Vector3.zero());
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect((captured.last as CmdWalk).direction.y, 0.0);
     });
   });
 }

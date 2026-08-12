@@ -1,0 +1,20 @@
+{
+  "name": "flat_v0_straight_wheel_smooth_19000",
+  "description": "PoseFlatV4HimURDFV0StraightWheelSmooth model_19000, verified checkpoint b9d3aebc73eee1e352489c3ba586b30c72c0cc4a30cc2ec71637fcdee2a0241d.",
+  "modelPath": "model/pose_flat_v4_him_urdf_v0_straight_wheel_smooth_model19000_policy.onnx",
+  "standingPose": [-0.1, -0.8, 1.8, 0.1, 0.8, -1.8, 0.1, 0.8, -1.8, -0.1, -0.8, 1.8, 0.0, 0.0, 0.0, 0.0],
+  "sittingPose": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  "inferKp": [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 0, 0, 0, 0],
+  "inferKd": [15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 1, 1, 1, 1],
+  "standUpKp": [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 0, 0, 0, 0],
+  "standUpKd": [15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 1, 1, 1, 1],
+  "sitDownKp": [100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 0, 0, 0, 0],
+  "sitDownKd": [15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 1, 1, 1, 1],
+  "standUpCounts": 150,
+  "sitDownCounts": 150,
+  "imuGyroscopeScale": 0.25,
+  "jointVelocityScale": [0.05, 0.05, 0.05, 0.05],
+  "actionScale": [0.125, 0.25, 0.25, 5.0],
+  "actionLowerLimits": [-0.39, -3.12, 0.02, -0.39, 0.02, -3.12, -0.39, 0.02, -3.12, -0.39, -3.12, -3.12, -25.0, -25.0, -25.0, -25.0],
+  "actionUpperLimits": [0.39, -0.02, 3.12, 0.39, 3.12, -0.02, 0.39, 3.12, 3.12, 0.39, -0.02, 3.12, 25.0, 25.0, 25.0, 25.0]
+}

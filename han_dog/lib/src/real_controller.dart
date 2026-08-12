@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:frequency_watch/frequency_watch.dart';
 import 'package:logging/logging.dart';
@@ -10,6 +11,14 @@ import 'package:vector_math/vector_math.dart';
 import 'gamepad.dart';
 
 final _log = Logger('han_dog.controller');
+
+Stream<Iterable<YunZhuoState>> _decodeStandardSbus(
+  Stream<Uint8List> stream,
+) => const StandardSbusChannelDecoder().bind(stream).map(
+  (frames) => frames
+      .where((frame) => isStandardSbusHealthy(frame.$2))
+      .map((frame) => YunZhuoState.fromChannels(frame.$1, frame.$2)),
+);
 
 class RealController implements Gamepad {
   final String portName;
@@ -98,7 +107,13 @@ class RealController implements Gamepad {
       .map((_) {});
 
   RealController([this.portName = '/dev/ttyUSB0']) {
-    port = SerialPortController<Never, YunZhuoState>(portName);
+    port = SerialPortController<Never, YunZhuoState>(
+      portName,
+      baudRate: 100000,
+      parity: .ParityEven,
+      stopbits: .StopTwo,
+      stateDecoder: _decodeStandardSbus,
+    );
   }
 
   bool open() {
@@ -113,16 +128,24 @@ class RealController implements Gamepad {
 
   /// 断连后尝试重新打开串口，数据自动流入已有的 stateStream。
   /// 新建 SerialPortController，避免原 port.state 单次订阅导致的 "Stream has already been listened to"。
-  bool reopen() {
+  Future<bool> reopen() async {
     _log.info('Controller reopening: $portName');
-    _portSub?.cancel();
+    final previousSub = _portSub;
+    _portSub = null;
+    await previousSub?.cancel();
     try {
       port.close();
       port.dispose();
     } catch (e, st) {
       _log.warning('Error closing port during reopen: $portName', e, st);
     }
-    port = SerialPortController<Never, YunZhuoState>(portName);
+    port = SerialPortController<Never, YunZhuoState>(
+      portName,
+      baudRate: 100000,
+      parity: .ParityEven,
+      stopbits: .StopTwo,
+      stateDecoder: _decodeStandardSbus,
+    );
     if (!port.open()) {
       _log.severe('Controller reopen failed: $portName');
       return false;

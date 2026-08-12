@@ -5,6 +5,17 @@ const frameSize = 35;
 const frameRestLength = 34;
 const syncCode = 0x0F;
 
+/// Standard Futaba SBUS framing: 0x0F + 22 packed channel bytes + flags + end.
+const standardSbusFrameSize = 25;
+const _standardSbusFlagsOffset = 23;
+const _standardSbusEndOffset = 24;
+const _standardSbusFrameLostMask = 1 << 2;
+const _standardSbusFailsafeMask = 1 << 3;
+
+/// Whether an SBUS frame represents a live RF link and can drive controls.
+bool isStandardSbusHealthy(int flags) =>
+    flags & (_standardSbusFrameLostMask | _standardSbusFailsafeMask) == 0;
+
 class DataFrame {
   int head = 0;
   List<int> channels = List.filled(16, 0);
@@ -106,6 +117,69 @@ class SubsChannelDecoder
       yield frames;
     }
   }
+}
+
+/// Decoder for standard 100000-baud, 8E2 SBUS frames.
+///
+/// The decoder keeps partial frames across chunks, discards line noise before
+/// the next sync byte, and accepts the normal SBUS/SBUS2 end markers.
+class StandardSbusChannelDecoder
+    extends StreamTransformerBase<Uint8List, List<(List<int>, int)>> {
+  const StandardSbusChannelDecoder();
+
+  @override
+  Stream<List<(List<int>, int)>> bind(Stream<Uint8List> stream) async* {
+    final pending = <int>[];
+
+    await for (final chunk in stream) {
+      pending.addAll(chunk);
+      final frames = <(List<int>, int)>[];
+
+      while (pending.length >= standardSbusFrameSize) {
+        final start = pending.indexOf(syncCode);
+        if (start < 0) {
+          pending.clear();
+          break;
+        }
+        if (start > 0) {
+          pending.removeRange(0, start);
+        }
+        if (pending.length < standardSbusFrameSize) break;
+
+        final end = pending[_standardSbusEndOffset];
+        if (!_isStandardSbusEndByte(end)) {
+          pending.removeAt(0);
+          continue;
+        }
+
+        final frame = pending.sublist(0, standardSbusFrameSize);
+        pending.removeRange(0, standardSbusFrameSize);
+        frames.add((
+          _decodeStandardSbusChannels(frame),
+          frame[_standardSbusFlagsOffset],
+        ));
+      }
+
+      if (frames.isNotEmpty) yield frames;
+    }
+  }
+}
+
+bool _isStandardSbusEndByte(int value) =>
+    value == 0x00 || (value & 0x0F) == 0x04;
+
+List<int> _decodeStandardSbusChannels(List<int> frame) {
+  final data = frame.sublist(1, 23);
+  return List<int>.generate(16, (channel) {
+    final bitOffset = channel * 11;
+    final byteOffset = bitOffset >> 3;
+    final shift = bitOffset & 7;
+    var packed = data[byteOffset] | (data[byteOffset + 1] << 8);
+    if (byteOffset + 2 < data.length) {
+      packed |= data[byteOffset + 2] << 16;
+    }
+    return (packed >> shift) & 0x07FF;
+  }, growable: false);
 }
 
 int checkCode(List<int> payload) =>

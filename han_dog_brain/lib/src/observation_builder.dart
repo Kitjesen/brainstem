@@ -17,27 +17,76 @@ abstract interface class ObservationBuilder {
 
   /// 站立姿态（Walk 用于 toRealAction / fromRealAction 以及 StandUp 目标姿态）。
   JointsMatrix get standingPose;
+  JointsMatrix get actionLowerLimits;
+  JointsMatrix get actionUpperLimits;
 }
 
 /// 标准 57 维观测构建器：
 /// [gyroscope(3), projectedGravity(3), direction(3),
 ///  jointPosition(16), jointVelocity(16), action(16)]
 class StandardObservationBuilder implements ObservationBuilder {
+  static final JointsMatrix defaultActionLowerLimits = JointsMatrix.fromList([
+    -0.39,
+    -3.12,
+    0.02,
+    -0.39,
+    0.02,
+    -3.12,
+    -0.39,
+    0.02,
+    -3.12,
+    -0.39,
+    -3.12,
+    -3.12,
+    -35.0,
+    -35.0,
+    -35.0,
+    -35.0,
+  ]);
+
+  static final JointsMatrix defaultActionUpperLimits = JointsMatrix.fromList([
+    0.39,
+    -0.02,
+    3.12,
+    0.39,
+    3.12,
+    -0.02,
+    0.39,
+    3.12,
+    3.12,
+    0.39,
+    -0.02,
+    3.12,
+    35.0,
+    35.0,
+    35.0,
+    35.0,
+  ]);
+
   @override
   final (double, double, double, double) actionScale;
 
   @override
   final JointsMatrix standingPose;
 
+  @override
+  final JointsMatrix actionLowerLimits;
+
+  @override
+  final JointsMatrix actionUpperLimits;
+
   final double imuGyroscopeScale;
   final (double, double, double, double) jointVelocityScale;
 
   StandardObservationBuilder({
     required this.standingPose,
+    JointsMatrix? actionLowerLimits,
+    JointsMatrix? actionUpperLimits,
     this.imuGyroscopeScale = 0.25,
     this.jointVelocityScale = (0.05, 0.05, 0.05, 0.05),
     this.actionScale = (0.125, 0.25, 0.25, 5.0),
-  });
+  }) : actionLowerLimits = actionLowerLimits ?? defaultActionLowerLimits,
+       actionUpperLimits = actionUpperLimits ?? defaultActionUpperLimits;
 
   @override
   int get tensorSize => 3 + 3 + 3 + 16 + 16 + 16; // 57
@@ -54,9 +103,15 @@ class StandardObservationBuilder implements ObservationBuilder {
     final jointVelocity = h.jointVelocity * jointVelocityScale;
     final action = (h.action - standingPose) / actionScale;
     final obs = [
-      gyroscope.x, gyroscope.y, gyroscope.z,
-      pg.x, pg.y, pg.z,
-      direction.x, direction.y, direction.z,
+      gyroscope.x,
+      gyroscope.y,
+      gyroscope.z,
+      pg.x,
+      pg.y,
+      pg.z,
+      direction.x,
+      direction.y,
+      direction.z,
       ...jointPosition.values,
       ...jointVelocity.values,
       ...action.values,

@@ -25,8 +25,48 @@ class RobotProfile {
   final double imuGyroscopeScale;
   final (double, double, double, double) jointVelocityScale;
   final (double, double, double, double) actionScale;
+  final JointsMatrix actionLowerLimits;
+  final JointsMatrix actionUpperLimits;
 
-  const RobotProfile({
+  static final JointsMatrix defaultActionLowerLimits = JointsMatrix.fromList([
+    -0.39,
+    -3.12,
+    0.02,
+    -0.39,
+    0.02,
+    -3.12,
+    -0.39,
+    0.02,
+    -3.12,
+    -0.39,
+    -3.12,
+    -3.12,
+    -35.0,
+    -35.0,
+    -35.0,
+    -35.0,
+  ]);
+
+  static final JointsMatrix defaultActionUpperLimits = JointsMatrix.fromList([
+    0.39,
+    -0.02,
+    3.12,
+    0.39,
+    3.12,
+    -0.02,
+    0.39,
+    3.12,
+    3.12,
+    0.39,
+    -0.02,
+    3.12,
+    35.0,
+    35.0,
+    35.0,
+    35.0,
+  ]);
+
+  RobotProfile({
     required this.name,
     this.description = '',
     required this.modelPath,
@@ -43,7 +83,10 @@ class RobotProfile {
     this.imuGyroscopeScale = 0.25,
     this.jointVelocityScale = (0.05, 0.05, 0.05, 0.05),
     this.actionScale = (0.125, 0.25, 0.25, 5.0),
-  });
+    JointsMatrix? actionLowerLimits,
+    JointsMatrix? actionUpperLimits,
+  }) : actionLowerLimits = actionLowerLimits ?? defaultActionLowerLimits,
+       actionUpperLimits = actionUpperLimits ?? defaultActionUpperLimits;
 
   factory RobotProfile.fromJson(Map<String, dynamic> json) {
     return RobotProfile(
@@ -61,10 +104,22 @@ class RobotProfile {
       sitDownKp: _joints16(json, 'sitDownKp'),
       sitDownKd: _joints16(json, 'sitDownKd'),
       imuGyroscopeScale: _finiteDouble(json, 'imuGyroscopeScale', 0.25),
-      jointVelocityScale: _tuple4(json['jointVelocityScale'], 'jointVelocityScale',
-          defaultValue: (0.05, 0.05, 0.05, 0.05)),
-      actionScale: _tuple4(json['actionScale'], 'actionScale',
-          defaultValue: (0.125, 0.25, 0.25, 5.0)),
+      jointVelocityScale: _tuple4(
+        json['jointVelocityScale'],
+        'jointVelocityScale',
+        defaultValue: (0.05, 0.05, 0.05, 0.05),
+      ),
+      actionScale: _tuple4(
+        json['actionScale'],
+        'actionScale',
+        defaultValue: (0.125, 0.25, 0.25, 5.0),
+      ),
+      actionLowerLimits: json['actionLowerLimits'] == null
+          ? null
+          : _joints16(json, 'actionLowerLimits'),
+      actionUpperLimits: json['actionUpperLimits'] == null
+          ? null
+          : _joints16(json, 'actionUpperLimits'),
     );
   }
 
@@ -72,18 +127,24 @@ class RobotProfile {
     final v = json[key];
     if (v == null) throw FormatException('Missing required field: "$key"');
     if (v is! String) {
-      throw FormatException('Field "$key" must be a string, got ${v.runtimeType}');
+      throw FormatException(
+        'Field "$key" must be a string, got ${v.runtimeType}',
+      );
     }
     return v;
   }
 
   static double _finiteDouble(
-      Map<String, dynamic> json, String key, double defaultValue) {
+    Map<String, dynamic> json,
+    String key,
+    double defaultValue,
+  ) {
     final v = json[key];
     if (v == null) return defaultValue;
     if (v is! num) {
       throw FormatException(
-          'Field "$key" must be a number, got ${v.runtimeType}');
+        'Field "$key" must be a number, got ${v.runtimeType}',
+      );
     }
     final d = v.toDouble();
     if (!d.isFinite) {
@@ -96,10 +157,14 @@ class RobotProfile {
     final v = json[key];
     if (v == null) throw FormatException('Missing required field: "$key"');
     if (v is! List) {
-      throw FormatException('Field "$key" must be a list, got ${v.runtimeType}');
+      throw FormatException(
+        'Field "$key" must be a list, got ${v.runtimeType}',
+      );
     }
     if (v.length != 16) {
-      throw FormatException('Field "$key" must have 16 elements, got ${v.length}');
+      throw FormatException(
+        'Field "$key" must have 16 elements, got ${v.length}',
+      );
     }
     final doubles = <double>[];
     for (int i = 0; i < v.length; i++) {
@@ -127,10 +192,14 @@ class RobotProfile {
   }) {
     if (v == null) return defaultValue;
     if (v is! List) {
-      throw FormatException('Field "$key" must be a list, got ${v.runtimeType}');
+      throw FormatException(
+        'Field "$key" must be a list, got ${v.runtimeType}',
+      );
     }
     if (v.length < 4) {
-      throw FormatException('Field "$key" must have at least 4 elements, got ${v.length}');
+      throw FormatException(
+        'Field "$key" must have at least 4 elements, got ${v.length}',
+      );
     }
     final list = <double>[];
     for (int i = 0; i < v.length; i++) {
@@ -154,6 +223,8 @@ class RobotProfile {
   /// 从当前 profile 参数创建对应的 [ObservationBuilder]。
   ObservationBuilder toObservationBuilder() => StandardObservationBuilder(
     standingPose: standingPose,
+    actionLowerLimits: actionLowerLimits,
+    actionUpperLimits: actionUpperLimits,
     imuGyroscopeScale: imuGyroscopeScale,
     jointVelocityScale: jointVelocityScale,
     actionScale: actionScale,

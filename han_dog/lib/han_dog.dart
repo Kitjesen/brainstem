@@ -9,6 +9,7 @@ export 'src/linux_joystick.dart';
 export 'src/real_controller.dart';
 export 'src/real_control_dog.dart';
 export 'src/xbox_controller.dart';
+export 'src/xbox_nc500_controller.dart';
 export 'src/server/gain_manager.dart';
 export 'src/server/proto_convert.dart';
 export 'src/server/sim_sensor.dart';

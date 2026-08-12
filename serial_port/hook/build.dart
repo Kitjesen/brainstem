@@ -20,9 +20,20 @@ Future<void> main(List<String> args) async {
     );
 
   await build(args, (input, output) async {
-    if (!await fetchSubmodule(input.packageRoot.resolveUri(.file('../..')))) {
+    final cserialPortDir = Directory.fromUri(
+      input.packageRoot.resolveUri(.file('src/CSerialPort/')),
+    );
+    if (!cserialPortDir.existsSync() &&
+        !await fetchSubmodule(input.packageRoot.resolveUri(.file('..')))) {
       throw Exception('Failed to fetch CSerialPort submodule.');
     }
+
+    // Native-toolchain-cmake does not automatically include every nested
+    // submodule source in the hook cache key. Track the Unix implementation
+    // explicitly so fixes there always rebuild libcserialport.so.
+    output.dependencies.add(
+      cserialPortDir.uri.resolve('src/SerialPortUnixBase.cpp'),
+    );
 
     final dllPath = input.outputDirectory.resolve('bin').toFilePath();
     final builder = CMakeBuilder.create(

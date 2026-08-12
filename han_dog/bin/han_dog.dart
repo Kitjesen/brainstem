@@ -29,22 +29,28 @@ Timer? _profileReloadTimer;
 /// Xbox 热插检测定时器（关机时取消）
 Timer? _controllerHotplugTimer;
 
+bool _hasJoystickNode(String preferredDevice) {
+  if (File(preferredDevice).existsSync()) return true;
+  final inputDir = Directory('/dev/input');
+  if (!inputDir.existsSync()) return false;
+  return inputDir.listSync().any(
+    (entity) => entity.path.split('/').last.startsWith('js'),
+  );
+}
+
 void main() {
   setupLogging(logDir: _cfg.logDir);
-  runZonedGuarded(
-    () async => _run(),
-    (error, stack) {
-      _log.severe('Uncaught: $error\n$stack');
-      (() async {
-        try {
-          _jointForCleanup?.disable();
-          await _grpcServerForCleanup?.shutdown();
-          _log.info('gRPC port ${_cfg.grpcPort} released.');
-        } catch (_) {}
-        exit(1);
-      })();
-    },
-  );
+  runZonedGuarded(() async => _run(), (error, stack) {
+    _log.severe('Uncaught: $error\n$stack');
+    (() async {
+      try {
+        _jointForCleanup?.disable();
+        await _grpcServerForCleanup?.shutdown();
+        _log.info('gRPC port ${_cfg.grpcPort} released.');
+      } catch (_) {}
+      exit(1);
+    })();
+  });
 }
 
 Future<void> _run() async {
@@ -68,9 +74,10 @@ Future<void> _run() async {
   final profiles = await loadProfiles(_cfg.profileDir);
   if (profiles.isEmpty) {
     _log.severe(
-        'No profiles found in "${_cfg.profileDir}" — '
-        'cannot start without at least one profile. '
-        'Create a JSON profile file and set HAN_DOG_PROFILE_DIR if needed.');
+      'No profiles found in "${_cfg.profileDir}" — '
+      'cannot start without at least one profile. '
+      'Create a JSON profile file and set HAN_DOG_PROFILE_DIR if needed.',
+    );
     exit(1);
   }
 
@@ -81,18 +88,22 @@ Future<void> _run() async {
   } else {
     if (defaultName != null) {
       _log.warning(
-          'HAN_DOG_DEFAULT_PROFILE="$defaultName" not found in profiles '
-          '(available: ${profiles.keys.join(", ")}). '
-          'Using first profile: "${profiles.keys.first}".');
+        'HAN_DOG_DEFAULT_PROFILE="$defaultName" not found in profiles '
+        '(available: ${profiles.keys.join(", ")}). '
+        'Using first profile: "${profiles.keys.first}".',
+      );
     }
     defaultProfile = profiles.values.first;
   }
-  _log.info('Default profile: ${defaultProfile.name} (model=${defaultProfile.modelPath})');
+  _log.info(
+    'Default profile: ${defaultProfile.name} (model=${defaultProfile.modelPath})',
+  );
   final historySize = await _resolveHistorySize(defaultProfile);
   final modelInputName = await _resolveInputName(defaultProfile);
   _log.info(
-      'Resolved historySize=$historySize inputName=$modelInputName '
-      '(model=${defaultProfile.modelPath})');
+    'Resolved historySize=$historySize inputName=$modelInputName '
+    '(model=${defaultProfile.modelPath})',
+  );
 
   final clock = StreamController<void>.broadcast();
 
@@ -106,10 +117,10 @@ Future<void> _run() async {
 
   // PCAN USB 通道映射（由硬件接线决定）
   final joint = RealJoint(
-    fr: .usbbus1,
-    fl: .usbbus2,
-    rr: .usbbus3,
-    rl: .usbbus4,
+    fr: .usbbus4,
+    fl: .usbbus3,
+    rr: .usbbus2,
+    rl: .usbbus1,
   );
   if (!joint.open()) {
     _log.severe('Joint PCAN open failed');
@@ -145,6 +156,7 @@ Future<void> _run() async {
     historySize: historySize,
     standUpCounts: defaultProfile.standUpCounts,
     sitDownCounts: defaultProfile.sitDownCounts,
+    observationBuilder: defaultProfile.toObservationBuilder(),
   );
   const modelLoadMaxAttempts = 3;
   bool modelLoaded = false;
@@ -159,10 +171,14 @@ Future<void> _run() async {
       break;
     } catch (e) {
       if (attempt == modelLoadMaxAttempts) {
-        _log.severe('Failed to load ONNX model after $modelLoadMaxAttempts attempts: $e');
+        _log.severe(
+          'Failed to load ONNX model after $modelLoadMaxAttempts attempts: $e',
+        );
       } else {
         final delay = Duration(seconds: attempt * 2);
-        _log.warning('ONNX model load failed (attempt $attempt/$modelLoadMaxAttempts): $e — retrying in $delay');
+        _log.warning(
+          'ONNX model load failed (attempt $attempt/$modelLoadMaxAttempts): $e — retrying in $delay',
+        );
         await Future<void>.delayed(delay);
       }
     }
@@ -194,14 +210,18 @@ Future<void> _run() async {
       controller = yunzhuo;
       _log.info('YUNZHUO controller opened.');
     } else {
-      _log.info('YUNZHUO not available, trying Xbox...');
-      final xbox = XboxController(_cfg.xboxDevice, config: xboxConfig);
+      _log.info('YUNZHUO not available, trying Xbox/NC500...');
+      final xbox = XboxNc500Controller(
+        _cfg.xboxDevice,
+        nc500HidrawDevice: _cfg.nc500HidrawDevice,
+        config: xboxConfig,
+      );
       if (xbox.open()) {
         controller = xbox;
-        _log.info('Xbox controller opened: ${_cfg.xboxDevice}');
+        _log.info('Xbox/NC500 controller opened.');
       } else {
         _log.warning(
-          'No controller available (YUNZHUO=${_cfg.yunzhuoPort}, Xbox=${_cfg.xboxDevice}) — '
+          'No controller available (YUNZHUO=${_cfg.yunzhuoPort}, Xbox/NC500=${_cfg.xboxDevice}) — '
           'running in gRPC-only mode',
         );
       }
@@ -210,16 +230,17 @@ Future<void> _run() async {
 
   // ──── 4. FSM + 仲裁器 ──────────────────────────────────────
   final M m = M(brain)..add(Init());
-  _subs.add(m.stream.listen((s) {
-    _log.info('CMS state: $s');
-  }));
+  _subs.add(
+    m.stream.listen((s) {
+      _log.info('CMS state: $s');
+    }),
+  );
   try {
     await m.stream
         .firstWhere((s) => s is Grounded)
         .timeout(_cfg.startupTimeout);
   } on TimeoutException {
-    _log.severe(
-        'FSM 未能在 ${_cfg.startupTimeoutSec}s 内到达 Grounded 状态 — 中止启动');
+    _log.severe('FSM 未能在 ${_cfg.startupTimeoutSec}s 内到达 Grounded 状态 — 中止启动');
     await m.close();
     joint.disable();
     imu.dispose();
@@ -230,9 +251,11 @@ Future<void> _run() async {
   _log.info('CMS initialized: ${m.state}');
 
   final arbiter = ControlArbiter(m, timeout: _cfg.arbiterTimeout);
-  _subs.add(arbiter.ownerStream.listen((owner) {
-    _log.info('Arbiter control owner: ${owner ?? "none"}');
-  }));
+  _subs.add(
+    arbiter.ownerStream.listen((owner) {
+      _log.info('Arbiter control owner: ${owner ?? "none"}');
+    }),
+  );
   // IMU 串口断联 → 记录警告。频率监控会在持续低频时触发 Fault。
   imu.onDisconnect = (reason) {
     _log.warning('IMU disconnect: $reason');
@@ -243,51 +266,75 @@ Future<void> _run() async {
     joint: joint,
     requestFault: (reason) => arbiter.fault(reason),
   );
-  _subs.add(motorHealth.healthStream.listen((event) {
-    switch (event.severity) {
-      case MotorSeverity.transient:
-        _log.fine('Motor health: $event');
-      case MotorSeverity.healthy:
-        _log.info('Motor health: $event');
-      case MotorSeverity.degraded:
-        _log.warning('Motor health: $event');
-      case MotorSeverity.critical:
-        _log.severe('Motor health: $event');
-    }
-  }));
+  _subs.add(
+    motorHealth.healthStream.listen((event) {
+      switch (event.severity) {
+        case MotorSeverity.transient:
+          _log.fine('Motor health: $event');
+        case MotorSeverity.healthy:
+          _log.info('Motor health: $event');
+        case MotorSeverity.degraded:
+          _log.warning('Motor health: $event');
+        case MotorSeverity.critical:
+          _log.severe('Motor health: $event');
+      }
+    }),
+  );
   // CMS state → recovery: when Grounded with faulted motors, attempt per-joint
   // verified recovery instead of blind clear-all.
-  _subs.add(m.stream.listen((s) {
-    if (s is Grounded && motorHealth.hasFaults) {
-      _log.info('Reached Grounded with faulted motors — starting recovery');
-      motorHealth.recoverFaults();
-    }
-  }));
+  _subs.add(
+    m.stream.listen((s) {
+      if (s is Grounded && motorHealth.hasFaults) {
+        _log.info('Reached Grounded with faulted motors — starting recovery');
+        motorHealth.recoverFaults();
+      }
+    }),
+  );
 
   var motorOutputEnabled = false;
+  var lastWheelActionLog = DateTime.fromMillisecondsSinceEpoch(0);
 
   // 推理输出 → 电机动作 (gated through MotorHealthManager)
-  _subs.add(brain.nextActionStream.listen(
-    (action) {
-      if (!motorOutputEnabled) return;
+  _subs.add(
+    brain.nextActionStream.listen(
+      (action) {
+        if (!motorOutputEnabled) return;
 
-      if (arbiter.state is Grounded) {
-        joint.sendAction(joint.position.discardFoot());
-        return;
-      }
+        if (arbiter.state is Grounded) {
+          joint.sendAction(joint.position.discardFoot());
+          return;
+        }
 
-      final gated = motorHealth.gateAction(action, joint.position);
-      joint.sendAction(gated);
-    },
-    onError: (Object error, StackTrace st) {
-      _log.severe('Inference stream error: $error', error, st);
-      arbiter.fault('Inference stream error: $error');
-    },
-    onDone: () {
-      _log.severe('Inference stream closed unexpectedly');
-      arbiter.fault('Inference stream closed');
-    },
-  ));
+        final gated = motorHealth.gateAction(action, joint.position);
+        final now = DateTime.now();
+        if (now.difference(lastWheelActionLog).inMilliseconds >= 200) {
+          lastWheelActionLog = now;
+          final v = joint.velocity;
+          _log.info(
+            'ACTION wheel target='
+            'FR=${gated.frFoot.toStringAsFixed(2)} '
+            'FL=${gated.flFoot.toStringAsFixed(2)} '
+            'RR=${gated.rrFoot.toStringAsFixed(2)} '
+            'RL=${gated.rlFoot.toStringAsFixed(2)} '
+            'vel='
+            'FR=${v.frFoot.toStringAsFixed(2)} '
+            'FL=${v.flFoot.toStringAsFixed(2)} '
+            'RR=${v.rrFoot.toStringAsFixed(2)} '
+            'RL=${v.rlFoot.toStringAsFixed(2)}',
+          );
+        }
+        joint.sendAction(gated);
+      },
+      onError: (Object error, StackTrace st) {
+        _log.severe('Inference stream error: $error', error, st);
+        arbiter.fault('Inference stream error: $error');
+      },
+      onDone: () {
+        _log.severe('Inference stream closed unexpectedly');
+        arbiter.fault('Inference stream closed');
+      },
+    ),
+  );
 
   // YUNZHUO 遥控器 → CMS 命令映射（仅在遥控器可用时创建）
   RealControlDog? controlDog;
@@ -323,14 +370,24 @@ Future<void> _run() async {
     _log.info('No controller — motor enable via gRPC only');
     // ──── Xbox 热插检测（每 3 秒扫描，接入后自动初始化）─────────
     _controllerHotplugTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (controller != null) { _controllerHotplugTimer?.cancel(); return; }
+      if (controller != null) {
+        _controllerHotplugTimer?.cancel();
+        return;
+      }
       // 先检查设备节点存在再尝试打开，避免 SEVERE 日志噪音
-      if (!File(_cfg.xboxDevice).existsSync()) return;
-      final xbox = XboxController(_cfg.xboxDevice, config: xboxConfig);
-      if (!xbox.open()) { xbox.dispose(); return; }
+      if (!_hasJoystickNode(_cfg.xboxDevice)) return;
+      final xbox = XboxNc500Controller(
+        _cfg.xboxDevice,
+        nc500HidrawDevice: _cfg.nc500HidrawDevice,
+        config: xboxConfig,
+      );
+      if (!xbox.open()) {
+        xbox.dispose();
+        return;
+      }
       _controllerHotplugTimer?.cancel();
       controller = xbox;
-      _log.info('Xbox hot-plugged: ${_cfg.xboxDevice}');
+      _log.info('Xbox/NC500 hot-plugged.');
       controlDog = RealControlDog(
         brain: brain,
         imu: imu,
@@ -352,44 +409,66 @@ Future<void> _run() async {
       );
       profileManager = pm;
       controlDog!.onProfileSwitch = () => pm.toggle();
-      controlDog!.onMotorEnableChanged = (enabled) { motorOutputEnabled = enabled; };
+      controlDog!.onMotorEnableChanged = (enabled) {
+        motorOutputEnabled = enabled;
+      };
       _profileReloadTimer ??= Timer.periodic(const Duration(seconds: 30), (_) {
         pm.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
           _log.warning('Profile hot-reload failed', e, st);
         });
       });
-      _log.info('Xbox hot-plug: ProfileManager ready: ${profiles.keys.join(", ")}');
+      _log.info(
+        'Xbox hot-plug: ProfileManager ready: ${profiles.keys.join(", ")}',
+      );
     });
   }
 
   // ──── 4c. 策略热加载（每 30s 扫描 profileDir）────────────────
   if (profileManager != null) {
     _profileReloadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      profileManager!.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
+      profileManager!.reload(_cfg.profileDir).catchError((
+        Object e,
+        StackTrace st,
+      ) {
         _log.warning('Profile hot-reload failed', e, st);
       });
     });
   }
 
   // ──── 5. 监控 ──────────────────────────────────────────────
-  _subs.add(startSensorMonitoring(
-    imu: imu,
-    joint: joint,
-    arbiter: arbiter,
-    threshold: _cfg.sensorLowThreshold,
-  ));
+  _subs.add(
+    startSensorMonitoring(
+      imu: imu,
+      joint: joint,
+      arbiter: arbiter,
+      threshold: _cfg.sensorLowThreshold,
+    ),
+  );
+  Timer(const Duration(seconds: 4), () {
+    _log.info(
+      'MOTOR_REPORT_HZ '
+      '${joint.frequencyWatches.map((watch) => watch.value).toList()}',
+    );
+  });
   final initialController = controller;
   if (initialController is RealController) {
-    _subs.add(startControllerMonitoring(
-      controller: initialController,
-      arbiter: arbiter,
-    ));
+    Timer(const Duration(seconds: 4), () {
+      _log.info('YUNZHUO_REPORT_HZ ${initialController.hz.value}');
+    });
+    _subs.add(
+      startControllerMonitoring(
+        controller: initialController,
+        arbiter: arbiter,
+      ),
+    );
   }
-  _subs.add(startJointLimitMonitoring(
-    joint: joint,
-    arbiter: arbiter,
-    limitRad: _cfg.jointLimitRad,
-  ));
+  _subs.add(
+    startJointLimitMonitoring(
+      joint: joint,
+      arbiter: arbiter,
+      limitRad: _cfg.jointLimitRad,
+    ),
+  );
 
   // ──── 6. gRPC 服务器 ───────────────────────────────────────
   final imuBroadcast = imu.stateStream.asBroadcastStream();
@@ -406,30 +485,36 @@ Future<void> _run() async {
     arbiter: arbiter,
     motor: joint,
     robotType: msg.RobotType.MINI,
-    imuStreamFactory: () => imuBroadcast.expand((s) => s).map(
+    imuStreamFactory: () => imuBroadcast
+        .expand((s) => s)
+        .map(
           (s) => msg.Imu(
             gyroscope: msg.Vector3(
-                x: s.gyroscope.x, y: s.gyroscope.y, z: s.gyroscope.z),
+              x: s.gyroscope.x,
+              y: s.gyroscope.y,
+              z: s.gyroscope.z,
+            ),
             quaternion: msg.Quaternion(
-                w: s.quaternion.w,
-                x: s.quaternion.x,
-                y: s.quaternion.y,
-                z: s.quaternion.z),
-            timestamp: elapsed(),
-          ),
-        ),
-    jointStreamFactory: () => jointBroadcast.map(
-          (r) => msg.Joint(
-            singleJoint: msg.SingleJoint(
-              id: r.$1,
-              position: r.$2.position,
-              velocity: r.$2.velocity,
-              torque: r.$2.torque,
-              status: r.$2.status.value,
+              w: s.quaternion.w,
+              x: s.quaternion.x,
+              y: s.quaternion.y,
+              z: s.quaternion.z,
             ),
             timestamp: elapsed(),
           ),
         ),
+    jointStreamFactory: () => jointBroadcast.map(
+      (r) => msg.Joint(
+        singleJoint: msg.SingleJoint(
+          id: r.$1,
+          position: r.$2.position,
+          velocity: r.$2.velocity,
+          torque: r.$2.torque,
+          status: r.$2.status.value,
+        ),
+        timestamp: elapsed(),
+      ),
+    ),
   );
   cmsService.profileManager = profileManager;
   cmsService.joint = joint;
@@ -512,25 +597,23 @@ Future<int> _resolveHistorySize(RobotProfile profile) async {
   );
   if (inferred != null) {
     _log.info(
-        'Inferred historySize=$inferred from model input '
-        '(tensorSize=$tensorSize, model=${profile.modelPath})');
+      'Inferred historySize=$inferred from model input '
+      '(tensorSize=$tensorSize, model=${profile.modelPath})',
+    );
     return inferred;
   }
 
   _log.warning(
-      'Unable to infer history size from model ${profile.modelPath}; '
-      'falling back to 1');
+    'Unable to infer history size from model ${profile.modelPath}; '
+    'falling back to 1',
+  );
   return 1;
 }
 
 Future<String> _resolveInputName(RobotProfile profile) async {
-  final inferred = await inferInputNameFromModel(
-    modelPath: profile.modelPath,
-  );
+  final inferred = await inferInputNameFromModel(modelPath: profile.modelPath);
   if (inferred != null && inferred.isNotEmpty) {
-    _log.info(
-      'Inferred inputName=$inferred from model ${profile.modelPath}',
-    );
+    _log.info('Inferred inputName=$inferred from model ${profile.modelPath}');
     return inferred;
   }
 
@@ -546,10 +629,22 @@ Future<String> _resolveInputName(RobotProfile profile) async {
 /// 检查 16 个关节的主动上报状态。
 Future<void> _checkJointReporting(RealJoint joint) async {
   const names = [
-    'FR Hip', 'FR Thigh', 'FR Calf', 'FR Foot',
-    'FL Hip', 'FL Thigh', 'FL Calf', 'FL Foot',
-    'RR Hip', 'RR Thigh', 'RR Calf', 'RR Foot',
-    'RL Hip', 'RL Thigh', 'RL Calf', 'RL Foot',
+    'FR Hip',
+    'FR Thigh',
+    'FR Calf',
+    'FR Foot',
+    'FL Hip',
+    'FL Thigh',
+    'FL Calf',
+    'FL Foot',
+    'RR Hip',
+    'RR Thigh',
+    'RR Calf',
+    'RR Foot',
+    'RL Hip',
+    'RL Thigh',
+    'RL Calf',
+    'RL Foot',
   ];
   const attempts = 8;
   for (var attempt = 1; attempt <= attempts; attempt++) {
@@ -575,8 +670,7 @@ Future<void> _checkJointReporting(RealJoint joint) async {
     _log.info('主动上报: 16/16 关节已收到');
   } else {
     _log.info('主动上报 已收到: ${hasReport.join(", ")}');
-    _log.warning(
-        '主动上报 未收到: ${noReport.join(", ")} (请检查 CAN/电机或重新上电)');
+    _log.warning('主动上报 未收到: ${noReport.join(", ")} (请检查 CAN/电机或重新上电)');
   }
 }
 
@@ -593,19 +687,22 @@ Future<grpc.Server> _startGrpc(UnifiedCmsServer cmsService) async {
   } on SocketException catch (e) {
     if (e.osError?.errorCode == 98) {
       _log.warning(
-          'Port ${_cfg.grpcPort} in use, freeing (fuser -k ${_cfg.grpcPort}/tcp)...');
-      await Process.run('fuser', ['-k', '${_cfg.grpcPort}/tcp'],
-          runInShell: false);
+        'Port ${_cfg.grpcPort} in use, freeing (fuser -k ${_cfg.grpcPort}/tcp)...',
+      );
+      await Process.run('fuser', [
+        '-k',
+        '${_cfg.grpcPort}/tcp',
+      ], runInShell: false);
       await Future<void>.delayed(const Duration(seconds: 1));
       server = create();
-      await server.serve(
-          address: InternetAddress.anyIPv4, port: _cfg.grpcPort);
+      await server.serve(address: InternetAddress.anyIPv4, port: _cfg.grpcPort);
     } else {
       rethrow;
     }
   }
   _log.info(
-      'gRPC server listening on 0.0.0.0:${_cfg.grpcPort} (accessible from network)');
+    'gRPC server listening on 0.0.0.0:${_cfg.grpcPort} (accessible from network)',
+  );
   return server;
 }
 
@@ -632,7 +729,9 @@ void _registerShutdown({
     // 全局关机总超时：防止任意步骤挂起导致进程永久卡死
     const hardDeadline = Duration(seconds: 15);
     Timer(hardDeadline, () {
-      _log.severe('Shutdown exceeded ${hardDeadline.inSeconds}s hard deadline — forcing exit(1)');
+      _log.severe(
+        'Shutdown exceeded ${hardDeadline.inSeconds}s hard deadline — forcing exit(1)',
+      );
       _jointForCleanup?.disable();
       exit(1);
     });
@@ -674,16 +773,30 @@ void _registerShutdown({
 
     // 释放所有资源
     for (final sub in _subs) {
-      try { sub.cancel(); } catch (_) {}
+      try {
+        sub.cancel();
+      } catch (_) {}
     }
     _subs.clear();
     getClockTimer()?.cancel();
     _profileReloadTimer?.cancel();
     _controllerHotplugTimer?.cancel();
-    for (final disposable in [motorHealth, arbiter, controlDog, controller, imu, joint, brain]) {
-      try { (disposable as dynamic).dispose(); } catch (_) {}
+    for (final disposable in [
+      motorHealth,
+      arbiter,
+      controlDog,
+      controller,
+      imu,
+      joint,
+      brain,
+    ]) {
+      try {
+        (disposable as dynamic).dispose();
+      } catch (_) {}
     }
-    try { await m.close().timeout(const Duration(seconds: 2)); } catch (_) {}
+    try {
+      await m.close().timeout(const Duration(seconds: 2));
+    } catch (_) {}
     _log.info('All resources released — exit(0)');
     exit(0);
   }

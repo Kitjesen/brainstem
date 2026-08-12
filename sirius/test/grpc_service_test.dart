@@ -27,6 +27,45 @@ class _FakeCmsService extends RobotControlServiceBase {
       initialState;
 
   @override
+  Future<Empty> clearMotorFault(
+    ServiceCall call,
+    ClearFaultRequest request,
+  ) async => Empty();
+
+  @override
+  Future<MotorStatusResponse> getMotorStatus(
+    ServiceCall call,
+    Empty request,
+  ) async => MotorStatusResponse();
+
+  @override
+  Future<SpeedModeRequest> getSpeedMode(
+    ServiceCall call,
+    Empty request,
+  ) async => SpeedModeRequest(mode: SpeedMode.SPEED_MODE_NORMAL);
+
+  @override
+  Future<Voltage> getVoltage(ServiceCall call, Empty request) async =>
+      Voltage(values: List<double>.filled(16, 0));
+
+  @override
+  Future<GestureList> listGestures(ServiceCall call, Empty request) async =>
+      GestureList();
+
+  @override
+  Future<Empty> playGesture(ServiceCall call, GestureRequest request) async =>
+      Empty();
+
+  @override
+  Future<Empty> setSpeedMode(
+    ServiceCall call,
+    SpeedModeRequest request,
+  ) async => Empty();
+
+  @override
+  Future<Empty> setZero(ServiceCall call, Empty request) async => Empty();
+
+  @override
   Future<Params> getParams(ServiceCall call, Empty request) async => Params(
     robot: RobotModel(
       type: RobotType.MINI,

@@ -100,7 +100,9 @@ StreamSubscription<void> startControllerMonitoring({
   required ControlArbiter arbiter,
 }) {
   int disconnectedTicks = 0;
-  return RealFrequency.manager.onTick.listen((_) {
+  bool reconnecting = false;
+  return RealFrequency.manager.onTick.listen((_) async {
+    if (reconnecting) return;
     if (controller.hz.value == 0) {
       disconnectedTicks++;
       if (disconnectedTicks == 1) {
@@ -108,11 +110,16 @@ StreamSubscription<void> startControllerMonitoring({
       }
       if (disconnectedTicks % 3 == 0) {
         _log.warning('Attempting to reopen controller...');
-        if (controller.reopen()) {
-          _log.info('Controller reconnected!');
-          disconnectedTicks = 0;
-        } else {
-          _log.warning('Controller reconnect failed, will retry...');
+        reconnecting = true;
+        try {
+          if (await controller.reopen()) {
+            _log.info('Controller reconnected!');
+            disconnectedTicks = 0;
+          } else {
+            _log.warning('Controller reconnect failed, will retry...');
+          }
+        } finally {
+          reconnecting = false;
         }
       }
     } else {
