@@ -152,6 +152,7 @@ expected=(
   "--setenv=HAN_DOG_YUNZHUO_PORT=$YUNZHUO_PORT"
   "--setenv=HAN_DOG_PORT=$GRPC_PORT"
   "--setenv=LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+  "--setenv=LD_PRELOAD=$CSERIALPORT_LIBRARY"
   "$DART_BIN"
   run
   han_dog/bin/han_dog.dart
@@ -276,6 +277,7 @@ reset_fixture() {
   PYTHON_BIN="$TEST_PYTHON_BIN"
   IMU_PORT="$CASE_DIR/imu"
   YUNZHUO_PORT="$CASE_DIR/yunzhuo"
+  CSERIALPORT_LIBRARY="$CASE_DIR/libcserialport.so"
   SERVICE_USER=test-user
   SERVICE_GROUP=test-group
   PRODUCTION_UNIT=han_dog.service
@@ -288,6 +290,7 @@ reset_fixture() {
   : >"$DART_BIN"
   : >"$IMU_PORT"
   : >"$YUNZHUO_PORT"
+  : >"$CSERIALPORT_LIBRARY"
   : >"$BRAINSTEM_ROOT/han_dog/bin/han_dog.dart"
   : >"$BRAINSTEM_ROOT/model/thunder_h15_model10400.onnx"
   : >"$BRAINSTEM_ROOT/model/thunder_h18_model5000.onnx"
@@ -329,6 +332,7 @@ run_service() {
     YUNZHUO_PORT="$YUNZHUO_PORT" \
     PROFILE_DIR="$PROFILE_DIR" \
     LD_LIBRARY_PATH=/opt/onnxruntime/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu \
+    CSERIALPORT_LIBRARY="$CSERIALPORT_LIBRARY" \
     START_TIMEOUT_SECONDS="$START_TIMEOUT_SECONDS" \
     STOP_TIMEOUT_SECONDS="$STOP_TIMEOUT_SECONDS" \
     LOCK_DIR="$LOCK_DIR" \
@@ -449,6 +453,13 @@ test_restore_refuses_candidate() {
 }
 
 test_preflight_failures_do_not_launch() {
+  reset_fixture
+  rm "$CSERIALPORT_LIBRARY"
+  run_service start h15
+  assert_status 1 "missing libcserialport fails preflight"
+  assert_contains "libcserialport" "missing libcserialport prints actionable output"
+  assert_log_absent '^sudo:' "missing libcserialport never invokes sudo"
+
   reset_fixture
   rm "$BRAINSTEM_ROOT/model/thunder_h15_model10400.onnx"
   run_service start h15

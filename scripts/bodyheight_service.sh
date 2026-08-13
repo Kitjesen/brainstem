@@ -14,7 +14,8 @@ IMU_PORT="${IMU_PORT:-/dev/imu}"
 YUNZHUO_PORT="${YUNZHUO_PORT:-/dev/yunzhuo}"
 PROFILE_DIR="${PROFILE_DIR:-$BRAINSTEM_ROOT/han_dog/profiles}"
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-/opt/onnxruntime/lib:/usr/local/lib:/usr/lib/aarch64-linux-gnu:/lib/aarch64-linux-gnu}"
-START_TIMEOUT_SECONDS="${START_TIMEOUT_SECONDS:-10}"
+CSERIALPORT_LIBRARY="${CSERIALPORT_LIBRARY:-/lib/aarch64-linux-gnu/libcserialport.so}"
+START_TIMEOUT_SECONDS="${START_TIMEOUT_SECONDS:-45}"
 STOP_TIMEOUT_SECONDS="${STOP_TIMEOUT_SECONDS:-10s}"
 
 # Operational commands are injectable so tests never reach the host system.
@@ -226,6 +227,12 @@ preflight_files() {
     printf '预检失败：Dart 不存在或不可执行：%s\n' "$DART_BIN" >&2
     return 1
   }
+  [[ "$CSERIALPORT_LIBRARY" == /* && "$CSERIALPORT_LIBRARY" != *$'\n'* &&
+      -f "$CSERIALPORT_LIBRARY" && -r "$CSERIALPORT_LIBRARY" ]] || {
+    printf '预检失败：libcserialport 必须是无换行、可读的绝对路径普通文件：%s\n' \
+      "$CSERIALPORT_LIBRARY" >&2
+    return 1
+  }
   [[ -f "$BRAINSTEM_ROOT/han_dog/bin/han_dog.dart" ]] || {
     printf '预检失败：服务入口不存在：%s\n' "$BRAINSTEM_ROOT/han_dog/bin/han_dog.dart" >&2
     return 1
@@ -394,6 +401,7 @@ start_candidate() {
     "--setenv=HAN_DOG_YUNZHUO_PORT=$YUNZHUO_PORT" \
     "--setenv=HAN_DOG_PORT=$GRPC_PORT" \
     "--setenv=LD_LIBRARY_PATH=$LD_LIBRARY_PATH" \
+    "--setenv=LD_PRELOAD=$CSERIALPORT_LIBRARY" \
     "$DART_BIN" run han_dog/bin/han_dog.dart; then
     printf '启动失败：systemd-run 未能创建候选服务。\n' >&2
     printf '检查：%s status\n' "$0" >&2
