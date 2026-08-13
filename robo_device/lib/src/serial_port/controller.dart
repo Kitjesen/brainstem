@@ -13,8 +13,7 @@ class SerialPortController<E, S> {
   final SerialPort _serialPort;
 
   final _eventConverter = eventConverter[E]! as Uint8List Function(E);
-  final _stateConverter =
-      stateConverter[S]! as Stream<Iterable<S>> Function(Stream<Uint8List>);
+  final Stream<Iterable<S>> Function(Stream<Uint8List>) _stateConverter;
 
   final int? _readIntervalTimeoutMs;
 
@@ -27,7 +26,12 @@ class SerialPortController<E, S> {
     FlowControl flowControl = .FlowNone,
     int readBufferSize = 4096,
     int? readIntervalTimeoutMs,
-  }) : _readIntervalTimeoutMs = readIntervalTimeoutMs,
+    Stream<Iterable<S>> Function(Stream<Uint8List>)? stateDecoder,
+  }) : _stateConverter =
+           stateDecoder ??
+           stateConverter[S]!
+               as Stream<Iterable<S>> Function(Stream<Uint8List>),
+       _readIntervalTimeoutMs = readIntervalTimeoutMs,
        _serialPort = SerialPort()
          ..init(
            portName,

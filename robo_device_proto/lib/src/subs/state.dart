@@ -4,6 +4,64 @@ import 'dart:typed_data';
 const frameSize = 35;
 const frameRestLength = 34;
 const syncCode = 0x0F;
+const standardSbusFrameSize = 25;
+const standardSbusFlagsOffset = 23;
+const standardSbusEndOffset = 24;
+const standardSbusFrameLostFlag = 1 << 2;
+const standardSbusFailsafeFlag = 1 << 3;
+
+bool isStandardSbusHealthy(int flags) =>
+    (flags & (standardSbusFrameLostFlag | standardSbusFailsafeFlag)) == 0;
+
+bool _isStandardSbusEndByte(int byte) =>
+    byte == 0 || (byte & 0x0F) == 0x04;
+
+List<int> _unpackStandardSbusChannels(List<int> frame) {
+  return List<int>.generate(16, (channel) {
+    final bitOffset = channel * 11;
+    var value = 0;
+    for (var bit = 0; bit < 11; bit++) {
+      final packedBit = bitOffset + bit;
+      final byte = frame[1 + packedBit ~/ 8];
+      value |= ((byte >> (packedBit % 8)) & 1) << bit;
+    }
+    return value;
+  }, growable: false);
+}
+
+class StandardSbusChannelDecoder
+    extends StreamTransformerBase<Uint8List, List<(List<int>, int)>> {
+  const StandardSbusChannelDecoder();
+
+  @override
+  Stream<List<(List<int>, int)>> bind(Stream<Uint8List> stream) async* {
+    final pending = <int>[];
+    await for (final chunk in stream) {
+      pending.addAll(chunk);
+      final frames = <(List<int>, int)>[];
+      while (true) {
+        final start = pending.indexOf(syncCode);
+        if (start < 0) {
+          pending.clear();
+          break;
+        }
+        if (start > 0) pending.removeRange(0, start);
+        if (pending.length < standardSbusFrameSize) break;
+        if (!_isStandardSbusEndByte(pending[standardSbusEndOffset])) {
+          pending.removeAt(0);
+          continue;
+        }
+        final frame = pending.sublist(0, standardSbusFrameSize);
+        frames.add((
+          _unpackStandardSbusChannels(frame),
+          frame[standardSbusFlagsOffset],
+        ));
+        pending.removeRange(0, standardSbusFrameSize);
+      }
+      if (frames.isNotEmpty) yield frames;
+    }
+  }
+}
 
 class DataFrame {
   int head = 0;

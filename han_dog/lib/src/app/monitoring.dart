@@ -100,19 +100,32 @@ StreamSubscription<void> startControllerMonitoring({
   required ControlArbiter arbiter,
 }) {
   int disconnectedTicks = 0;
-  return RealFrequency.manager.onTick.listen((_) {
+  var reconnecting = false;
+  return RealFrequency.manager.onTick.listen((_) async {
     if (controller.hz.value == 0) {
       disconnectedTicks++;
       if (disconnectedTicks == 1) {
         arbiter.fault('YUNZHUO controller disconnected (0 Hz)');
       }
       if (disconnectedTicks % 3 == 0) {
+        if (reconnecting) return;
+        reconnecting = true;
         _log.warning('Attempting to reopen controller...');
-        if (controller.reopen()) {
-          _log.info('Controller reconnected!');
-          disconnectedTicks = 0;
-        } else {
-          _log.warning('Controller reconnect failed, will retry...');
+        try {
+          if (await controller.reopen()) {
+            _log.info('Controller reconnected!');
+            disconnectedTicks = 0;
+          } else {
+            _log.warning('Controller reconnect failed, will retry...');
+          }
+        } catch (error, stackTrace) {
+          _log.warning(
+            'Controller reconnect threw, will retry...',
+            error,
+            stackTrace,
+          );
+        } finally {
+          reconnecting = false;
         }
       }
     } else {
