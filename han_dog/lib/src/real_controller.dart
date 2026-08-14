@@ -20,8 +20,21 @@ Stream<Iterable<YunZhuoState>> _decodeStandardSbus(
       .map((frame) => YunZhuoState.fromChannels(frame.$1, frame.$2)),
 );
 
+Vector3 mapYunZhuoDirection(
+  YunZhuoState data, {
+  required String observationType,
+}) {
+  final scale = data.LT ? 0.5 : (data.RT ? 1.5 : 1.0);
+  final rightStickYaw = observationType == 'bodyHeight'
+      ? 0.0
+      : data.rightStick.x * 0.5;
+  final yaw = (data.knob + rightStickYaw).clamp(-1.0, 1.0);
+  return Vector3(data.leftStick.y * scale, -data.leftStick.x * scale, -yaw);
+}
+
 class RealController implements Gamepad, BodyHeightAxisInput {
   final String portName;
+  final String observationType;
   late SerialPortController<Never, YunZhuoState> port;
   final hz = RealFrequency();
 
@@ -35,7 +48,7 @@ class RealController implements Gamepad, BodyHeightAxisInput {
   Stream<double> get bodyHeightAxis =>
       bodyHeightAxisWithWatchdog(stateStream.map((state) => state.rightStick.y));
 
-  // CH1  右摇杆左右 (rightStick.x) → 叠加到旋转轴（yaw 精细控制）
+  // CH1  右摇杆左右 (rightStick.x) → 普通策略叠加到旋转轴；bodyHeight 不参与 yaw
   // CH2  右摇杆上下 (rightStick.y) → 上推为正；仅提供标准化输入，不负责死区、积分、profile 或 FSM
   // CH8  LT 两档    → 精确模式（速度 × 0.5）
   // CH12 RT 两档    → 冲刺模式（速度 × 1.5）
@@ -46,18 +59,12 @@ class RealController implements Gamepad, BodyHeightAxisInput {
   /// 训练约定：x>0 前进, y>0 向左, z>0 逆时针。
   /// 摇杆约定：leftStick.y>0 前推, leftStick.x>0 右推, knob>0 顺时针。
   /// 速度缩放规则：LT=精确(0.5×)，RT=冲刺(1.5×)，默认 1.0×。
-  /// rightStick.x 以 0.5 权重叠加到旋转轴，实现双手协同偏航控制。
+  /// 普通策略将 rightStick.x 以 0.5 权重叠加到旋转轴；bodyHeight 策略仅使用旋钮。
   /// 行走方向流，强关联遥控器：有数据就输出，150ms 无数据直接归零。
   Stream<Vector3> get direction => watchdogDecay(
-    stateStream.map((data) {
-      final scale = data.LT ? 0.5 : (data.RT ? 1.5 : 1.0);
-      final yaw = (data.knob + data.rightStick.x * 0.5).clamp(-1.0, 1.0);
-      return Vector3(
-        data.leftStick.y * scale,   // x=前后: 前推(y+) → forward(+)
-        -data.leftStick.x * scale,  // y=左右: 左推(x-) → left(+)
-        -yaw,                        // z=旋转: 顺时针(+) → 逆时针(-)
-      );
-    }),
+    stateStream.map(
+      (data) => mapYunZhuoDirection(data, observationType: observationType),
+    ),
     timeout: const Duration(milliseconds: 150),
     steps: 1,                         // 1 步直接归零，不衰减
     stepPeriod: const Duration(milliseconds: 1),
@@ -110,7 +117,10 @@ class RealController implements Gamepad, BodyHeightAxisInput {
       })
       .map((_) {});
 
-  RealController([this.portName = '/dev/ttyUSB0']) {
+  RealController([
+    this.portName = '/dev/ttyUSB0',
+    this.observationType = 'standard',
+  ]) {
     port = SerialPortController<Never, YunZhuoState>(
       portName,
       baudRate: 100000,

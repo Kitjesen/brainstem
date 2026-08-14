@@ -207,7 +207,10 @@ Future<void> _run() async {
   }
   {
     // 优先尝试 YUNZHUO 遥控器
-    final yunzhuo = RealController(_cfg.yunzhuoPort);
+    final yunzhuo = RealController(
+      _cfg.yunzhuoPort,
+      defaultProfile.observationType,
+    );
     if (yunzhuo.open()) {
       controller = yunzhuo;
       _log.info('YUNZHUO controller opened.');
