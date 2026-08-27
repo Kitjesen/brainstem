@@ -10,7 +10,9 @@ void main() async {
     print(state);
   });
   con.add(.disable(5));
-  con.add(.control(5, position: pi / 2, kd: 1, kp: 50));
+  // Han Dog CAN ID 1 is the RS04 hip motor. Motor IDs and models are declared
+  // centrally in robo_device_proto's hanDogMotorLayout.
+  con.add(.control(1, position: pi / 2, kd: 1, kp: 50));
   await Future.delayed(const Duration(seconds: 1));
   con.close();
 }

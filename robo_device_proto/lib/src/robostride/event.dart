@@ -5,6 +5,7 @@ import 'package:robo_device_proto/src/can_frame.dart';
 import 'type.dart';
 import 'parameter.dart';
 import 'internal.dart';
+import 'motor_config.dart';
 
 part 'event.freezed.dart';
 
@@ -22,11 +23,11 @@ sealed class RSEvent with _$RSEvent {
   }) = RSEventGetDeviceId;
   factory RSEvent.control(
     int canId, {
-    @Default(0.0) double torque, // (-120Nm~120Nm)
+    @Default(0.0) double torque, // range depends on motor at [canId]
     @Default(0.0) double position, // (-12.57f~12.57f)
-    @Default(0.0) double velocity, // (-15rad/s~15rad/s)
-    @Default(0.0) double kp, // (0.0~5000.0)
-    @Default(0.0) double kd, // (0.0~100.0)
+    @Default(0.0) double velocity, // range depends on motor at [canId]
+    @Default(0.0) double kp, // range depends on motor at [canId]
+    @Default(0.0) double kd, // range depends on motor at [canId]
   }) = RSEventControl;
   factory RSEvent.enable(int canId, {@Default(_defaultHostId) int hostId}) =
       RSEventEnable;
@@ -86,24 +87,13 @@ sealed class RSEvent with _$RSEvent {
       :final kp,
       :final kd,
     ) =>
-      .new(
-        mode: 0x01,
-        data2: floatToUint16(torque, -torqueMax, torqueMax),
+      _controlDataFrame(
         canId: canId,
-        data1:
-            (ByteData(8)
-                  ..setUint16(
-                    0,
-                    floatToUint16(position, -positionMax, positionMax),
-                  )
-                  ..setUint16(
-                    2,
-                    floatToUint16(velocity, -velocityMax, velocityMax),
-                  )
-                  ..setUint16(4, floatToUint16(kp, 0.0, kpMax))
-                  ..setUint16(6, floatToUint16(kd, 0.0, kdMax)))
-                .buffer
-                .asUint8List(),
+        torque: torque,
+        position: position,
+        velocity: velocity,
+        kp: kp,
+        kd: kd,
       ),
     RSEventEnable(:final canId, :final hostId) => .new(
       mode: 0x03,
@@ -171,4 +161,35 @@ sealed class RSEvent with _$RSEvent {
   };
 
   CanFrame toCanFrame() => toDataFrame().toCanFrame();
+}
+
+RSDataFrame _controlDataFrame({
+  required int canId,
+  required double torque,
+  required double position,
+  required double velocity,
+  required double kp,
+  required double kd,
+}) {
+  final limits = rsMotorLimitsForCanId(canId);
+  return RSDataFrame(
+    mode: 0x01,
+    data2: floatToUint16(torque, -limits.torqueMax, limits.torqueMax),
+    canId: canId,
+    data1:
+        (ByteData(8)
+              ..setUint16(0, floatToUint16(position, -positionMax, positionMax))
+              ..setUint16(
+                2,
+                floatToUint16(
+                  velocity,
+                  -limits.velocityMax,
+                  limits.velocityMax,
+                ),
+              )
+              ..setUint16(4, floatToUint16(kp, 0.0, limits.kpMax))
+              ..setUint16(6, floatToUint16(kd, 0.0, limits.kdMax)))
+            .buffer
+            .asUint8List(),
+  );
 }

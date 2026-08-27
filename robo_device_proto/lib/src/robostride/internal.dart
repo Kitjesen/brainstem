@@ -3,6 +3,8 @@ import 'package:equatable/equatable.dart';
 import 'package:robo_device_proto/src/can_frame.dart';
 
 const double positionMax = 12.57;
+
+// Backward-compatible RS04 aliases for existing package users and tests.
 const double velocityMax = 15.0;
 const double torqueMax = 120.0;
 const double kpMax = 5000.0;

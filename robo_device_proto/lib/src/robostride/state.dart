@@ -5,6 +5,7 @@ import 'type.dart';
 import 'parameter.dart';
 import 'internal.dart';
 import 'error.dart';
+import 'motor_config.dart';
 
 part 'state.freezed.dart';
 
@@ -58,42 +59,8 @@ sealed class RSState with _$RSState {
     // 0x02: general motor response
     // Both share identical data2/data1 layout: position, velocity, torque,
     // temperature in data1; canId, errors, status packed in data2.
-    0x01 || 0x02 => .response(
-      canId: (frame.data2) & 0xFF,
-      hostId: frame.canId,
-      position: uint16ToFloat(
-        frame.bytes.getUint16(0),
-        -positionMax,
-        positionMax,
-      ),
-      velocity: uint16ToFloat(
-        frame.bytes.getUint16(2),
-        -velocityMax,
-        velocityMax,
-      ),
-      torque: uint16ToFloat(frame.bytes.getUint16(4), -torqueMax, torqueMax),
-      temperature: frame.bytes.getUint16(6) / 10.0,
-      status: .fromValue((frame.data2 >> 14) & 0x3),
-      errors: .new((frame.data2 >> 8) & 0x3F),
-    ),
-    0x18 => .report(
-      canId: (frame.data2) & 0xFF,
-      hostId: frame.canId,
-      position: uint16ToFloat(
-        frame.bytes.getUint16(0),
-        -positionMax,
-        positionMax,
-      ),
-      velocity: uint16ToFloat(
-        frame.bytes.getUint16(2),
-        -velocityMax,
-        velocityMax,
-      ),
-      torque: uint16ToFloat(frame.bytes.getUint16(4), -torqueMax, torqueMax),
-      temperature: frame.bytes.getUint16(6) / 10.0,
-      status: .fromValue((frame.data2 >> 14) & 0x3),
-      errors: .new((frame.data2 >> 8) & 0x3F),
-    ),
+    0x01 || 0x02 => _motionState(frame, isReport: false),
+    0x18 => _motionState(frame, isReport: true),
     0x11 => .getter(
       hostId: frame.canId,
       canId: frame.data2 & 0xFF,
@@ -106,9 +73,56 @@ sealed class RSState with _$RSState {
       canId: frame.data2 & 0xFF,
       errors: .new(frame.data2),
     ),
-    _ => throw UnimplementedError('Unknown RSState mode: 0x${frame.mode.toRadixString(16)}'),
+    _ => throw UnimplementedError(
+      'Unknown RSState mode: 0x${frame.mode.toRadixString(16)}',
+    ),
   };
 
   factory RSState.fromCanFrame(CanFrame frame) =>
       .fromDataFrame(.fromCanFrame(frame));
+}
+
+RSState _motionState(RSDataFrame frame, {required bool isReport}) {
+  final canId = frame.data2 & 0xFF;
+  final limits = rsMotorLimitsForCanId(canId);
+  final position = uint16ToFloat(
+    frame.bytes.getUint16(0),
+    -positionMax,
+    positionMax,
+  );
+  final velocity = uint16ToFloat(
+    frame.bytes.getUint16(2),
+    -limits.velocityMax,
+    limits.velocityMax,
+  );
+  final torque = uint16ToFloat(
+    frame.bytes.getUint16(4),
+    -limits.torqueMax,
+    limits.torqueMax,
+  );
+  final temperature = frame.bytes.getUint16(6) / 10.0;
+  final status = RSStatus.fromValue((frame.data2 >> 14) & 0x3);
+  final errors = RSErrors1((frame.data2 >> 8) & 0x3F);
+
+  return isReport
+      ? RSState.report(
+          canId: canId,
+          hostId: frame.canId,
+          position: position,
+          velocity: velocity,
+          torque: torque,
+          temperature: temperature,
+          status: status,
+          errors: errors,
+        )
+      : RSState.response(
+          canId: canId,
+          hostId: frame.canId,
+          position: position,
+          velocity: velocity,
+          torque: torque,
+          temperature: temperature,
+          status: status,
+          errors: errors,
+        );
 }

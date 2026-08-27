@@ -10,6 +10,7 @@ import 'package:logging/logging.dart';
 import 'package:cms/cms.dart';
 import 'package:han_dog/src/app/config.dart';
 import 'package:han_dog/src/app/monitoring.dart';
+import 'package:robo_device_proto/robo_device_proto.dart';
 
 final _log = Logger('han_dog');
 final _cfg = HanDogConfig();
@@ -128,6 +129,8 @@ Future<void> _run() async {
     return;
   }
   _log.info('Joint PCAN opened.');
+  validateHanDogMotorLayout();
+  _log.info('MOTOR_CODEC $hanDogMotorCodecSummary');
 
   // 清除上次异常退出遗留的 fault
   _log.info('Clearing motor faults...');
