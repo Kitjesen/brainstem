@@ -146,6 +146,7 @@ expected=(
   --property=KillSignal=SIGINT
   "--property=TimeoutStopSec=$STOP_TIMEOUT_SECONDS"
   --property=Restart=no
+  --setenv=HAN_DOG_ALLOW_MOTOR_ENABLE=true
   "--setenv=HAN_DOG_DEFAULT_PROFILE=$EXPECTED_LAUNCH_PROFILE"
   "--setenv=HAN_DOG_PROFILE_DIR=$PROFILE_DIR"
   "--setenv=HAN_DOG_IMU_PORT=$IMU_PORT"
@@ -375,7 +376,7 @@ test_help() {
   reset_fixture
   run_service --help
   assert_status 0 "help exits zero"
-  assert_contains "不会启用电机" "help states start does not enable motors"
+  assert_contains "允许 CH5 使能电机" "help states CH5 motor enable is allowed"
   assert_contains "停机" "help explains stop safety"
 }
 

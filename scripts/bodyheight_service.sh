@@ -47,13 +47,14 @@ usage() {
 安全管理 Thunder body-height 候选服务：
   help, --help       显示帮助
   status             查看生产/候选服务和端口状态（只读）
-  start v2|h15|h18   预检后启动候选服务；不会停止生产服务，也不会启用电机
+  start v2|h15|h18   预检后启动候选服务；允许 CH5 使能电机，但不会主动使能
   logs [--follow]    查看候选服务最近 100 行日志，可持续跟踪
   stop               仅停止候选服务
   restore-master     在候选服务完全停止且端口空闲后启动生产服务
 
 重要安全说明：
-  start 只会打开服务所需硬件，不会启用电机或发送运动 RPC。
+  start 会统一设置 HAN_DOG_ALLOW_MOTOR_ENABLE=true；实际使能仍由 CH5 控制。
+  start 本身不会切换 CH5，也不会发送站立、行走、速度或高度运动 RPC。
   停机安全：stop 前必须先通过既有流程禁用电机并可靠支撑机器人；本脚本不会代办。
 EOF
 }
@@ -392,7 +393,7 @@ start_candidate() {
   preflight_runtime || return 1
   preflight_files || return 1
 
-  printf '预检通过，启动候选服务 %s（不会启用电机）...\n' "$PROFILE_NAME"
+  printf '预检通过，启动候选服务 %s（允许 CH5 使能，当前不会主动使能）...\n' "$PROFILE_NAME"
   if ! "$SUDO_BIN" "$SYSTEMD_RUN_BIN" \
     "--collect" \
     "--unit=$CANDIDATE_UNIT" \
@@ -403,6 +404,7 @@ start_candidate() {
     "--property=KillSignal=SIGINT" \
     "--property=TimeoutStopSec=$STOP_TIMEOUT_SECONDS" \
     "--property=Restart=no" \
+    "--setenv=HAN_DOG_ALLOW_MOTOR_ENABLE=true" \
     "--setenv=HAN_DOG_DEFAULT_PROFILE=$PROFILE_NAME" \
     "--setenv=HAN_DOG_PROFILE_DIR=$PROFILE_DIR" \
     "--setenv=HAN_DOG_IMU_PORT=$IMU_PORT" \
@@ -419,7 +421,7 @@ start_candidate() {
 
   if wait_until_ready; then
     printf '候选服务已启动：%s，端口 %s 正在监听。\n' "$CANDIDATE_UNIT" "$GRPC_PORT"
-    printf '提示：服务启动不代表电机已启用，本脚本不会发送运动命令。\n'
+    printf '提示：服务启动不代表电机已启用；CH5 可使能电机，本脚本不会主动切换 CH5。\n'
     return 0
   fi
 

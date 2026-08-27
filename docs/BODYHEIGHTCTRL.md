@@ -136,8 +136,10 @@ No unattended or remote motor motion is part of automated validation. Complete e
 
 The installed motor layout is CAN IDs 1–3 = RS04 legs and CAN ID 4 = RS02
 wheel on every leg bus. Encoding and feedback decoding use model-specific MIT
-ranges. Motor-enable and action frames remain blocked until the operator sets
-`HAN_DOG_ALLOW_MOTOR_ENABLE=true`; startup always sends disable frames first.
+ranges. All `start v2|h15|h18` launches set
+`HAN_DOG_ALLOW_MOTOR_ENABLE=true`, so CH5 may enable the motors for every
+profile. Startup still sends disable frames first, and the helper never toggles
+CH5 or sends a motion RPC by itself.
 
 The remote development server has no verified robot/CAN attachment, so this branch can prove the no-motion software preflight and MuJoCo chain only. Final motor-enabled acceptance must be performed by an onsite operator under this gate.
 
@@ -165,8 +167,9 @@ Use `start h15` or `start h18` for rollback. `start` verifies that `han_dog.serv
 stopped, the candidate service and port `13145` are free, the selected profile
 matches the ONNX filename/hash, and the required IMU/Yunzhuo devices exist. It
 never stops the production service automatically. Starting the service only
-opens the interfaces and gRPC endpoint: it does not enable motors and does not
-send stand-up, walking, velocity, or height motion commands.
+opens the interfaces and gRPC endpoint. It permits CH5 motor enable for all
+three profiles, but does not itself toggle CH5 or send stand-up, walking,
+velocity, or height motion commands.
 
 Before manually stopping production or running `stop`, disable the motors and
 place the robot on reliable support. Starting the candidate opens its hardware
