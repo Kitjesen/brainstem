@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:han_dog/han_dog.dart';
+import 'package:han_dog_brain/han_dog_brain.dart'
+    show SingleFrameHeightObservationBuilder;
 import 'package:test/test.dart';
 
 const _safeStandPose = [
@@ -103,4 +105,31 @@ void main() {
       expect(builder.tensorSize * expected.historySize, expected.inputSize);
     });
   }
+
+  test('single_frame_height_v2 matches the accepted deployment contract', () {
+    final raw =
+        jsonDecode(_profileFile('single_frame_height_v2').readAsStringSync())
+            as Map<String, dynamic>;
+    final profile = RobotProfile.fromJson(raw);
+    final builder = profile.toObservationBuilder();
+
+    expect(profile.observationType, 'singleFrameHeight');
+    expect(builder, isA<SingleFrameHeightObservationBuilder>());
+    expect(builder.tensorSize, 58);
+    expect(profile.inputName, 'obs');
+    expect(profile.bodyHeightCommand, 0.375);
+    expect(profile.minBodyHeightCommand, 0.25);
+    expect(profile.maxBodyHeightCommand, 0.50);
+    expect(profile.bodyHeightRateLimit, 0.05);
+    expect(profile.velocityCommandMin, (-0.5, -0.3, -0.3));
+    expect(profile.velocityCommandMax, (0.5, 0.3, 0.3));
+    expect(raw['_historySize'], 1);
+    expect(
+      raw['_onnxSha256'],
+      '318bff03d1b765f30553bf5aea85a2b413f58a8a2078eae830a097e6475dffb5',
+    );
+    expect(profile.modelPath, 'model/single_frame_height_v2_policy.onnx');
+    expect(_profileFile('single_frame_height_v2').existsSync(), isTrue);
+    expect(File(profile.modelPath).lengthSync(), 787237);
+  });
 }

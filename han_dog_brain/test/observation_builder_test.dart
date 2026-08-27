@@ -231,4 +231,75 @@ void main() {
       );
     });
   });
+
+  group('SingleFrameHeightObservationBuilder', () {
+    final singleFrameBuilder = SingleFrameHeightObservationBuilder(
+      standingPose: standingPose,
+      imuGyroscopeScale: 0.25,
+      jointVelocityScale: (0.05, 0.1, 0.2, 0.5),
+      actionScale: (0.125, 0.25, 0.25, 5.0),
+    );
+
+    test('matches the exact 58D V2 tensor contract', () {
+      final jointDelta = JointsMatrix.fromList(
+        List<double>.generate(16, (index) => (index + 1) / 10),
+      );
+      final jointVelocity = JointsMatrix.fromList(
+        List<double>.generate(16, (index) => (index + 1).toDouble()),
+      );
+      final rawLastAction = JointsMatrix.fromList(
+        List<double>.generate(16, (index) => -(index + 1) / 20),
+      );
+      final realLastAction =
+          rawLastAction * singleFrameBuilder.actionScale + standingPose;
+      final history = makeHistory(
+        gyroscope: Vector3(1, -2, 3),
+        projectedGravity: Vector3(0.1, -0.2, -0.9),
+        command: Command.walk(Vector3(0.6, -0.4, 0.2)),
+        bodyHeightCommand: 0.375,
+        jointPosition: standingPose + jointDelta,
+        jointVelocity: jointVelocity,
+        action: realLastAction,
+      );
+
+      final actual = singleFrameBuilder.build(history);
+      final expectedJointPosition = jointDelta.discardFoot().values;
+      final expectedJointVelocity =
+          (jointVelocity * singleFrameBuilder.jointVelocityScale).values;
+      final expected = <double>[
+        0.25,
+        -0.5,
+        0.75,
+        0.1,
+        -0.2,
+        -0.9,
+        0.6,
+        -0.4,
+        0.2,
+        0.375,
+        ...expectedJointPosition,
+        ...expectedJointVelocity,
+        ...rawLastAction.values,
+      ];
+
+      expect(singleFrameBuilder.tensorSize, 58);
+      expect(actual, hasLength(58));
+      for (var index = 0; index < 58; index++) {
+        expect(
+          actual[index],
+          closeTo(expected[index], 1e-6),
+          reason: 'observation index $index',
+        );
+      }
+      expect(actual.sublist(6, 10), closeToList([0.6, -0.4, 0.2, 0.375]));
+      expect(actual.sublist(22, 26), everyElement(0.0));
+      expect(actual.sublist(42, 58), closeToList(rawLastAction.values));
+    });
+  });
 }
+
+Matcher closeToList(Iterable<double> expected) => pairwiseCompare<double, double>(
+  expected,
+  (actual, target) => (actual - target).abs() <= 1e-6,
+  'values within 1e-6',
+);

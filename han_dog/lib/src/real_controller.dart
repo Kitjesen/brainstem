@@ -9,6 +9,7 @@ import 'package:rxdart/rxdart.dart';
 import 'package:vector_math/vector_math.dart';
 
 import 'gamepad.dart';
+import 'app/robot_profile.dart';
 
 final _log = Logger('han_dog.controller');
 
@@ -25,7 +26,7 @@ Vector3 mapYunZhuoDirection(
   required String observationType,
 }) {
   final scale = data.LT ? 0.5 : (data.RT ? 1.5 : 1.0);
-  final rightStickYaw = observationType == 'bodyHeight'
+  final rightStickYaw = isBodyHeightObservationType(observationType)
       ? 0.0
       : data.rightStick.x * 0.5;
   final yaw = (data.knob + rightStickYaw).clamp(-1.0, 1.0);

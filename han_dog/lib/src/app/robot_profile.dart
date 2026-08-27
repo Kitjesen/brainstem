@@ -7,6 +7,10 @@ import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 
 final _log = Logger('han_dog.profile.loader');
 
+bool isBodyHeightObservationType(String observationType) =>
+    observationType == 'bodyHeight' ||
+    observationType == 'singleFrameHeight';
+
 /// 机器人策略配置：一套完整的模型 + 姿态 + 增益 + 缩放参数。
 class RobotProfile {
   final String name;
@@ -32,6 +36,7 @@ class RobotProfile {
   final double bodyHeightCommand;
   final double minBodyHeightCommand;
   final double maxBodyHeightCommand;
+  final double bodyHeightRateLimit;
   final (double, double, double) velocityCommandMin;
   final (double, double, double) velocityCommandMax;
 
@@ -59,6 +64,7 @@ class RobotProfile {
     this.bodyHeightCommand = 0.35,
     this.minBodyHeightCommand = 0.20,
     this.maxBodyHeightCommand = 0.54,
+    this.bodyHeightRateLimit = 0.02,
     this.velocityCommandMin = (-3.0, -3.0, -3.0),
     this.velocityCommandMax = (3.0, 3.0, 3.0),
   }) : standUpPose = standUpPose ?? standingPose,
@@ -76,7 +82,8 @@ class RobotProfile {
     if (observationValue is! String) {
       throw FormatException('Field "observationType" must be a string');
     }
-    if (observationValue != 'standard' && observationValue != 'bodyHeight') {
+    if (observationValue != 'standard' &&
+        !isBodyHeightObservationType(observationValue)) {
       throw FormatException('Unknown observationType: $observationValue');
     }
 
@@ -101,6 +108,14 @@ class RobotProfile {
       throw const FormatException(
         'bodyHeightCommand must be within the configured range',
       );
+    }
+    final bodyHeightRateLimit = _finiteDouble(
+      json,
+      'bodyHeightRateLimit',
+      0.02,
+    );
+    if (bodyHeightRateLimit <= 0) {
+      throw const FormatException('bodyHeightRateLimit must be greater than 0');
     }
 
     final velocityCommandMin = _tuple3(
@@ -171,6 +186,7 @@ class RobotProfile {
       bodyHeightCommand: bodyHeightCommand,
       minBodyHeightCommand: minBodyHeightCommand,
       maxBodyHeightCommand: maxBodyHeightCommand,
+      bodyHeightRateLimit: bodyHeightRateLimit,
       velocityCommandMin: velocityCommandMin,
       velocityCommandMax: velocityCommandMax,
     );
@@ -316,6 +332,12 @@ class RobotProfile {
         actionScale: actionScale,
       ),
       'bodyHeight' => BodyHeightObservationBuilder(
+        standingPose: policyDefaultPose,
+        imuGyroscopeScale: imuGyroscopeScale,
+        jointVelocityScale: jointVelocityScale,
+        actionScale: actionScale,
+      ),
+      'singleFrameHeight' => SingleFrameHeightObservationBuilder(
         standingPose: policyDefaultPose,
         imuGyroscopeScale: imuGyroscopeScale,
         jointVelocityScale: jointVelocityScale,

@@ -294,12 +294,16 @@ reset_fixture() {
   : >"$BRAINSTEM_ROOT/han_dog/bin/han_dog.dart"
   : >"$BRAINSTEM_ROOT/model/thunder_h15_model10400.onnx"
   : >"$BRAINSTEM_ROOT/model/thunder_h18_model5000.onnx"
+  : >"$BRAINSTEM_ROOT/model/single_frame_height_v2_policy.onnx"
   chmod +x "$DART_BIN"
   cat >"$PROFILE_DIR/thunder_h15.json" <<'EOF'
 {"name":"thunder_h15","modelPath":"model/thunder_h15_model10400.onnx","_onnxSha256":"ded34be402b25a3a77a9feba196a3d76efa2b5660d7d9c8396b28963a0efbde4"}
 EOF
   cat >"$PROFILE_DIR/thunder_h18.json" <<'EOF'
 {"name":"thunder_h18","modelPath":"model/thunder_h18_model5000.onnx","_onnxSha256":"d632413aa9ddf16b6c795377bdbbef69c454ba1cc77f8acb7d560f381cd84296"}
+EOF
+  cat >"$PROFILE_DIR/single_frame_height_v2.json" <<'EOF'
+{"name":"single_frame_height_v2","modelPath":"model/single_frame_height_v2_policy.onnx","_onnxSha256":"318bff03d1b765f30553bf5aea85a2b413f58a8a2078eae830a097e6475dffb5"}
 EOF
   PRODUCTION_STATE=inactive
   CANDIDATE_STATE=inactive
@@ -531,6 +535,16 @@ test_h18_launch_command() {
   assert_log_line "systemd-run:argv-ok:thunder_h18" "launch argv exactly matches ordered H18 contract"
 }
 
+test_v2_launch_command() {
+  reset_fixture
+  EXPECTED_LAUNCH_PROFILE=single_frame_height_v2
+  EXPECTED_MODEL_PATH="$BRAINSTEM_ROOT/model/single_frame_height_v2_policy.onnx"
+  FAKE_SHA=318bff03d1b765f30553bf5aea85a2b413f58a8a2078eae830a097e6475dffb5
+  run_service start v2
+  assert_status 0 "valid V2 start succeeds with fakes"
+  assert_log_line "systemd-run:argv-ok:single_frame_height_v2" "launch argv exactly matches ordered V2 contract"
+}
+
 test_readiness_timeout_is_explicitly_unsafe() {
   reset_fixture
   READINESS_PORT=0
@@ -710,6 +724,7 @@ test_restore_refuses_candidate
 test_preflight_failures_do_not_launch
 test_successful_start_command
 test_h18_launch_command
+test_v2_launch_command
 test_readiness_timeout_is_explicitly_unsafe
 test_identity_and_format_validation
 test_busy_lock_blocks_mutations

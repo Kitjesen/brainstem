@@ -68,8 +68,8 @@ class ProfileManager {
         '(available: ${_profiles.keys.join(", ")})',
       );
     }
-    if (currentProfile.observationType == 'bodyHeight' ||
-        p.observationType == 'bodyHeight') {
+    if (isBodyHeightObservationType(currentProfile.observationType) ||
+        isBodyHeightObservationType(p.observationType)) {
       throw StateError('Body-height profile changes require a service restart');
     }
     final prevName = _current;
@@ -165,9 +165,12 @@ class ProfileManager {
 
   /// YUNZHUO R2 切换：在已有策略间循环。
   Future<void> toggle() async {
-    if (currentProfile.observationType == 'bodyHeight') return;
+    if (isBodyHeightObservationType(currentProfile.observationType)) return;
     final keys = names
-        .where((name) => _profiles[name]!.observationType != 'bodyHeight')
+        .where(
+          (name) =>
+              !isBodyHeightObservationType(_profiles[name]!.observationType),
+        )
         .toList();
     if (keys.length <= 1) return;
     final idx = keys.indexOf(_current);

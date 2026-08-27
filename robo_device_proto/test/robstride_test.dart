@@ -29,27 +29,187 @@ void main() {
     check(
       1,
       RSEvent.control(
-        127,
+        1,
         torque: 110.0,
         position: 12,
         velocity: 14,
         kp: 4500,
         kd: 80,
       ),
-      _yourcee(('41540faaa3fc08fa31f777e666cccc0d0a')),
+      _yourcee(('41540faaa00808fa31f777e666cccc0d0a')),
     );
     check(
       2,
       RSEvent.control(
-        127,
+        2,
         torque: 3.0,
         position: 1.0,
         velocity: 2.0,
         kp: 600.0,
         kd: 5.0,
       ),
-      _yourcee(('41540c199bfc088a2e91111eb80ccd0d0a')),
+      _yourcee(('41540c199810088a2e91111eb80ccd0d0a')),
     );
+
+    test('CAN IDs 1-3 encode with RS04 ranges', () {
+      final frame = RSEvent.control(
+        1,
+        torque: 10.0,
+        velocity: 10.0,
+        kp: 100.0,
+        kd: 1.0,
+      ).toDataFrame();
+
+      expect(
+        frame.data2,
+        floatToUint16(
+          10.0,
+          -rs04MotorLimits.torqueMax,
+          rs04MotorLimits.torqueMax,
+        ),
+      );
+      expect(
+        frame.bytes.getUint16(2),
+        floatToUint16(
+          10.0,
+          -rs04MotorLimits.velocityMax,
+          rs04MotorLimits.velocityMax,
+        ),
+      );
+      expect(
+        frame.bytes.getUint16(4),
+        floatToUint16(100.0, 0.0, rs04MotorLimits.kpMax),
+      );
+      expect(
+        frame.bytes.getUint16(6),
+        floatToUint16(1.0, 0.0, rs04MotorLimits.kdMax),
+      );
+    });
+
+    test('CAN ID 4 encodes with RS02 ranges', () {
+      final frame = RSEvent.control(
+        4,
+        torque: 10.0,
+        velocity: 10.0,
+        kp: 100.0,
+        kd: 1.0,
+      ).toDataFrame();
+
+      expect(
+        frame.data2,
+        floatToUint16(
+          10.0,
+          -rs02MotorLimits.torqueMax,
+          rs02MotorLimits.torqueMax,
+        ),
+      );
+      expect(
+        frame.bytes.getUint16(2),
+        floatToUint16(
+          10.0,
+          -rs02MotorLimits.velocityMax,
+          rs02MotorLimits.velocityMax,
+        ),
+      );
+      expect(
+        frame.bytes.getUint16(4),
+        floatToUint16(100.0, 0.0, rs02MotorLimits.kpMax),
+      );
+      expect(
+        frame.bytes.getUint16(6),
+        floatToUint16(1.0, 0.0, rs02MotorLimits.kdMax),
+      );
+    });
+  });
+
+  group('Han Dog motor layout', () {
+    test('CAN IDs map explicitly to the installed hardware', () {
+      expect(hanDogMotorLayout.keys, orderedEquals([1, 2, 3, 4]));
+      expect(rsMotorSlotForCanId(1).role, HanDogMotorRole.hip);
+      expect(rsMotorSlotForCanId(1).model, RSMotorModel.rs04);
+      expect(rsMotorSlotForCanId(2).role, HanDogMotorRole.thigh);
+      expect(rsMotorSlotForCanId(2).model, RSMotorModel.rs04);
+      expect(rsMotorSlotForCanId(3).role, HanDogMotorRole.calf);
+      expect(rsMotorSlotForCanId(3).model, RSMotorModel.rs04);
+      expect(rsMotorSlotForCanId(4).role, HanDogMotorRole.wheel);
+      expect(rsMotorSlotForCanId(4).model, RSMotorModel.rs02);
+      expect(validateHanDogMotorLayout, returnsNormally);
+    });
+
+    test('unknown CAN IDs fail instead of silently using RS04', () {
+      expect(() => rsMotorLimitsForCanId(0), throwsArgumentError);
+      expect(() => rsMotorLimitsForCanId(5), throwsArgumentError);
+    });
+
+    test('startup summary is generated from the same source of truth', () {
+      expect(hanDogMotorCodecSummary, contains('CAN1 hip=RS04'));
+      expect(hanDogMotorCodecSummary, contains('CAN4 wheel=RS02'));
+      expect(hanDogMotorCodecSummary, contains('v=±44'));
+      expect(hanDogMotorCodecSummary, contains('t=±17'));
+    });
+
+    test('documents the RS02/RS04 velocity scaling mismatch', () {
+      final rs04EncodedTen = floatToUint16(
+        10.0,
+        -rs04MotorLimits.velocityMax,
+        rs04MotorLimits.velocityMax,
+      );
+      final rs02Interpretation = uint16ToFloat(
+        rs04EncodedTen,
+        -rs02MotorLimits.velocityMax,
+        rs02MotorLimits.velocityMax,
+      );
+      expect(rs02Interpretation, closeTo(10.0 * 44.0 / 15.0, 0.002));
+
+      final rs02EncodedTen = floatToUint16(
+        10.0,
+        -rs02MotorLimits.velocityMax,
+        rs02MotorLimits.velocityMax,
+      );
+      final rs04DecodedFeedback = uint16ToFloat(
+        rs02EncodedTen,
+        -rs04MotorLimits.velocityMax,
+        rs04MotorLimits.velocityMax,
+      );
+      expect(rs04DecodedFeedback, closeTo(10.0 * 15.0 / 44.0, 0.002));
+    });
+  });
+
+  group('mixed motor feedback decoding', () {
+    for (final entry in [(1, rs04MotorLimits), (4, rs02MotorLimits)]) {
+      final canId = entry.$1;
+      final limits = entry.$2;
+
+      test('CAN ID $canId uses the matching physical ranges', () {
+        final bytes = ByteData(8)
+          ..setUint16(0, floatToUint16(0.5, -positionMax, positionMax))
+          ..setUint16(
+            2,
+            floatToUint16(5.0, -limits.velocityMax, limits.velocityMax),
+          )
+          ..setUint16(
+            4,
+            floatToUint16(2.0, -limits.torqueMax, limits.torqueMax),
+          )
+          ..setUint16(6, 260);
+        final state =
+            RSState.fromDataFrame(
+                  RSDataFrame(
+                    mode: 0x18,
+                    data2: canId,
+                    canId: 0xfd,
+                    data1: bytes.buffer.asUint8List(),
+                  ),
+                )
+                as RSStateReport;
+
+        expect(state.canId, canId);
+        expect(state.position, closeTo(0.5, 0.001));
+        expect(state.velocity, closeTo(5.0, 0.002));
+        expect(state.torque, closeTo(2.0, 0.005));
+        expect(state.temperature, 26.0);
+      });
+    }
   });
 
   check(
@@ -77,12 +237,12 @@ void main() {
     'report',
     RSDataFrame(
       mode: 24,
-      data2: 0x7f,
+      data2: 0x01,
       canId: 0xfd,
       data1: _b([0x99, 0x7a, 0x7f, 0xd7, 0x7f, 0xff, 0x01, 0x22]),
     ),
     isA<RSStateReport>()
-        .having((e) => e.canId, 'canId', 0x7f)
+        .having((e) => e.canId, 'canId', 0x01)
         .having((e) => e.hostId, 'hostId', 0xfd)
         .having((e) => e.position, 'position', closeTo(2.5, 0.01))
         .having((e) => e.velocity, 'velocity', closeTo(0.0, 0.05))
@@ -95,12 +255,12 @@ void main() {
     'motion control ACK (mode 0x01)',
     RSDataFrame(
       mode: 0x01,
-      data2: 0x7f,
+      data2: 0x01,
       canId: 0xfd,
       data1: _b([0x99, 0x7a, 0x7f, 0xd7, 0x7f, 0xff, 0x01, 0x22]),
     ),
     isA<RSStateResponse>()
-        .having((e) => e.canId, 'canId', 0x7f)
+        .having((e) => e.canId, 'canId', 0x01)
         .having((e) => e.hostId, 'hostId', 0xfd)
         .having((e) => e.position, 'position', closeTo(2.5, 0.01))
         .having((e) => e.velocity, 'velocity', closeTo(0.0, 0.05))

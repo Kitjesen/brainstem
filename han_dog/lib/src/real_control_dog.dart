@@ -244,11 +244,12 @@ class RealControlDog {
           final canceledPendingWalk = bodyHeightHandover?.isRequested == true;
           _cancelBodyHeightHandover();
           final profile = initialProfile;
-          if (profile?.observationType == 'bodyHeight' &&
+          if (profile != null &&
+              isBodyHeightObservationType(profile.observationType) &&
               arbiter.state is Standing) {
             _log.info('R1 → reset body height');
             final accepted = sendCommand(
-              A.setBodyHeight(profile!.bodyHeightCommand),
+              A.setBodyHeight(profile.bodyHeightCommand),
               'reset body height(R1)',
             );
             if (accepted) {
@@ -289,7 +290,8 @@ class RealControlDog {
     _subscriptions.add(
       controller.switchProfile.listen(
         (_) {
-          if (initialProfile?.observationType == 'bodyHeight') {
+          if (initialProfile != null &&
+              isBodyHeightObservationType(initialProfile!.observationType)) {
             _log.warning(
               'R2 profile switch ignored in body-height remote mode',
             );
@@ -318,14 +320,18 @@ class RealControlDog {
 
   void _configureBodyHeightControl() {
     final profile = initialProfile;
-    if (profile?.observationType != 'bodyHeight') return;
+    if (profile == null ||
+        !isBodyHeightObservationType(profile.observationType)) {
+      return;
+    }
     if (bodyHeightHandover == null) {
       throw ArgumentError.notNull('bodyHeightHandover');
     }
 
-    final defaultHeight = profile!.bodyHeightCommand;
+    final defaultHeight = profile.bodyHeightCommand;
     final minHeight = profile.minBodyHeightCommand;
     final maxHeight = profile.maxBodyHeightCommand;
+    final rateMetersPerSecond = profile.bodyHeightRateLimit;
     if (!defaultHeight.isFinite ||
         !minHeight.isFinite ||
         !maxHeight.isFinite ||
@@ -404,7 +410,6 @@ class RealControlDog {
         return;
       }
       const tickSeconds = 0.020;
-      const rateMetersPerSecond = 0.02;
       final next =
           (_bodyHeightCommand! +
                   _bodyHeightAxis * rateMetersPerSecond * tickSeconds)
@@ -419,7 +424,9 @@ class RealControlDog {
   bool _requestBodyHeightHandover() {
     final profile = initialProfile;
     final handover = bodyHeightHandover;
-    if (profile?.observationType != 'bodyHeight' || handover == null) {
+    if (profile == null ||
+        !isBodyHeightObservationType(profile.observationType) ||
+        handover == null) {
       return false;
     }
     if (!_motorOutputEnabled) {
@@ -429,7 +436,7 @@ class RealControlDog {
     }
     if (handover.blocksControllerCommands) return false;
 
-    final defaultHeight = profile!.bodyHeightCommand;
+    final defaultHeight = profile.bodyHeightCommand;
     final heightAccepted = arbiter.command(
       A.setBodyHeight(defaultHeight),
       ControlSource.yunzhuo,

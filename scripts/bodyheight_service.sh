@@ -36,6 +36,9 @@ readonly H15_SHA256="ded34be402b25a3a77a9feba196a3d76efa2b5660d7d9c8396b28963a0e
 readonly H18_PROFILE="thunder_h18"
 readonly H18_MODEL="thunder_h18_model5000.onnx"
 readonly H18_SHA256="d632413aa9ddf16b6c795377bdbbef69c454ba1cc77f8acb7d560f381cd84296"
+readonly V2_PROFILE="single_frame_height_v2"
+readonly V2_MODEL="single_frame_height_v2_policy.onnx"
+readonly V2_SHA256="318bff03d1b765f30553bf5aea85a2b413f58a8a2078eae830a097e6475dffb5"
 
 usage() {
   cat <<EOF
@@ -44,7 +47,7 @@ usage() {
 安全管理 Thunder body-height 候选服务：
   help, --help       显示帮助
   status             查看生产/候选服务和端口状态（只读）
-  start h15|h18      预检后启动候选服务；不会停止生产服务，也不会启用电机
+  start v2|h15|h18   预检后启动候选服务；不会停止生产服务，也不会启用电机
   logs [--follow]    查看候选服务最近 100 行日志，可持续跟踪
   stop               仅停止候选服务
   restore-master     在候选服务完全停止且端口空闲后启动生产服务
@@ -198,6 +201,11 @@ show_status() {
 
 select_profile() {
   case "$1" in
+    v2)
+      PROFILE_NAME="$V2_PROFILE"
+      MODEL_NAME="$V2_MODEL"
+      EXPECTED_SHA256="$V2_SHA256"
+      ;;
     h15)
       PROFILE_NAME="$H15_PROFILE"
       MODEL_NAME="$H15_MODEL"
@@ -498,11 +506,11 @@ main() {
       ;;
     start)
       (($# == 1)) || {
-        usage_error "start 需要且仅需要 h15 或 h18"
+        usage_error "start 需要且仅需要 v2、h15 或 h18"
         return
       }
       if ! select_profile "$1"; then
-        usage_error "未知 profile：$1（仅支持 h15 或 h18）"
+        usage_error "未知 profile：$1（仅支持 v2、h15 或 h18）"
         return
       fi
       run_mutation start_candidate "$1"

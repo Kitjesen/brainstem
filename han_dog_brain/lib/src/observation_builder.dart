@@ -95,3 +95,53 @@ class BodyHeightObservationBuilder extends StandardObservationBuilder {
     return observation;
   }
 }
+
+/// ThunderV4 V2 58-value single-frame height observation:
+/// [gyroscope(3), projectedGravity(3), commands(4), jointPosition(16),
+///  jointVelocity(16), lastAction(16)].
+///
+/// Unlike the legacy body-height builder, h_cmd is command index 3 and tensor
+/// index 9. The last action is recovered from Brain's previous policy target,
+/// before the hardware dispatcher applies handover or motor gating.
+class SingleFrameHeightObservationBuilder extends StandardObservationBuilder {
+  SingleFrameHeightObservationBuilder({
+    required super.standingPose,
+    super.imuGyroscopeScale = 0.25,
+    super.jointVelocityScale = (0.05, 0.05, 0.05, 0.05),
+    super.actionScale = (0.125, 0.25, 0.25, 5.0),
+  });
+
+  @override
+  int get tensorSize => 3 + 3 + 4 + 16 + 16 + 16;
+
+  @override
+  List<double> build(History h) {
+    final Vector3 direction = switch (h.command) {
+      WalkCommand(:final direction) => direction,
+      _ => Vector3.zero(),
+    };
+    final gyroscope = h.gyroscope * imuGyroscopeScale;
+    final jointPosition = (h.jointPosition - standingPose).discardFoot();
+    final jointVelocity = h.jointVelocity * jointVelocityScale;
+    final lastAction = (h.action - standingPose) / actionScale;
+    final obs = <double>[
+      gyroscope.x,
+      gyroscope.y,
+      gyroscope.z,
+      h.projectedGravity.x,
+      h.projectedGravity.y,
+      h.projectedGravity.z,
+      direction.x,
+      direction.y,
+      direction.z,
+      h.bodyHeightCommand,
+      ...jointPosition.values,
+      ...jointVelocity.values,
+      ...lastAction.values,
+    ];
+    for (var index = 0; index < obs.length; index++) {
+      if (!obs[index].isFinite) obs[index] = 0.0;
+    }
+    return obs;
+  }
+}

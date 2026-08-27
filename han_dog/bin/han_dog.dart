@@ -10,6 +10,7 @@ import 'package:logging/logging.dart';
 import 'package:cms/cms.dart';
 import 'package:han_dog/src/app/config.dart';
 import 'package:han_dog/src/app/monitoring.dart';
+import 'package:robo_device_proto/robo_device_proto.dart';
 
 final _log = Logger('han_dog');
 final _cfg = HanDogConfig();
@@ -89,7 +90,8 @@ Future<void> _run() async {
   _log.info(
     'Default profile: ${defaultProfile.name} (model=${defaultProfile.modelPath})',
   );
-  final bodyHeightHandover = defaultProfile.observationType == 'bodyHeight'
+  final bodyHeightHandover =
+      isBodyHeightObservationType(defaultProfile.observationType)
       ? BodyHeightHandover(
           standUpKp: defaultProfile.standUpKp,
           standUpKd: defaultProfile.standUpKd,
@@ -127,6 +129,8 @@ Future<void> _run() async {
     return;
   }
   _log.info('Joint PCAN opened.');
+  validateHanDogMotorLayout();
+  _log.info('MOTOR_CODEC $hanDogMotorCodecSummary');
 
   // 清除上次异常退出遗留的 fault
   _log.info('Clearing motor faults...');
@@ -336,7 +340,7 @@ Future<void> _run() async {
   late final UnifiedCmsServer cmsService;
   final selectedController = controller;
   if (selectedController != null &&
-      defaultProfile.observationType == 'bodyHeight' &&
+      isBodyHeightObservationType(defaultProfile.observationType) &&
       selectedController is! BodyHeightAxisInput) {
     _log.warning(
       'Selected controller does not support body-height input; '
@@ -380,7 +384,7 @@ Future<void> _run() async {
   } else {
     _log.info('No controller — motor enable via gRPC only');
     // ──── Xbox 热插检测（每 3 秒扫描，接入后自动初始化）─────────
-    if (defaultProfile.observationType == 'bodyHeight') {
+    if (isBodyHeightObservationType(defaultProfile.observationType)) {
       _log.info('Xbox hot-plug disabled: body-height input is not supported');
     } else {
       _controllerHotplugTimer = Timer.periodic(const Duration(seconds: 3), (_) {

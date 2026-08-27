@@ -1,10 +1,12 @@
 # Body-height policy deployment contract
 
-This branch adds the Thunder V4 H15 and H18 body-height policies without changing the legacy 57-value policy contract.
+This branch deploys the Thunder V4 single-frame V2 body-height policy. H15 and
+H18 remain available as rollback profiles; the legacy 57-value policy contract
+is unchanged.
 
 ## Policy interface
 
-A single body-height frame has 58 values in this exact order:
+H15/H18 use the legacy body-height frame below:
 
 | Slice | Values | Runtime transform |
 |---|---:|---|
@@ -18,6 +20,17 @@ A single body-height frame has 58 values in this exact order:
 
 History is flattened oldest-to-newest. H15 uses one frame (`58` values, input `policy_obs`); H18 uses ten frames (`580` values, input `policy_history`). Both output 16 normalized actions. Leg action scales are `0.125/0.25/0.25`; wheel velocity scale is `5.0`.
 
+V2 uses one frame (`58` values, input `obs`) with this order:
+
+| Slice | Values | Runtime transform |
+|---|---:|---|
+| `0:3` | base angular velocity | multiply by `0.25` |
+| `3:6` | projected gravity | none |
+| `6:10` | `[vx, vy, yaw, height]` command | height is raw metres |
+| `10:26` | joint position relative to the V2 training default | wheel entries are zero |
+| `26:42` | joint velocity | multiply by `0.05` |
+| `42:58` | previous normalized policy action | recovered before hardware handover/gating |
+
 The gRPC API exposes `SetBodyHeight(BodyHeightCommand)`. The server rejects non-finite values, rate-limits updates to the 50 Hz control period, rejects unsafe FSM states, participates in control arbitration, and clamps the command to the active profile range. Velocity is clamped per axis to the profile training range.
 
 ## Profiles and model files
@@ -26,19 +39,26 @@ Profiles are committed at:
 
 - `han_dog/profiles/thunder_h15.json`
 - `han_dog/profiles/thunder_h18.json`
+- `han_dog/profiles/single_frame_height_v2.json`
 
-ONNX binaries are intentionally ignored by Git. Copy them into `model/` using these exact names and verify them before launch:
+The accepted V2 ONNX is committed despite the repository-wide ONNX ignore
+rule. Legacy H15/H18 models remain robot-local rollback artifacts. Verify the
+selected model before launch:
 
 ```text
 ded34be402b25a3a77a9feba196a3d76efa2b5660d7d9c8396b28963a0efbde4  model/thunder_h15_model10400.onnx
 d632413aa9ddf16b6c795377bdbbef69c454ba1cc77f8acb7d560f381cd84296  model/thunder_h18_model5000.onnx
+318bff03d1b765f30553bf5aea85a2b413f58a8a2078eae830a097e6475dffb5  model/single_frame_height_v2_policy.onnx
 ```
 
 ```bash
-sha256sum model/thunder_h15_model10400.onnx model/thunder_h18_model5000.onnx
+sha256sum model/single_frame_height_v2_policy.onnx
 ```
 
 The committed ranges and transforms match the archived Isaac Lab training configuration: height `0.20..0.54 m`, velocity `vx=-2.5..2.5`, `vy=-1.0..1.0`, `yaw=-1.0..1.0`, and policy training zero `[-0.1,-1.1,2.6, 0.1,1.1,-2.6, 0.1,1.1,-2.6, -0.1,-1.1,2.6, 0,0,0,0]`.
+
+V2 uses height `0.25..0.50 m` (default `0.375 m`) and conservative first-run
+velocity clamps `vx=-0.5..0.5`, `vy=-0.3..0.3`, `yaw=-0.3..0.3`.
 
 H15 and H18 have different history tensor sizes. Select one at process startup; switching between them requires a restart. The model shape check deliberately rejects a mismatched live switch before replacing the active policy.
 
@@ -58,12 +78,13 @@ physical stand pose in `standUpPose` and the trained `±1.1/±2.6` zero in
 
 ### Body-height remote takeover
 
-For H15/H18 only, the left stick continues to command velocity and the right
-stick Y axis changes height at `0.02 m/s` with a `0.10` deadzone. The default is
-`0.40 m`, clamped to `0.20..0.54 m`.
+For body-height profiles, the left stick commands velocity and the right stick
+Y axis changes height with a `0.10` deadzone. V2 uses `0.05 m/s`, default
+`0.375 m`, and clamp `0.25..0.50 m`; H15/H18 retain `0.02 m/s`, default
+`0.40 m`, and clamp `0.20..0.54 m`.
 
 The first non-zero speed or height input received in `Standing` requests
-`Walking(0,0,0)` and freezes the height at `0.40 m`. The runtime then blends
+`Walking(0,0,0)` and freezes the height at the profile default. The runtime then blends
 from the measured joint position to the live policy target over 100 actual
 successful 20 ms output intervals (101 samples, approximately two seconds).
 Leg actions, wheel targets, Kp, and Kd use the same smoothstep coefficient.
@@ -73,7 +94,8 @@ recaptures the measured pose and restarts frame 0.
 
 L1, L2, R1, a state exit, a controller/inference error, or a motor fault
 cancels the takeover. R2 is rejected in body-height mode; stop the candidate
-service and restart it with `start h15` or `start h18` to change policy.
+service and restart it with `start v2`, `start h15`, or `start h18` to change
+policy.
 
 ## Simulation launch
 
@@ -108,9 +130,14 @@ No unattended or remote motor motion is part of automated validation. Complete e
 3. Assign a second operator to the physical emergency stop. Confirm that disable cuts motor output before any policy command.
 4. With motor output disabled, inspect all 16 reported joint positions and signs against the order `FR, FL, RR, RL`, each as `hip, thigh, calf`, followed by four wheels.
 5. Confirm IMU projected gravity is approximately `[0, 0, -1]` while level and that sensor/control frequency is stable at 50 Hz.
-6. Before enabling, verify telemetry reports the expected `0.40 m` current/target height. Enable only while supported, command zero velocity at `0.40 m`, and stop immediately on a sign/order mismatch, non-finite value, unexpected motion, lost sensor reporting, or joint-limit/fault event.
-7. Exercise height only in a narrow `0.30..0.40 m` window, then forward velocity no higher than `0.1 m/s`. Expand toward the training envelope only after reviewing logs and measured tracking.
-8. Repeat separately for H15 and H18, restarting the process between profiles. Save logs, selected profile, model hash, and abort/accept result.
+6. Before enabling, verify telemetry reports the selected profile's expected current/target height (`0.375 m` for V2). Enable only while supported, command zero velocity, and stop immediately on a sign/order mismatch, non-finite value, unexpected motion, lost sensor reporting, or joint-limit/fault event.
+7. For V2, exercise height only in a narrow `0.35..0.40 m` window, then forward velocity no higher than `0.1 m/s`. Expand toward `0.25..0.50 m` only after reviewing logs and measured tracking.
+8. Save logs, selected profile, model hash, motor model mapping, and abort/accept result.
+
+The installed motor layout is CAN IDs 1–3 = RS04 legs and CAN ID 4 = RS02
+wheel on every leg bus. Encoding and feedback decoding use model-specific MIT
+ranges. Motor-enable and action frames remain blocked until the operator sets
+`HAN_DOG_ALLOW_MOTOR_ENABLE=true`; startup always sends disable frames first.
 
 The remote development server has no verified robot/CAN attachment, so this branch can prove the no-motion software preflight and MuJoCo chain only. Final motor-enabled acceptance must be performed by an onsite operator under this gate.
 
@@ -127,14 +154,14 @@ Run these commands on the robot from the body-height checkout:
 cd /home/bsrl1/brainstem-bodyheightctrl
 
 ./scripts/bodyheight_service.sh status
-./scripts/bodyheight_service.sh start h15
+./scripts/bodyheight_service.sh start v2
 ./scripts/bodyheight_service.sh logs
 ./scripts/bodyheight_service.sh logs --follow
 ./scripts/bodyheight_service.sh stop
 ./scripts/bodyheight_service.sh restore-master
 ```
 
-Use `start h18` for H18. `start` verifies that `han_dog.service` is already
+Use `start h15` or `start h18` for rollback. `start` verifies that `han_dog.service` is already
 stopped, the candidate service and port `13145` are free, the selected profile
 matches the ONNX filename/hash, and the required IMU/Yunzhuo devices exist. It
 never stops the production service automatically. Starting the service only
@@ -182,8 +209,8 @@ python scripts/bodyheight_grpc.py set-velocity --vx 0.1
 
 There is no confirmation flag. A velocity command is accepted only in
 `Standing` or `Walking`, and it may move the robot if motors are already
-enabled. Height and velocity values are checked against the active H15/H18
-profile. The client opens the history stream before sending a changed target
+enabled. Height and velocity values are checked against the active profile.
+The client opens the history stream before sending a changed target
 and only reports `confirmed` after matching later telemetry. If the requested
 value is already active, it reports `already active` without sending a
 redundant RPC. A silently rejected arbitration command returns a non-zero exit

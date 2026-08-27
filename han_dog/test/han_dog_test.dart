@@ -4,7 +4,12 @@ import 'package:han_dog/src/app/config.dart';
 import 'package:han_dog/src/app/robot_profile.dart';
 import 'package:han_dog/src/control_arbiter.dart';
 import 'package:han_dog_brain/han_dog_brain.dart'
-    show A, BodyHeightObservationBuilder, M, StandardObservationBuilder;
+    show
+        A,
+        BodyHeightObservationBuilder,
+        M,
+        SingleFrameHeightObservationBuilder,
+        StandardObservationBuilder;
 import 'package:mocktail/mocktail.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart' show JointsMatrix;
 import 'package:test/test.dart';
@@ -252,7 +257,11 @@ void main() {
     });
 
     test('observation builders use policyDefaultPose as their zero point', () {
-      for (final observationType in ['standard', 'bodyHeight']) {
+      for (final observationType in [
+        'standard',
+        'bodyHeight',
+        'singleFrameHeight',
+      ]) {
         final json = validJson()
           ..['observationType'] = observationType
           ..['standingPose'] = List.filled(16, 1.0)
@@ -411,6 +420,30 @@ void main() {
       expect(profile.velocityCommandMin, (-2.5, -1.0, -1.0));
       expect(profile.velocityCommandMax, (2.5, 1.0, 1.0));
       expect(builder, isA<BodyHeightObservationBuilder>());
+      expect(builder.tensorSize, 58);
+    });
+
+    test('single-frame height fields select the V2 observation contract', () {
+      final json = validJson()
+        ..addAll({
+          'observationType': 'singleFrameHeight',
+          'inputName': 'obs',
+          'bodyHeightCommand': 0.375,
+          'minBodyHeightCommand': 0.25,
+          'maxBodyHeightCommand': 0.50,
+          'bodyHeightRateLimit': 0.05,
+        });
+
+      final profile = RobotProfile.fromJson(json);
+      final builder = profile.toObservationBuilder();
+
+      expect(profile.observationType, 'singleFrameHeight');
+      expect(profile.inputName, 'obs');
+      expect(profile.bodyHeightCommand, 0.375);
+      expect(profile.minBodyHeightCommand, 0.25);
+      expect(profile.maxBodyHeightCommand, 0.50);
+      expect(profile.bodyHeightRateLimit, 0.05);
+      expect(builder, isA<SingleFrameHeightObservationBuilder>());
       expect(builder.tensorSize, 58);
     });
 

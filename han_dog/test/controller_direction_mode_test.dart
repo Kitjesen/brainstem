@@ -22,6 +22,15 @@ void main() {
     expect(direction.z, closeTo(-0.1, 1e-6));
   });
 
+  test('single-frame height observation isolates yaw from height stick', () {
+    final direction = mapYunZhuoDirection(
+      _state(rightStickX: 0.8, knob: 0.1),
+      observationType: 'singleFrameHeight',
+    );
+
+    expect(direction.z, closeTo(-0.1, 1e-6));
+  });
+
   test('body-height observation preserves knob sign', () {
     final direction = mapYunZhuoDirection(
       _state(knob: -0.25),
