@@ -30,6 +30,7 @@ enum MotorSeverity { healthy, transient, degraded, critical }
 /// Errors that are always critical regardless of streak count.
 const _criticalErrors = {
   RSError.driverFault,
+  RSError.threePhaseCurrentFault,
   RSError.magneticEncoderFault,
   RSError.underVoltage,
   RSError.overVoltage,

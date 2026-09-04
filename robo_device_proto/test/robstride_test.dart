@@ -212,6 +212,16 @@ void main() {
     }
   });
 
+  group('fault decoding', () {
+    test('compressed bit 17 is the three-phase current fault', () {
+      expect(RSErrors1(0x2).errors, {RSError.threePhaseCurrentFault});
+    });
+
+    test('full fault bit 1 remains the driver chip fault', () {
+      expect(RSErrors2(1 << 1).errors, {RSError.driverFault});
+    });
+  });
+
   check(
     'request locKp',
     RSEvent.get(0x7f, hostId: 0xfd, key: .locKp),

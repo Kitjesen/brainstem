@@ -12,6 +12,7 @@ enum RSError {
   stallOverload, // bit14: 堵转过载保护
   phaseAOverCurrent, // bit16: A相电流过流
   magneticEncoderFault, // 磁编码故障（兼容旧代码）
+  threePhaseCurrentFault, // 压缩反馈 bit17: 三相电流故障
 }
 
 /// 故障清除方法（RS04 手册 §4.1 通信类型 4）：
@@ -26,13 +27,13 @@ enum RSError {
 /// 4. 重新 enable()
 /// 5. 确认故障清除后恢复控制
 
-/// 通信类型 2 反馈帧中 bit16~21 的故障标志（旧协议格式）
+/// 运动反馈帧中 bit16~21 的压缩故障标志。
 extension type RSErrors1(int value) {
   factory RSErrors1.none() => .new(0);
 
   static const _fromCode = <int, RSError>{
     16: .underVoltage,
-    17: .driverFault,
+    17: .threePhaseCurrentFault,
     18: .overTemperature,
     19: .magneticEncoderFault,
     20: .stallOverload,
