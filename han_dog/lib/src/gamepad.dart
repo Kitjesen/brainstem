@@ -32,3 +32,20 @@ abstract class Gamepad {
 
   void dispose();
 }
+
+/// 可报告“必须绕过普通平滑并立即归零”的物理控制器。
+///
+/// 例如 SBUS 超过看门狗时限或串口断开。人为 CH5 切档不走此通道。
+abstract interface class HardStopGamepad {
+  Stream<void> get hardStop;
+  bool get hardStopActive; // 仅新收到的真实遥控帧可以解除输入超时。
+}
+
+/// Optional health surface used by boot self-checks.
+///
+/// Keeping this separate from [Gamepad] lets future input backends expose
+/// richer diagnostics without forcing command-stream changes.
+abstract interface class InputHealthGamepad {
+  bool get inputHealthy;
+  int get inputHz;
+}

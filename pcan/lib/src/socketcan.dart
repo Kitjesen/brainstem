@@ -68,36 +68,65 @@ final class _CanFrame extends ffi.Struct {
 
 final ffi.DynamicLibrary _libc = ffi.DynamicLibrary.open('libc.so.6');
 
-final int Function(int, int, int) _socket =
-    _libc.lookupFunction<ffi.Int32 Function(ffi.Int32, ffi.Int32, ffi.Int32),
-        int Function(int, int, int)>('socket');
+final int Function(int, int, int) _socket = _libc
+    .lookupFunction<
+      ffi.Int32 Function(ffi.Int32, ffi.Int32, ffi.Int32),
+      int Function(int, int, int)
+    >('socket');
 
 final int Function(int, ffi.Pointer<_SockaddrCan>, int) _bind = _libc
     .lookupFunction<
-        ffi.Int32 Function(ffi.Int32, ffi.Pointer<_SockaddrCan>, ffi.Uint32),
-        int Function(int, ffi.Pointer<_SockaddrCan>, int)>('bind');
+      ffi.Int32 Function(ffi.Int32, ffi.Pointer<_SockaddrCan>, ffi.Uint32),
+      int Function(int, ffi.Pointer<_SockaddrCan>, int)
+    >('bind');
 
-final int Function(int, int, ffi.Pointer<_Ifreq>) _ioctl =
-    _libc.lookupFunction<
-        ffi.Int32 Function(ffi.Int32, ffi.Uint64, ffi.Pointer<_Ifreq>),
-        int Function(int, int, ffi.Pointer<_Ifreq>)>('ioctl');
+final int Function(int, int, ffi.Pointer<_Ifreq>) _ioctl = _libc
+    .lookupFunction<
+      ffi.Int32 Function(ffi.Int32, ffi.Uint64, ffi.Pointer<_Ifreq>),
+      int Function(int, int, ffi.Pointer<_Ifreq>)
+    >('ioctl');
 
-final int Function(int, ffi.Pointer<_CanFrame>, int) _write =
-    _libc.lookupFunction<
-        ffi.IntPtr Function(ffi.Int32, ffi.Pointer<_CanFrame>, ffi.Size),
-        int Function(int, ffi.Pointer<_CanFrame>, int)>('write');
+final int Function(int, ffi.Pointer<_CanFrame>, int, int) _send = _libc
+    .lookupFunction<
+      ffi.IntPtr Function(
+        ffi.Int32,
+        ffi.Pointer<_CanFrame>,
+        ffi.Size,
+        ffi.Int32,
+      ),
+      int Function(int, ffi.Pointer<_CanFrame>, int, int)
+    >('send');
 
-final int Function(int, ffi.Pointer<_CanFrame>, int, int) _recv =
-    _libc.lookupFunction<
-        ffi.IntPtr Function(ffi.Int32, ffi.Pointer<_CanFrame>, ffi.Size, ffi.Int32),
-        int Function(int, ffi.Pointer<_CanFrame>, int, int)>('recv');
+final ffi.Pointer<ffi.Int32> Function() _errnoLocation = _libc
+    .lookupFunction<
+      ffi.Pointer<ffi.Int32> Function(),
+      ffi.Pointer<ffi.Int32> Function()
+    >('__errno_location');
+
+// Linux errno values. Only transient backpressure/interruption is retryable.
+PcanStatus socketCanWriteStatus(int error) => switch (error) {
+  4 || 11 || 105 => PcanStatus.xmtfull, // EINTR, EAGAIN, ENOBUFS
+  100 || 101 => PcanStatus.busoff, // ENETDOWN, ENETUNREACH
+  9 || 19 => PcanStatus.illhw, // EBADF, ENODEV
+  22 || 90 => PcanStatus.illdata, // EINVAL, EMSGSIZE
+  _ => PcanStatus.unknown,
+};
+
+final int Function(int, ffi.Pointer<_CanFrame>, int, int) _recv = _libc
+    .lookupFunction<
+      ffi.IntPtr Function(
+        ffi.Int32,
+        ffi.Pointer<_CanFrame>,
+        ffi.Size,
+        ffi.Int32,
+      ),
+      int Function(int, ffi.Pointer<_CanFrame>, int, int)
+    >('recv');
 
 const int _MSG_DONTWAIT = 0x40;
 
-final int Function(int) _close =
-    _libc.lookupFunction<ffi.Int32 Function(ffi.Int32), int Function(int)>(
-        'close');
-
+final int Function(int) _close = _libc
+    .lookupFunction<ffi.Int32 Function(ffi.Int32), int Function(int)>('close');
 
 // ─── Channel mapping ─────────────────────────────────────────────────────────
 
@@ -125,6 +154,7 @@ String? _channelToInterface(PcanChannel channel) {
 class SocketCanPcan {
   final PcanChannel channel;
   int _fd = -1;
+  int? lastWriteErrno;
 
   // Reusable native buffers (allocated once, freed on close)
   ffi.Pointer<_CanFrame>? _frameBuf;
@@ -172,13 +202,7 @@ class SocketCanPcan {
       calloc.free(ifreq);
     }
 
-    // 4. Keep write BLOCKING (CAN tx queue is small; non-blocking bursts
-    //    return EAGAIN).  Read uses poll/select externally so blocking
-    //    write + non-blocking read is the practical combination.
-    //    We only set O_NONBLOCK for read via a separate fcntl after open
-    //    — but SocketCAN doesn't support mixed mode on one fd, so we
-    //    leave the fd blocking and handle read-empty via MSG_DONTWAIT
-    //    in the read path instead.
+    // send/recv both use MSG_DONTWAIT; congestion must not stall sensor polling.
 
     _fd = fd;
     _frameBuf = calloc<_CanFrame>();
@@ -213,9 +237,13 @@ class SocketCanPcan {
     }
 
     final size = ffi.sizeOf<_CanFrame>();
-    // Blocking write — kernel will wait until tx queue has space.
-    final written = _write(_fd, frame, size);
-    return written == size ? PcanStatus.ok : PcanStatus.xmtfull;
+    // Never block the Dart event loop: it also receives motor feedback.
+    final written = _send(_fd, frame, size, _MSG_DONTWAIT);
+    lastWriteErrno = written < 0 ? _errnoLocation().value : null;
+    if (written == size) return PcanStatus.ok;
+    return written < 0
+        ? socketCanWriteStatus(lastWriteErrno!)
+        : PcanStatus.illdata;
   }
 
   (PcanMessage, PcanTimestamp, PcanStatus) read() {

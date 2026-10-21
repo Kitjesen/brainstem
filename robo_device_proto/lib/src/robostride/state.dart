@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:robo_device_proto/src/can_frame.dart';
 
@@ -71,7 +73,9 @@ sealed class RSState with _$RSState {
     0x15 => .error(
       hostId: frame.canId,
       canId: frame.data2 & 0xFF,
-      errors: .new(frame.data2),
+      // Type-21 puts the 32-bit fault value in payload bytes 0..3.
+      // data2 only contains the motor/host CAN IDs and is not a fault code.
+      errors: .new(frame.bytes.getUint32(0, Endian.little)),
     ),
     _ => throw UnimplementedError(
       'Unknown RSState mode: 0x${frame.mode.toRadixString(16)}',

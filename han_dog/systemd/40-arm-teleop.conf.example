@@ -1,0 +1,6 @@
+[Service]
+Environment=HAN_DOG_ARM_TELEOP_ENABLED=true
+Environment=HAN_DOG_ARM_TELEOP_HOST=192.168.66.65
+Environment=HAN_DOG_ARM_TELEOP_CONTROL_PORT=14600
+Environment=HAN_DOG_ARM_TELEOP_ACK_PORT=14601
+Environment=HAN_DOG_ARM_TELEOP_SECRET_FILE=/etc/han_dog/arm-teleop.key

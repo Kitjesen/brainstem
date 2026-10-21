@@ -1,0 +1,68 @@
+{
+  "name": "flat_model13000",
+  "description": "Thunder V4 Flat StraightSmooth model_13000, Legacy pose, uniform leg PD 100/15, staged real-hardware command limits",
+  "_jointLayout": "FR hip/thigh/calf, FL hip/thigh/calf, RR hip/thigh/calf, RL hip/thigh/calf, FR/FL/RR/RL wheel",
+  "modelPath": "model/pose_flat_v4_him_urdf_v0_straight_smooth_model13000_policy.onnx",
+  "standingPose": [
+    -0.1, -0.8, 1.8,
+     0.1,  0.8, -1.8,
+     0.1,  0.8, -1.8,
+    -0.1, -0.8, 1.8,
+     0.0,  0.0, 0.0, 0.0
+  ],
+  "sittingPose": [
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0
+  ],
+  "inferKp": [
+    100, 100, 100,
+    100, 100, 100,
+    100, 100, 100,
+    100, 100, 100,
+    0, 0, 0, 0
+  ],
+  "inferKd": [
+    15, 15, 15,
+    15, 15, 15,
+    15, 15, 15,
+    15, 15, 15,
+    1, 1, 1, 1
+  ],
+  "standUpKp": [
+    200, 200, 200, 200,
+    200, 200, 200, 200,
+    200, 200, 200, 200,
+    200, 200, 200, 200
+  ],
+  "standUpKd": [
+    8, 8, 8, 8,
+    8, 8, 8, 8,
+    8, 8, 8, 8,
+    8, 8, 8, 8
+  ],
+  "sitDownKp": [
+    200, 200, 200, 200,
+    200, 200, 200, 200,
+    200, 200, 200, 200,
+    200, 200, 200, 200
+  ],
+  "sitDownKd": [
+    8, 8, 8, 8,
+    8, 8, 8, 8,
+    8, 8, 8, 8,
+    8, 8, 8, 8
+  ],
+  "standUpCounts": 150,
+  "sitDownCounts": 150,
+  "imuGyroscopeScale": 0.25,
+  "jointVelocityScale": [0.05, 0.05, 0.05, 0.05],
+  "actionScale": [0.125, 0.25, 0.25, 5.0],
+  "commandVxMax": 1.0,
+  "commandVyMax": 1.0,
+  "commandYawMax": 1.0,
+  "forwardMinCommand": 0.3,
+  "lateralMinCommand": 0.3,
+  "yawMinCommand": 0.3
+}

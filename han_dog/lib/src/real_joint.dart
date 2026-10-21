@@ -11,6 +11,15 @@ import 'package:han_dog_brain/han_dog_brain.dart';
 
 final _log = Logger('han_dog.real_joint');
 
+/// Learned walking uses the active profile's gains without a global override.
+/// Stand-up and sit-down also keep their profile values unchanged.
+const double hanDogWalkingHipKdScale = 1.0;
+
+JointsMatrix applyHanDogWalkingHipKp(JointsMatrix kp) => kp;
+
+JointsMatrix applyHanDogWalkingHipKdScale(JointsMatrix kd) =>
+    kd.scale(hanDogWalkingHipKdScale, 1.0, 1.0, 1.0);
+
 // ─── Motor fault event ───────────────────────────────────────────────────────
 
 class MotorFaultEvent {
@@ -44,6 +53,19 @@ class MotorFaultEvent {
       'temp=${temperature.toStringAsFixed(1)}?C)';
 }
 
+/// Communication-type-21 full fault feedback from a RobStride motor.
+class MotorFullFaultEvent {
+  final int jointIndex;
+  final int faultBits;
+  final Set<RSError> decodedErrors;
+
+  const MotorFullFaultEvent({
+    required this.jointIndex,
+    required this.faultBits,
+    required this.decodedErrors,
+  });
+}
+
 RSStateReport get _defaultReport => .new(
   hostId: 0,
   canId: 0,
@@ -57,8 +79,7 @@ RSStateReport get _defaultReport => .new(
 
 class RealJoint implements JointService, MotorService {
   bool get _motorCommandsAllowed =>
-      Platform.environment['HAN_DOG_ALLOW_MOTOR_ENABLE']
-          ?.toLowerCase() ==
+      Platform.environment['HAN_DOG_ALLOW_MOTOR_ENABLE']?.toLowerCase() ==
       'true';
 
   bool _blockedActionLogged = false;
@@ -128,6 +149,7 @@ class RealJoint implements JointService, MotorService {
     .filled(4, _defaultReport), // leg 4
   ];
   final frequencyWatches = List.generate(16, (_) => RealFrequency());
+  final lastReportAt = List<DateTime?>.filled(16, null);
 
   late final List<StreamSubscription<RSState>> subscriptions;
 
@@ -136,6 +158,11 @@ class RealJoint implements JointService, MotorService {
 
   final _motorFaultController = StreamController<MotorFaultEvent>.broadcast();
   Stream<MotorFaultEvent> get motorFaultStream => _motorFaultController.stream;
+
+  final _fullFaultController =
+      StreamController<MotorFullFaultEvent>.broadcast();
+  Stream<MotorFullFaultEvent> get fullFaultStream =>
+      _fullFaultController.stream;
 
   // Cached JointsMatrix values, invalidated on status update
   JointsMatrix? _cachedThetas;
@@ -167,6 +194,7 @@ class RealJoint implements JointService, MotorService {
             _cachedThetas = null;
             _cachedOmegas = null;
             frequencyWatches[legId * 4 + targetId - 1].add(1);
+            lastReportAt[legId * 4 + targetId - 1] = DateTime.now();
             _reportController.add((legId * 4 + targetId - 1, state));
             final jointIdx = targetId <= 3
                 ? legId * 3 + (targetId - 1)
@@ -181,6 +209,18 @@ class RealJoint implements JointService, MotorService {
                 velocity: state.velocity,
                 torque: state.torque,
                 temperature: state.temperature,
+              ),
+            );
+          case RSStateError(canId: final targetId)
+              when targetId >= 1 && targetId <= 4:
+            final jointIdx = targetId <= 3
+                ? legId * 3 + (targetId - 1)
+                : 12 + legId;
+            _fullFaultController.add(
+              MotorFullFaultEvent(
+                jointIndex: jointIdx,
+                faultBits: state.errors.value,
+                decodedErrors: state.errors.errors,
               ),
             );
           default:
@@ -218,6 +258,12 @@ class RealJoint implements JointService, MotorService {
 
   @override
   Future<void> enable() async {
+    if (_disableOperation != null || _disableFailed) {
+      throw StateError(
+        'Enable blocked: motor disable has not been confirmed; '
+        'retry disable and check CAN feedback',
+      );
+    }
     if (!_motorCommandsAllowed) {
       _log.warning(
         'Motor enable blocked: HAN_DOG_ALLOW_MOTOR_ENABLE is not true',
@@ -230,11 +276,81 @@ class RealJoint implements JointService, MotorService {
         pcan.add(.enable(i));
       }
     }
+    _disableRequested = false;
   }
 
+  bool _disableRequested = false;
+  bool _disableFailed = false;
+  Future<void>? _disableOperation;
+  bool lastDisableConfirmed = false;
+  List<int> unconfirmedDisableJoints = const [];
+
   @override
-  Future<void> disable({bool clearErrors = false}) async {
-    _sendDisableAll(clearErrors: clearErrors);
+  Future<void> disable({bool clearErrors = false}) {
+    // This gate is synchronous: even stale action subscriptions cannot send
+    // motion while the stop is being delivered/verified.
+    _disableRequested = true;
+    if (_disableOperation != null) {
+      if (clearErrors) _sendDisableAll(clearErrors: true);
+      return _disableOperation!;
+    }
+    return _disableOperation = _disableAndVerify(clearErrors).whenComplete(() {
+      _disableOperation = null;
+    });
+  }
+
+  Future<void> _disableAndVerify(bool clearErrors) async {
+    lastDisableConfirmed = false;
+    final watch = Stopwatch()..start();
+    final seenAt = List<int>.filled(16, -1);
+    final disabled = List<bool>.filled(16, false);
+    final sub = reportStream.listen((event) {
+      seenAt[event.$1] = watch.elapsedMilliseconds;
+      disabled[event.$1] = event.$2.status == RSStatus.reset;
+    });
+    try {
+      for (final pcan in pcans) {
+        pcan.clearPendingWrites();
+      }
+      setReporting(true);
+      _sendDisableAll(clearErrors: clearErrors);
+      while (!_disposed && watch.elapsedMilliseconds < 1000) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        final missing = <int>[];
+        for (var i = 0; i < 16; i++) {
+          if (!disabled[i] ||
+              seenAt[i] < 0 ||
+              watch.elapsedMilliseconds - seenAt[i] > 100) {
+            missing.add(i);
+          }
+        }
+        if (missing.isEmpty) {
+          lastDisableConfirmed = true;
+          _disableFailed = false;
+          unconfirmedDisableJoints = const [];
+          _log.info(
+            'Motor disable confirmed by fresh feedback from all 16 motors',
+          );
+          return;
+        }
+        unconfirmedDisableJoints = [
+          for (final i in missing)
+            i % 4 == 3 ? 12 + i ~/ 4 : (i ~/ 4) * 3 + i % 4,
+        ];
+        for (final i in missing) {
+          pcans[i ~/ 4].add(
+            RSEvent.disable(i % 4 + 1, clearErrors: clearErrors),
+          );
+        }
+      }
+      _disableFailed = true;
+      _log.severe(
+        'MOTOR DISABLE UNCONFIRMED: joints=$unconfirmedDisableJoints; '
+        'motion remains blocked and re-enable is refused',
+      );
+    } finally {
+      await sub.cancel();
+    }
   }
 
   void _sendDisableAll({
@@ -275,6 +391,7 @@ class RealJoint implements JointService, MotorService {
   void sendAction(JointsMatrix action) => realActionExt(action);
 
   void realActionExt(JointsMatrix action) {
+    if (_disableRequested) return;
     if (!_motorCommandsAllowed) {
       if (!_blockedActionLogged) {
         _blockedActionLogged = true;
@@ -339,6 +456,30 @@ class RealJoint implements JointService, MotorService {
     return frequencyWatches[legId * 4 + canId - 1].value > 0;
   }
 
+  /// Returns the current report frequency for flat joint [idx].
+  ///
+  /// The internal watch list is in CAN report order, while policy actions use
+  /// the flat 16-joint order. Keep this mapping in one place.
+  int feedbackFrequency(int idx) {
+    if (idx < 0 || idx >= 16) return 0;
+    final (legId, canId) = _flatIndexToLegCan(idx);
+    return frequencyWatches[legId * 4 + canId - 1].value;
+  }
+
+  /// Latest report without consulting the one-second frequency bucket.
+  RSStateReport? latestReport(int idx) {
+    if (idx < 0 || idx >= 16) return null;
+    final (legId, canId) = _flatIndexToLegCan(idx);
+    return status[legId][canId - 1];
+  }
+
+  /// Wall-clock time of the latest real report for flat joint [idx].
+  DateTime? latestReportAt(int idx) {
+    if (idx < 0 || idx >= 16) return null;
+    final (legId, canId) = _flatIndexToLegCan(idx);
+    return lastReportAt[legId * 4 + canId - 1];
+  }
+
   /// Returns the latest report for flat joint [idx], or null if out of range
   /// or if the motor is offline (0 Hz — data is stale).
   RSStateReport? getReport(int idx) {
@@ -353,6 +494,36 @@ class RealJoint implements JointService, MotorService {
     if (idx < 0 || idx >= 16) return;
     final (legId, canId) = _flatIndexToLegCan(idx);
     pcans[legId].add(.disable(canId, clearErrors: true));
+  }
+
+  /// Read the small set of supported private diagnostics for one motor.
+  /// This is called only after a fault and adds no traffic during normal motion.
+  Future<Map<String, double>> readFaultDiagnostics(
+    int idx, {
+    Duration timeout = const Duration(milliseconds: 180),
+  }) async {
+    if (idx < 0 || idx >= 16) return const {};
+    final (legId, canId) = _flatIndexToLegCan(idx);
+    final values = <String, double>{};
+    final sub = pcans[legId].state.listen((state) {
+      if (state is! RSStateGetter || state.canId != canId) return;
+      final getter = state.getter;
+      if (getter is RSGetterVbus) {
+        values['vbus'] = getter.value;
+      } else if (getter is RSGetterIqf) {
+        values['iqf'] = getter.value;
+      } else if (getter is RSGetterLimitCur) {
+        values['limitCur'] = getter.value;
+      }
+    });
+
+    pcans[legId]
+      ..add(RSEvent.get(canId, key: RSKey.vbus))
+      ..add(RSEvent.get(canId, key: RSKey.iqf))
+      ..add(RSEvent.get(canId, key: RSKey.limitCur));
+    await Future<void>.delayed(timeout);
+    await sub.cancel();
+    return values;
   }
 
   /// 电机清零：把当前位置标记为零点，设置符号，保存参数。
@@ -420,6 +591,7 @@ class RealJoint implements JointService, MotorService {
     }
     _reportController.close();
     _motorFaultController.close();
+    _fullFaultController.close();
     close();
   }
 

@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 // Linux Joystick FFI — 直接用 open/read/ioctl 系统调用读 /dev/input/js*。
 //
 // 非阻塞模式：O_NONBLOCK + Timer 轮询，不卡 Dart event loop。
@@ -43,7 +45,10 @@ final _libc = DynamicLibrary.open('libc.so.6');
 final _open = _libc.lookupFunction<_OpenNative, _OpenDart>('open');
 final _read = _libc.lookupFunction<_ReadNative, _ReadDart>('read');
 final _close = _libc.lookupFunction<_CloseNative, _CloseDart>('close');
-final _errnoLocation = _libc.lookupFunction<_ErrnoLocationNative, _ErrnoLocationDart>('__errno_location');
+final _errnoLocation = _libc
+    .lookupFunction<_ErrnoLocationNative, _ErrnoLocationDart>(
+      '__errno_location',
+    );
 
 int get _errno => _errnoLocation().value;
 
@@ -63,7 +68,11 @@ class JsEvent {
 
   @override
   String toString() =>
-      'JsEvent(type=${isButton ? "BTN" : isAxis ? "AXIS" : "?"}${isInit ? "+INIT" : ""}, '
+      'JsEvent(type=${isButton
+          ? "BTN"
+          : isAxis
+          ? "AXIS"
+          : "?"}${isInit ? "+INIT" : ""}, '
       'num=$number, val=$value)';
 }
 
@@ -86,7 +95,9 @@ class LinuxJoystick {
   bool _disposed = false;
 
   final _eventController = StreamController<JsEvent>.broadcast();
-  final Pointer<Uint8> _buf = calloc<Uint8>(_JS_EVENT_SIZE * 32); // 一次最多读 32 个事件
+  final Pointer<Uint8> _buf = calloc<Uint8>(
+    _JS_EVENT_SIZE * 32,
+  ); // 一次最多读 32 个事件
 
   LinuxJoystick(this.devicePath);
 
@@ -106,7 +117,10 @@ class LinuxJoystick {
     _log.info('LinuxJoystick opened: $devicePath (fd=$_fd)');
 
     // 5ms 轮询（200Hz）— 足够捕捉所有按钮事件
-    _pollTimer = Timer.periodic(const Duration(milliseconds: 5), (_) => _poll());
+    _pollTimer = Timer.periodic(
+      const Duration(milliseconds: 5),
+      (_) => _poll(),
+    );
     return true;
   }
 

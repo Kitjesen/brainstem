@@ -176,6 +176,15 @@ void main() {
   });
 
   group('mixed motor feedback decoding', () {
+    test('rejects CAN frames without exactly 8 data bytes', () {
+      expect(
+        () => RSState.fromCanFrame(
+          CanFrame(id: 0, type: CanType.extended, data: Uint8List(0)),
+        ),
+        throwsArgumentError,
+      );
+    });
+
     for (final entry in [(1, rs04MotorLimits), (4, rs02MotorLimits)]) {
       final canId = entry.$1;
       final limits = entry.$2;
@@ -277,6 +286,31 @@ void main() {
         .having((e) => e.torque, 'torque', closeTo(0.0, 0.05))
         .having((e) => e.temperature, 'temperature', closeTo(29.0, 0.05))
         .having((e) => e.errors, 'errors', 0),
+  );
+
+  check(
+    'full fault feedback (mode 0x15)',
+    RSDataFrame(
+      mode: 0x15,
+      data2: 0x01,
+      canId: 0xfd,
+      data1: _b([0x12, 0x41, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00]),
+    ),
+    isA<RSStateError>()
+        .having((e) => e.canId, 'canId', 0x01)
+        .having((e) => e.hostId, 'hostId', 0xfd)
+        .having((e) => e.errors.value, 'faultBits', 0x00014112)
+        .having(
+          (e) => e.errors.errors,
+          'decoded errors',
+          containsAll(<RSError>{
+            RSError.driverFault,
+            RSError.phaseBOverCurrent,
+            RSError.hardwareIdFault,
+            RSError.stallOverload,
+            RSError.phaseAOverCurrent,
+          }),
+        ),
   );
 }
 

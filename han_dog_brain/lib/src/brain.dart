@@ -32,6 +32,7 @@ class Brain {
     required int standUpCounts,
     required int sitDownCounts,
     required ObservationBuilder observationBuilder,
+    bool forceZeroWheelOnStop = true,
     required JointsMatrix sittingPose,
     required this.memory,
   }) :
@@ -55,6 +56,7 @@ class Brain {
        ),
        walk = .new(
          observationBuilder: observationBuilder,
+         forceZeroWheelOnStop: forceZeroWheelOnStop,
          imu: imu,
          joint: joint,
          clock: clock,
@@ -63,6 +65,7 @@ class Brain {
 
   factory Brain({
     int historySize = 1,
+    bool forceZeroWheelOnStop = true,
     required ImuService imu,
     required JointService joint,
     required StreamController<void> clock,
@@ -90,6 +93,7 @@ class Brain {
         );
     final brain = Brain.shareMemory(
       historySize: historySize,
+      forceZeroWheelOnStop: forceZeroWheelOnStop,
       imu: imu,
       joint: joint,
       clock: clock,
@@ -163,6 +167,7 @@ class Brain {
   /// 保留 memory/imu/joint/clock，替换 Walk/StandUp/SitDown 行为并重新加载模型。
   /// 若模型加载失败，自动回滚到旧行为实例，保证 Brain 始终处于可用状态。
   Future<void> switchProfile({
+    bool forceZeroWheelOnStop = true,
     required JointsMatrix standingPose,
     required JointsMatrix sittingPose,
     required String modelPath,
@@ -204,6 +209,7 @@ class Brain {
     );
     final newWalk = Walk(
       observationBuilder: builder,
+      forceZeroWheelOnStop: forceZeroWheelOnStop,
       imu: imu,
       joint: joint,
       clock: clock,

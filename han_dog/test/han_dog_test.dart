@@ -2,8 +2,10 @@ import 'dart:io';
 
 import 'package:han_dog/src/app/config.dart';
 import 'package:han_dog/src/app/robot_profile.dart';
+import 'package:han_dog/src/arm_teleop_protocol.dart';
 import 'package:han_dog/src/control_arbiter.dart';
-import 'package:han_dog_brain/han_dog_brain.dart' show M, A;
+import 'package:han_dog_brain/han_dog_brain.dart'
+    show A, M, ThunderFlatObservationBuilder;
 import 'package:mocktail/mocktail.dart';
 import 'package:test/test.dart';
 
@@ -128,6 +130,112 @@ void main() {
     });
   });
 
+  group('arm teleop secret resolution', () {
+    const directSecret = '0123456789abcdef0123456789abcdef';
+
+    test(
+      'legacy direct environment value remains supported and is trimmed',
+      () {
+        expect(
+          resolveArmTeleopSecret(
+            environment: const {
+              'HAN_DOG_ARM_TELEOP_SECRET': '  $directSecret\n',
+            },
+          ),
+          directSecret,
+        );
+      },
+    );
+
+    test(
+      'secret file takes precedence and is read exactly once per config',
+      () {
+        var reads = 0;
+        final config = HanDogConfig(
+          environment: const {
+            'HAN_DOG_ARM_TELEOP_SECRET_FILE': '/secure/arm-teleop.key',
+            'HAN_DOG_ARM_TELEOP_SECRET': 'must-not-be-used',
+          },
+          readTextFile: (path) {
+            reads++;
+            expect(path, '/secure/arm-teleop.key');
+            return '\n$directSecret\n';
+          },
+        );
+
+        expect(config.armTeleopSecret, directSecret);
+        expect(config.armTeleopSecret, directSecret);
+        expect(reads, 1);
+      },
+    );
+
+    test('configured unreadable file fails closed without env fallback', () {
+      var reads = 0;
+      final config = HanDogConfig(
+        environment: const {
+          'HAN_DOG_ARM_TELEOP_SECRET_FILE': '/missing/arm-teleop.key',
+          'HAN_DOG_ARM_TELEOP_SECRET': directSecret,
+        },
+        readTextFile: (path) {
+          reads++;
+          throw FileSystemException('denied', path);
+        },
+      );
+      expect(() => config.armTeleopSecret, throwsA(isA<StateError>()));
+      expect(() => config.armTeleopSecret, throwsA(isA<StateError>()));
+      expect(reads, 1);
+    });
+
+    test('configured empty file fails closed', () {
+      expect(
+        () => resolveArmTeleopSecret(
+          environment: const {
+            'HAN_DOG_ARM_TELEOP_SECRET_FILE': '/secure/empty.key',
+          },
+          readTextFile: (_) => ' \n ',
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
+  group('arm teleop profile selection', () {
+    test('defaults to full gripper when both opt-in switches are absent', () {
+      final config = HanDogConfig(environment: const {});
+      expect(config.armTeleopActiveProfile, armTeleopProfileFullGripper);
+    });
+
+    test('six-axis-only requires both explicit true switches', () {
+      final config = HanDogConfig(
+        environment: const {
+          'HAN_DOG_ARM_TELEOP_SIX_AXIS_ONLY': 'true',
+          'HAN_DOG_ARM_TELEOP_ACKNOWLEDGE_GRIPPER_DISABLED': 'true',
+        },
+      );
+      expect(config.armTeleopActiveProfile, armTeleopProfileSixAxisOnly);
+      expect(config.validate(), isEmpty);
+    });
+
+    test('partial or malformed six-axis opt-in fails validation', () {
+      final partial = HanDogConfig(
+        environment: const {'HAN_DOG_ARM_TELEOP_SIX_AXIS_ONLY': 'true'},
+      );
+      expect(
+        partial.validate(),
+        contains(contains('must be configured together')),
+      );
+
+      final malformed = HanDogConfig(
+        environment: const {
+          'HAN_DOG_ARM_TELEOP_SIX_AXIS_ONLY': 'TRUE',
+          'HAN_DOG_ARM_TELEOP_ACKNOWLEDGE_GRIPPER_DISABLED': 'TRUE',
+        },
+      );
+      expect(malformed.validate(), isNotEmpty);
+      expect(malformed.armTeleopActiveProfile, armTeleopProfileFullGripper);
+    });
+  });
+
   group('resolveProfileDir', () {
     test('prefers primary env var over legacy env var', () {
       expect(
@@ -201,6 +309,7 @@ void main() {
       expect(profile.modelPath, 'model.onnx');
       expect(profile.description, '');
       expect(profile.standUpCounts, 150);
+      expect(profile.observationLayout, 'standard57');
     });
 
     test('description field defaults to empty string', () {
@@ -210,6 +319,31 @@ void main() {
     test('description field is read when present', () {
       final json = validJson()..['description'] = '标准行走';
       expect(RobotProfile.fromJson(json).description, '标准行走');
+    });
+
+    test('thunderFlat53 observation layout selects the 53D builder', () {
+      final json = validJson()..['observationLayout'] = 'thunderFlat53';
+      final profile = RobotProfile.fromJson(json);
+      expect(profile.observationLayout, 'thunderFlat53');
+      expect(
+        profile.toObservationBuilder(),
+        isA<ThunderFlatObservationBuilder>(),
+      );
+      expect(profile.toObservationBuilder().tensorSize, 53);
+    });
+
+    test('unknown observation layout throws FormatException', () {
+      final json = validJson()..['observationLayout'] = 'unknown';
+      expect(
+        () => RobotProfile.fromJson(json),
+        throwsA(
+          isA<FormatException>().having(
+            (e) => e.message,
+            'message',
+            contains('observationLayout'),
+          ),
+        ),
+      );
     });
 
     test('missing name throws FormatException mentioning field', () {
@@ -292,6 +426,40 @@ void main() {
       expect(profile.imuGyroscopeScale, closeTo(0.25, 1e-9));
       expect(profile.standUpCounts, 150);
       expect(profile.sitDownCounts, 150);
+      expect(profile.commandVxMax, 1.5);
+      expect(profile.commandVyMax, 1.0);
+      expect(profile.commandYawMax, 1.0);
+      expect(profile.forwardMinCommand, 0.0);
+      expect(profile.lateralMinCommand, 0.30);
+      expect(profile.yawMinCommand, 0.40);
+    });
+
+    test('command envelope fields are read when present', () {
+      final json = validJson()
+        ..['commandVxMax'] = 0.5
+        ..['commandVyMax'] = 0.4
+        ..['commandYawMax'] = 0.25
+        ..['forwardMinCommand'] = 0.1
+        ..['lateralMinCommand'] = 0.2
+        ..['yawMinCommand'] = 0.3;
+      final profile = RobotProfile.fromJson(json);
+      expect(profile.commandVxMax, 0.5);
+      expect(profile.commandVyMax, 0.4);
+      expect(profile.commandYawMax, 0.25);
+      expect(profile.forwardMinCommand, 0.1);
+      expect(profile.lateralMinCommand, 0.2);
+      expect(profile.yawMinCommand, 0.3);
+    });
+
+    test('invalid command envelope fields throw FormatException', () {
+      expect(
+        () => RobotProfile.fromJson(validJson()..['commandVxMax'] = 0),
+        throwsA(isA<FormatException>()),
+      );
+      expect(
+        () => RobotProfile.fromJson(validJson()..['lateralMinCommand'] = 1.01),
+        throwsA(isA<FormatException>()),
+      );
     });
 
     test('actionScale defaults to (0.125, 0.25, 0.25, 5.0) when absent', () {

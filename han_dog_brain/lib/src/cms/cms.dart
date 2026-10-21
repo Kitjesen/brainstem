@@ -16,8 +16,12 @@ final _log = Logger('han_dog_brain.cms');
 
 class M extends Cms<S, A> {
   final Brain _brain;
+  bool _closing = false;
 
-  M(this._brain) : super(const Zero());
+  // Cancellation is asynchronous. Concurrent handlers can all observe the same
+  // old state and create subscriptions which the final state can no longer cancel.
+  M(this._brain)
+    : super(const Zero(), (events, mapper) => events.asyncExpand(mapper));
 
   /// 监听 idle 行为（由时钟驱动的无限流）。
   /// 正常运行时 onDone 不应触发；若触发说明时钟流中断，强制触发 Fault 保持 FSM 一致性。
@@ -84,9 +88,13 @@ class M extends Cms<S, A> {
 
   /// 监听行走行为（由时钟驱动的无限流）。
   /// 正常运行时 onDone 不应触发；若触发说明时钟流中断，强制触发 Fault 保持 FSM 一致性。
-  StreamSubscription<History> _listenWalk(Vector3 direction) {
+  StreamSubscription<History> _listenWalk(
+    Vector3 direction, {
+    bool forceWheelStop = false,
+  }) {
     final Stream<History> stream;
     try {
+      _brain.walk.forceWheelStop = forceWheelStop;
       stream = _brain.walk.doing(direction);
     } catch (e, st) {
       _log.severe('Failed to create walk stream', e, st);
@@ -108,8 +116,13 @@ class M extends Cms<S, A> {
 
   @override
   Future<void> close() async {
-    // 取消当前状态持有的行为流订阅，防止资源泄漏
-    switch (state) {
+    _closing = true;
+    await super.close();
+    await _cancelState(state);
+  }
+
+  Future<void> _cancelState(S s) async {
+    switch (s) {
       case Grounded(:final sub):
       case Standing(:final sub):
       case Walking(:final sub):
@@ -118,12 +131,16 @@ class M extends Cms<S, A> {
       case Zero():
         break;
     }
-    return super.close();
   }
 
   @override
   Future<S?> kernel(S s, A a) async {
+    if (_closing) return null;
     final next = await _kernelImpl(s, a);
+    if (_closing) {
+      if (next != null) await _cancelState(next);
+      return null;
+    }
     if (next != null) {
       _log.info(
         'FSM ${s.runtimeType} + ${a.runtimeType} → ${next.runtimeType}',
@@ -164,9 +181,9 @@ class M extends Cms<S, A> {
     (Grounded(), _) => null,
 
     // ── Standing (idle, upright) ────────────────────────────
-    (Standing(:final sub), CmdWalk(:final direction)) => () async {
+    (Standing(:final sub), CmdWalk(:final direction, :final forceWheelStop)) => () async {
       await sub.cancel();
-      return Walking(_listenWalk(direction));
+      return Walking(_listenWalk(direction, forceWheelStop: forceWheelStop));
     }(),
     (Standing(:final sub), CmdSitDown()) => () async {
       await sub.cancel();
@@ -196,8 +213,9 @@ class M extends Cms<S, A> {
     (Standing(), _) => null,
 
     // ── Walking (active control) ────────────────────────────
-    (Walking(), CmdWalk(:final direction)) => () {
+    (Walking(), CmdWalk(:final direction, :final forceWheelStop)) => () {
       _brain.walk.direction = direction;
+      _brain.walk.forceWheelStop = forceWheelStop;
       return null; // 仅更新方向，不切换状态
     }(),
     (Walking(:final sub), CmdIdle()) => () async {

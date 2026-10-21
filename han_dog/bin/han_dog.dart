@@ -11,9 +11,29 @@ import 'package:cms/cms.dart';
 import 'package:han_dog/src/app/config.dart';
 import 'package:han_dog/src/app/monitoring.dart';
 import 'package:robo_device_proto/robo_device_proto.dart';
+import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
 
 final _log = Logger('han_dog');
 final _cfg = HanDogConfig();
+
+const _bootMotorNames = [
+  'FR Hip',
+  'FR Thigh',
+  'FR Calf',
+  'FR Foot',
+  'FL Hip',
+  'FL Thigh',
+  'FL Calf',
+  'FL Foot',
+  'RR Hip',
+  'RR Thigh',
+  'RR Calf',
+  'RR Foot',
+  'RL Hip',
+  'RL Thigh',
+  'RL Calf',
+  'RL Foot',
+];
 
 /// 所有需要在关机时取消的 subscription
 final _subs = <StreamSubscription<Object?>>[];
@@ -23,6 +43,9 @@ grpc.Server? _grpcServerForCleanup;
 
 /// 用于异常退出时禁用电机
 RealJoint? _jointForCleanup;
+
+/// 异常退出时先向机械臂发送安全中立包并关闭 UDP。
+ArmTeleopBridge? _armBridgeForCleanup;
 
 /// 策略热加载定时器（关机时取消）
 Timer? _profileReloadTimer;
@@ -45,6 +68,7 @@ void main() {
     _log.severe('Uncaught: $error\n$stack');
     (() async {
       try {
+        await _armBridgeForCleanup?.dispose();
         _jointForCleanup?.disable();
         await _grpcServerForCleanup?.shutdown();
         _log.info('gRPC port ${_cfg.grpcPort} released.');
@@ -110,11 +134,12 @@ Future<void> _run() async {
 
   // ──── 1. 设备初始化 ────────────────────────────────────────
   final imu = RealImu(_cfg.imuPort);
-  if (!imu.open()) {
+  final imuOpened = imu.open();
+  if (!imuOpened) {
     _log.severe('IMU open failed on ${_cfg.imuPort}');
-    return;
+  } else {
+    _log.info('IMU opened.');
   }
-  _log.info('IMU opened.');
 
   // PCAN USB 通道映射（由硬件接线决定）
   final joint = RealJoint(
@@ -123,31 +148,32 @@ Future<void> _run() async {
     rr: .usbbus2,
     rl: .usbbus1,
   );
-  if (!joint.open()) {
+  final jointOpened = joint.open();
+  if (!jointOpened) {
     _log.severe('Joint PCAN open failed');
-    imu.dispose();
-    return;
+  } else {
+    _log.info('Joint PCAN opened.');
   }
-  _log.info('Joint PCAN opened.');
   validateHanDogMotorLayout();
   _log.info('MOTOR_CODEC $hanDogMotorCodecSummary');
 
-  // 清除上次异常退出遗留的 fault
-  _log.info('Clearing motor faults...');
-  joint.clearFaults();
-  await Future<void>.delayed(const Duration(milliseconds: 200));
+  if (jointOpened) {
+    // 清除上次异常退出遗留的 fault
+    _log.info('Clearing motor faults...');
+    joint.clearFaults();
+    await Future<void>.delayed(const Duration(milliseconds: 200));
 
-  // 设置足轮 cantimeout = 500ms，程序崩溃后轮子自动停转
-  _log.info('Setting foot wheel canTimeout...');
-  joint.setFootWheelCantimeout(500000);
-  await Future<void>.delayed(const Duration(milliseconds: 100));
-
-  // 发送 setReporting x3（带间隔），防止刚 open 后首帧丢失
-  for (var retry = 0; retry < 3; retry++) {
-    joint.setReporting(true);
+    // 设置足轮 cantimeout = 500ms，程序崩溃后轮子自动停转
+    _log.info('Setting foot wheel canTimeout...');
+    joint.setFootWheelCantimeout(500000);
     await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    // 发送 setReporting x3（带间隔），防止刚 open 后首帧丢失
+    for (var retry = 0; retry < 3; retry++) {
+      joint.setReporting(true);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
   }
-  await _checkJointReporting(joint);
 
   // ──── 2. Brain（参数来自默认策略）─────────────────────────────
   final brain = Brain(
@@ -160,7 +186,10 @@ Future<void> _run() async {
     standUpCounts: defaultProfile.standUpCounts,
     sitDownCounts: defaultProfile.sitDownCounts,
     observationBuilder: defaultProfile.toObservationBuilder(),
+    forceZeroWheelOnStop: defaultProfile.forceZeroWheelOnStop,
   );
+  _log.info('WHEEL_STOP profile=${defaultProfile.name} '
+      'forceZeroWheelOnStop=${defaultProfile.forceZeroWheelOnStop}; hard-stop override retained');
   const modelLoadMaxAttempts = 3;
   bool modelLoaded = false;
   for (var attempt = 1; attempt <= modelLoadMaxAttempts; attempt++) {
@@ -195,6 +224,20 @@ Future<void> _run() async {
 
   joint.kpExt = defaultProfile.inferKp;
   joint.kdExt = defaultProfile.inferKd;
+  final walkingKp = applyHanDogWalkingHipKp(defaultProfile.inferKp);
+  final walkingKd = applyHanDogWalkingHipKdScale(defaultProfile.inferKd);
+  _log.info(
+    'HIP_KP walking=${_fmt4(walkingKp.frHip, walkingKp.flHip, walkingKp.rrHip, walkingKp.rlHip)} '
+    'standUp=${_fmt4(defaultProfile.standUpKp.frHip, defaultProfile.standUpKp.flHip, defaultProfile.standUpKp.rrHip, defaultProfile.standUpKp.rlHip)} '
+    'sitDown=${_fmt4(defaultProfile.sitDownKp.frHip, defaultProfile.sitDownKp.flHip, defaultProfile.sitDownKp.rrHip, defaultProfile.sitDownKp.rlHip)}',
+  );
+  _log.info(
+    'HIP_KD walkingScale=$hanDogWalkingHipKdScale '
+    'walkingBase=${_fmt4(defaultProfile.inferKd.frHip, defaultProfile.inferKd.flHip, defaultProfile.inferKd.rrHip, defaultProfile.inferKd.rlHip)} '
+    'walkingEffective=${_fmt4(walkingKd.frHip, walkingKd.flHip, walkingKd.rrHip, walkingKd.rlHip)} '
+    'standUp=${_fmt4(defaultProfile.standUpKd.frHip, defaultProfile.standUpKd.flHip, defaultProfile.standUpKd.rrHip, defaultProfile.standUpKd.rlHip)} '
+    'sitDown=${_fmt4(defaultProfile.sitDownKd.frHip, defaultProfile.sitDownKd.flHip, defaultProfile.sitDownKd.rrHip, defaultProfile.sitDownKd.rlHip)}',
+  );
 
   // ──── 3. 手柄（YUNZHUO → Xbox → gRPC-only 三级降级）────────
   Gamepad? controller;
@@ -229,6 +272,89 @@ Future<void> _run() async {
         );
       }
     }
+  }
+
+  // ──── 3a. 快速开机自检 + 统一使能互锁 ───────────────────────
+  // 这里只检查当前硬件帧流，不做策略验收、模型参数验收或额外 PCAN 检查。
+  final motorEnableInterlock = MotorEnableInterlock();
+  final bootSelfCheck = BootSelfCheck(
+    voice: createVoiceAnnouncerFromEnvironment(),
+  );
+  final inputHealth = controller is InputHealthGamepad
+      ? controller as InputHealthGamepad
+      : null;
+  final selfCheckResult = await bootSelfCheck.run(
+    CallbackBootSelfCheckProbe(() {
+      final gyro = imu.gyroscope;
+      final gravity = imu.projectedGravity;
+      final motors = <MotorBootSnapshot>[];
+      for (var i = 0; i < _bootMotorNames.length; i++) {
+        final report = joint.latestReport(i);
+        final lastReportAt = joint.latestReportAt(i);
+        final hasReport = lastReportAt != null;
+        final finite =
+            hasReport &&
+            report != null &&
+            report.position.isFinite &&
+            report.velocity.isFinite &&
+            report.torque.isFinite &&
+            report.temperature.isFinite;
+        final hasError =
+            !hasReport ||
+            report == null ||
+            report.status.value == 1 ||
+            report.status.value == 3 ||
+            report.errors.errors.isNotEmpty;
+        motors.add(
+          MotorBootSnapshot(
+            name: _bootMotorNames[i],
+            hasReport: hasReport,
+            finite: finite,
+            hasError: hasError,
+            frameHz: joint.feedbackFrequency(i),
+            lastFrameAt: lastReportAt,
+          ),
+        );
+      }
+      return BootSelfCheckSnapshot(
+        imu: ImuBootSnapshot(
+          deviceOpen: imuOpened,
+          hasFrame: imu.lastUpdate != null,
+          finite:
+              gyro.x.isFinite &&
+              gyro.y.isFinite &&
+              gyro.z.isFinite &&
+              gravity.x.isFinite &&
+              gravity.y.isFinite &&
+              gravity.z.isFinite,
+          frameHz: imu.hz.value,
+          lastFrameAt: imu.lastUpdate,
+        ),
+        motors: motors,
+        controller: ControllerBootSnapshot(
+          connected: inputHealth?.inputHealthy ?? false,
+          hasFrame: inputHealth?.inputHealthy ?? false,
+          frameHz: inputHealth?.inputHz ?? 0,
+        ),
+      );
+    }),
+  );
+  if (selfCheckResult.motorEnableAllowed) {
+    motorEnableInterlock.permit();
+    if (selfCheckResult.passed) {
+      _log.info('Boot self-check ready: motor enable permitted');
+    } else {
+      _log.warning(
+        'Boot self-check has a recoverable controller fault; '
+        'motor enable permitted while controller reconnects',
+      );
+    }
+  } else {
+    motorEnableInterlock.block(bootSelfCheck.blockReason ?? '开机自检失败');
+    _log.severe(
+      'Boot self-check fault: IMU/motor safety fault; '
+      'motor enable remains blocked until process reboot',
+    );
   }
 
   // ──── 4. FSM + 仲裁器 ──────────────────────────────────────
@@ -268,6 +394,25 @@ Future<void> _run() async {
   final motorHealth = MotorHealthManager(
     joint: joint,
     requestFault: (reason) => arbiter.fault(reason),
+    contextProvider: () {
+      var vx = 0.0;
+      var vy = 0.0;
+      var yaw = 0.0;
+      if (brain.histories.isNotEmpty) {
+        final command = brain.histories.last.command;
+        if (command case WalkCommand(:final direction)) {
+          vx = direction.x;
+          vy = direction.y;
+          yaw = direction.z;
+        }
+      }
+      return {
+        'cmsState': m.state.runtimeType.toString(),
+        'commandVx': vx,
+        'commandVy': vy,
+        'commandYaw': yaw,
+      };
+    },
   );
   _subs.add(
     motorHealth.healthStream.listen((event) {
@@ -295,24 +440,108 @@ Future<void> _run() async {
   );
 
   var motorOutputEnabled = false;
+  JointsMatrix? groundedHoldAction;
   var lastWheelActionLog = DateTime.fromMillisecondsSinceEpoch(0);
+
+  void updateMotorOutputEnabled(bool enabled) {
+    motorOutputEnabled = enabled;
+    if (!enabled && groundedHoldAction != null) {
+      groundedHoldAction = null;
+      _log.info('Grounded hold released: motor output disabled');
+    }
+  }
+
+  void recordControlSample(JointsMatrix policyTarget, JointsMatrix sentTarget) {
+    var vx = 0.0;
+    var vy = 0.0;
+    var yaw = 0.0;
+    var gyro = <double>[0.0, 0.0, 0.0];
+    if (brain.histories.isNotEmpty) {
+      final history = brain.histories.last;
+      if (history.command case WalkCommand(:final direction)) {
+        vx = direction.x;
+        vy = direction.y;
+        yaw = direction.z;
+      }
+      gyro = [history.gyroscope.x, history.gyroscope.y, history.gyroscope.z];
+    }
+    motorHealth.recordControlSample(
+      cmsState: arbiter.state.runtimeType.toString(),
+      motorOutputEnabled: motorOutputEnabled,
+      command: [vx, vy, yaw],
+      policyTarget: policyTarget,
+      sentTarget: sentTarget,
+      position: joint.position,
+      velocity: joint.velocity,
+      hipTorque: [
+        for (final i in const [0, 3, 6, 9]) joint.getReport(i)?.torque,
+      ],
+      gyroscope: gyro,
+      inferenceUs: brain.lastInferenceUs,
+    );
+  }
 
   // 推理输出 → 电机动作 (gated through MotorHealthManager)
   _subs.add(
     brain.nextActionStream.listen(
       (action) {
-        if (!motorOutputEnabled) return;
-
-        if (arbiter.state is Grounded) {
-          joint.sendAction(joint.position.discardFoot());
+        if (!motorOutputEnabled) {
+          groundedHoldAction = null;
           return;
         }
 
+        if (arbiter.state is Grounded) {
+          if (groundedHoldAction == null) {
+            // Capture once on entry (or after re-enable). Re-reading the live
+            // position every cycle turns position stiffness into damping and
+            // lets suspended legs sag under gravity.
+            groundedHoldAction = joint.position.discardFoot();
+            _log.info(
+              'Grounded hold latched: 12 leg joints fixed, wheel targets zero',
+            );
+          }
+          recordControlSample(action, groundedHoldAction!);
+          joint.sendAction(groundedHoldAction!);
+          return;
+        }
+
+        if (groundedHoldAction != null) {
+          groundedHoldAction = null;
+          _log.info('Grounded hold released: leaving Grounded');
+        }
+
         final gated = motorHealth.gateAction(action, joint.position);
+        recordControlSample(action, gated);
         final now = DateTime.now();
-        if (now.difference(lastWheelActionLog).inMilliseconds >= 200) {
+        if (now.difference(lastWheelActionLog).inMilliseconds >= 100) {
           lastWheelActionLog = now;
           final v = joint.velocity;
+          final p = joint.position;
+          final h = brain.histories.last;
+          var vx = 0.0;
+          var vy = 0.0;
+          var yaw = 0.0;
+          if (h.command case WalkCommand(:final direction)) {
+            vx = direction.x;
+            vy = direction.y;
+            yaw = direction.z;
+          }
+          final wheelTau = [
+            for (var i = 12; i < 16; i++)
+              joint.getReport(i)?.torque ?? double.nan,
+          ];
+          final hipTau = [
+            for (final i in const [0, 3, 6, 9])
+              joint.getReport(i)?.torque ?? double.nan,
+          ];
+          final thighTau = [
+            for (final i in const [1, 4, 7, 10])
+              joint.getReport(i)?.torque ?? double.nan,
+          ];
+          final calfTau = [
+            for (final i in const [2, 5, 8, 11])
+              joint.getReport(i)?.torque ?? double.nan,
+          ];
           _log.info(
             'ACTION wheel target='
             'FR=${gated.frFoot.toStringAsFixed(2)} '
@@ -323,7 +552,34 @@ Future<void> _run() async {
             'FR=${v.frFoot.toStringAsFixed(2)} '
             'FL=${v.flFoot.toStringAsFixed(2)} '
             'RR=${v.rrFoot.toStringAsFixed(2)} '
-            'RL=${v.rlFoot.toStringAsFixed(2)}',
+            'RL=${v.rlFoot.toStringAsFixed(2)} '
+            'TRACE10 '
+            'state=${arbiter.state.runtimeType} enabled=1 '
+            'cmd=${_fmt3(vx, vy, yaw)} '
+            'wheelErr=${_fmt4(gated.frFoot - v.frFoot, gated.flFoot - v.flFoot, gated.rrFoot - v.rrFoot, gated.rlFoot - v.rlFoot)} '
+            'wheelTau=${_fmt4(wheelTau[0], wheelTau[1], wheelTau[2], wheelTau[3])} '
+            'hipT=${_fmt4(gated.frHip, gated.flHip, gated.rrHip, gated.rlHip)} '
+            'hipP=${_fmt4(p.frHip, p.flHip, p.rrHip, p.rlHip)} '
+            'hipErr=${_fmt4(gated.frHip - p.frHip, gated.flHip - p.flHip, gated.rrHip - p.rrHip, gated.rlHip - p.rlHip)} '
+            'hipV=${_fmt4(v.frHip, v.flHip, v.rrHip, v.rlHip)} '
+            'hipTau=${_fmt4(hipTau[0], hipTau[1], hipTau[2], hipTau[3])} '
+            'hipKd=${_fmt4(joint.kdExt.frHip, joint.kdExt.flHip, joint.kdExt.rrHip, joint.kdExt.rlHip)} '
+            'thighT=${_fmt4(gated.frThigh, gated.flThigh, gated.rrThigh, gated.rlThigh)} '
+            'thighP=${_fmt4(p.frThigh, p.flThigh, p.rrThigh, p.rlThigh)} '
+            'thighErr=${_fmt4(gated.frThigh - p.frThigh, gated.flThigh - p.flThigh, gated.rrThigh - p.rrThigh, gated.rlThigh - p.rlThigh)} '
+            'thighV=${_fmt4(v.frThigh, v.flThigh, v.rrThigh, v.rlThigh)} '
+            'thighTau=${_fmt4(thighTau[0], thighTau[1], thighTau[2], thighTau[3])} '
+            'calfT=${_fmt4(gated.frCalf, gated.flCalf, gated.rrCalf, gated.rlCalf)} '
+            'calfP=${_fmt4(p.frCalf, p.flCalf, p.rrCalf, p.rlCalf)} '
+            'calfErr=${_fmt4(gated.frCalf - p.frCalf, gated.flCalf - p.flCalf, gated.rrCalf - p.rrCalf, gated.rlCalf - p.rlCalf)} '
+            'calfV=${_fmt4(v.frCalf, v.flCalf, v.rrCalf, v.rlCalf)} '
+            'calfTau=${_fmt4(calfTau[0], calfTau[1], calfTau[2], calfTau[3])} '
+            'gyro=${_fmt3(h.gyroscope.x, h.gyroscope.y, h.gyroscope.z)} '
+            'gravity=${_fmt3(h.projectedGravity.x, h.projectedGravity.y, h.projectedGravity.z)} '
+            'calfKp=${_fmt4(joint.kpExt.frCalf, joint.kpExt.flCalf, joint.kpExt.rrCalf, joint.kpExt.rlCalf)} '
+            'calfKd=${_fmt4(joint.kdExt.frCalf, joint.kdExt.flCalf, joint.kdExt.rrCalf, joint.kdExt.rlCalf)} '
+            'wheelKd=${_fmt4(joint.kdExt.frFoot, joint.kdExt.flFoot, joint.kdExt.rrFoot, joint.kdExt.rlFoot)} '
+            'inferUs=${brain.lastInferenceUs}',
           );
         }
         joint.sendAction(gated);
@@ -354,7 +610,14 @@ Future<void> _run() async {
       standUpKp: defaultProfile.standUpKp,
       sitDownKd: defaultProfile.sitDownKd,
       sitDownKp: defaultProfile.sitDownKp,
+      commandVxMax: defaultProfile.commandVxMax,
+      commandVyMax: defaultProfile.commandVyMax,
+      commandYawMax: defaultProfile.commandYawMax,
+      forwardMinCommand: defaultProfile.forwardMinCommand,
+      lateralMinCommand: defaultProfile.lateralMinCommand,
+      yawMinCommand: defaultProfile.yawMinCommand,
       controller: controller,
+      requestMotorEnable: () => motorEnableInterlock.request(joint.enable),
     );
 
     // ──── 4b. 策略管理 ───────────────────────────────────────────
@@ -366,7 +629,7 @@ Future<void> _run() async {
     );
     controlDog.onProfileSwitch = () => profileManager!.toggle();
     controlDog.onMotorEnableChanged = (enabled) {
-      motorOutputEnabled = enabled;
+      updateMotorOutputEnabled(enabled);
     };
     _log.info('ProfileManager ready: ${profiles.keys.join(", ")}');
   } else {
@@ -402,7 +665,14 @@ Future<void> _run() async {
         standUpKp: defaultProfile.standUpKp,
         sitDownKd: defaultProfile.sitDownKd,
         sitDownKp: defaultProfile.sitDownKp,
+        commandVxMax: defaultProfile.commandVxMax,
+        commandVyMax: defaultProfile.commandVyMax,
+        commandYawMax: defaultProfile.commandYawMax,
+        forwardMinCommand: defaultProfile.forwardMinCommand,
+        lateralMinCommand: defaultProfile.lateralMinCommand,
+        yawMinCommand: defaultProfile.yawMinCommand,
         controller: xbox,
+        requestMotorEnable: () => motorEnableInterlock.request(joint.enable),
       );
       final pm = ProfileManager(
         profiles: profiles,
@@ -413,7 +683,7 @@ Future<void> _run() async {
       profileManager = pm;
       controlDog!.onProfileSwitch = () => pm.toggle();
       controlDog!.onMotorEnableChanged = (enabled) {
-        motorOutputEnabled = enabled;
+        updateMotorOutputEnabled(enabled);
       };
       _profileReloadTimer ??= Timer.periodic(const Duration(seconds: 30), (_) {
         pm.reload(_cfg.profileDir).catchError((Object e, StackTrace st) {
@@ -521,10 +791,12 @@ Future<void> _run() async {
   );
   cmsService.profileManager = profileManager;
   cmsService.joint = joint;
+  cmsService.motorEnableBlockReason = () =>
+      motorEnableInterlock.allowed ? null : motorEnableInterlock.reason;
   // 无遥控器时，gRPC Enable/Disable 直接控制 motorOutputEnabled
   if (controlDog == null) {
     cmsService.onMotorEnableChanged = (enabled) {
-      motorOutputEnabled = enabled;
+      updateMotorOutputEnabled(enabled);
       _log.info('motorOutputEnabled=$enabled (via gRPC)');
     };
   }
@@ -544,10 +816,14 @@ Future<void> _run() async {
     imu: imu,
     brain: brain,
     motorHealth: motorHealth,
+    armTeleopBridge: null,
     getClockTimer: () => clockTimer,
   );
 
-  _log.info('gRPC + YUNZHUO 就绪. 电机输出受 CH5 使能控制；Grounded 时保持当前姿态.');
+  _log.info(
+    'gRPC + YUNZHUO 就绪. H 控制机器狗电机使能；'
+    'CH5 不再选择控制模式；Grounded 时保持当前姿态.',
+  );
 
   clockTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
     clock.add(null);
@@ -580,7 +856,7 @@ Future<void> _run() async {
             _log.severe('Low voltage: Grounded timeout 8s, force disabling');
           }
           joint.disable();
-          motorOutputEnabled = false;
+          updateMotorOutputEnabled(false);
           _log.severe('Motors disabled due to low voltage');
         }();
       }
@@ -629,54 +905,6 @@ Future<String> _resolveInputName(RobotProfile profile) async {
 
 // ─── 辅助函数 ──────────────────────────────────────────────────
 
-/// 检查 16 个关节的主动上报状态。
-Future<void> _checkJointReporting(RealJoint joint) async {
-  const names = [
-    'FR Hip',
-    'FR Thigh',
-    'FR Calf',
-    'FR Foot',
-    'FL Hip',
-    'FL Thigh',
-    'FL Calf',
-    'FL Foot',
-    'RR Hip',
-    'RR Thigh',
-    'RR Calf',
-    'RR Foot',
-    'RL Hip',
-    'RL Thigh',
-    'RL Calf',
-    'RL Foot',
-  ];
-  const attempts = 8;
-  for (var attempt = 1; attempt <= attempts; attempt++) {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    final received = joint.frequencyWatches.where((e) => e.value > 0).length;
-    if (received == names.length) {
-      _log.info('主动上报: 16/16 关节已收到 (attempt $attempt/$attempts)');
-      return;
-    }
-    // Re-send reporting requests to wake slow motors up sooner.
-    joint.setReporting(true);
-  }
-  final noReport = <String>[];
-  final hasReport = <String>[];
-  for (var i = 0; i < joint.frequencyWatches.length; i++) {
-    if (joint.frequencyWatches[i].value > 0) {
-      hasReport.add(names[i]);
-    } else {
-      noReport.add(names[i]);
-    }
-  }
-  if (noReport.isEmpty) {
-    _log.info('主动上报: 16/16 关节已收到');
-  } else {
-    _log.info('主动上报 已收到: ${hasReport.join(", ")}');
-    _log.warning('主动上报 未收到: ${noReport.join(", ")} (请检查 CAN/电机或重新上电)');
-  }
-}
-
 /// 启动 gRPC 服务器，处理端口冲突。
 Future<grpc.Server> _startGrpc(UnifiedCmsServer cmsService) async {
   grpc.Server create() => grpc.Server.create(
@@ -720,6 +948,7 @@ void _registerShutdown({
   required RealImu imu,
   required Brain brain,
   required MotorHealthManager motorHealth,
+  required ArmTeleopBridge? armTeleopBridge,
   required Timer? Function() getClockTimer,
 }) {
   var shuttingDown = false;
@@ -740,6 +969,9 @@ void _registerShutdown({
     });
 
     try {
+      await armTeleopBridge?.dispose();
+      _armBridgeForCleanup = null;
+
       final current = m.state;
       if (current is Walking || current is Transitioning) {
         arbiter.fault('Process signal $signal');
@@ -764,8 +996,15 @@ void _registerShutdown({
       _log.warning('Shutdown FSM error: $e, proceeding with disable.');
     }
 
-    joint.disable();
-    _log.info('Motors disabled safely.');
+    await joint.disable();
+    if (joint.lastDisableConfirmed) {
+      _log.info('Motors disabled safely (feedback verified).');
+    } else {
+      _log.severe(
+        'Shutdown with UNCONFIRMED motor disable: '
+        '${joint.unconfirmedDisableJoints}',
+      );
+    }
 
     try {
       await grpcServer.shutdown().timeout(const Duration(seconds: 3));
@@ -809,3 +1048,9 @@ void _registerShutdown({
     _subs.add(ProcessSignal.sigterm.watch().listen((s) => handle(s)));
   }
 }
+
+String _fmt3(double a, double b, double c) =>
+    '[${a.toStringAsFixed(3)},${b.toStringAsFixed(3)},${c.toStringAsFixed(3)}]';
+
+String _fmt4(double a, double b, double c, double d) =>
+    '[${a.toStringAsFixed(3)},${b.toStringAsFixed(3)},${c.toStringAsFixed(3)},${d.toStringAsFixed(3)}]';

@@ -123,6 +123,10 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   /// gRPC Enable/Disable 时的回调（无遥控器时用于设置 motorOutputEnabled）。
   void Function(bool enabled)? onMotorEnableChanged;
 
+  /// Optional process-wide interlock, injected by the hardware bootstrap.
+  /// It is checked before the existing joint safety checks.
+  String? Function()? motorEnableBlockReason;
+
   @override
   Future<proto.Empty> enable(ServiceCall call, proto.Empty request) async {
     final blockReason = _enableBlockReason();
@@ -130,7 +134,11 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
       _log.warning('Motors enable blocked: $blockReason');
       throw GrpcError.failedPrecondition('Motors enable blocked: $blockReason');
     }
-    await motor?.enable();
+    try {
+      await motor?.enable();
+    } on StateError catch (e) {
+      throw GrpcError.failedPrecondition(e.message.toString());
+    }
     onMotorEnableChanged?.call(true);
     _log.info('Motors enabled');
     return proto.Empty();
@@ -138,13 +146,21 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   @override
   Future<proto.Empty> disable(ServiceCall call, proto.Empty request) async {
-    await motor?.disable();
     onMotorEnableChanged?.call(false);
+    await motor?.disable();
+    if (motor case RealJoint j when !j.lastDisableConfirmed) {
+      throw GrpcError.unavailable(
+        'Motor disable unconfirmed: '
+        '${j.unconfirmedDisableJoints}',
+      );
+    }
     _log.info('Motors disabled');
     return proto.Empty();
   }
 
   String? _enableBlockReason() {
+    final externalReason = motorEnableBlockReason?.call();
+    if (externalReason != null) return externalReason;
     if (mode != CmsMode.hardware) return null;
     final j = joint;
     if (j == null) return 'joint controller unavailable';

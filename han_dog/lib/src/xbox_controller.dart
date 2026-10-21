@@ -135,7 +135,7 @@ class XboxConfig {
 /// if (!xbox.open()) { ... }
 /// // 然后传给 RealControlDog 使用 direction/standup/sitdown/enabled 流
 /// ```
-class XboxController implements Gamepad {
+class XboxController implements Gamepad, InputHealthGamepad {
   final String devicePath;
   final XboxConfig config;
 
@@ -144,6 +144,19 @@ class XboxController implements Gamepad {
   Timer? _tickTimer;
   Timer? _reconnectTimer;
   bool _disposed = false;
+  bool _opened = false;
+  DateTime? _lastInputAt;
+
+  @override
+  bool get inputHealthy =>
+      _opened &&
+      !_disposed &&
+      _lastInputAt != null &&
+      DateTime.now().difference(_lastInputAt!).abs() <=
+          const Duration(milliseconds: 500);
+
+  @override
+  int get inputHz => inputHealthy ? 50 : 0;
 
   // 内部状态
   final Map<int, double> _axes = {};
@@ -159,6 +172,7 @@ class XboxController implements Gamepad {
   bool open() {
     final ok = _attach();
     if (!ok) return false;
+    _opened = true;
     // 50Hz tick 驱动 direction 流（无事件时也保持输出）
     _tickTimer = Timer.periodic(const Duration(milliseconds: 20), (_) {
       if (!_disposed) _stateController.add(null);
@@ -180,6 +194,7 @@ class XboxController implements Gamepad {
     _axes[config.axisRT] = -1.0;
     _eventSub = _joystick!.eventStream.listen(
       (event) {
+        _lastInputAt = DateTime.now();
         if (event.isAxis) {
           _axes[event.number] = event.value / 32767.0;
         } else if (event.isButton) {
@@ -193,6 +208,7 @@ class XboxController implements Gamepad {
         _log.warning('Xbox joystick disconnected: $devicePath');
         _joystick?.dispose(); // 释放 FFI buffer，dispose 内部有幂等保护
         _joystick = null;
+        _opened = false;
         _axes.clear();
         _buttons.clear();
         if (!_disposed && !_stateController.isClosed) {
@@ -335,6 +351,7 @@ class XboxController implements Gamepad {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _opened = false;
     _tickTimer?.cancel();
     _reconnectTimer?.cancel();
     _eventSub?.cancel();

@@ -14,12 +14,18 @@ final _log = Logger('han_dog.xbox_nc500');
 /// Both are allowed to control the robot only when Linux exposes a standard
 /// /dev/input/js* joystick node. NC500's current 1a34:f517 hidraw/update mode is
 /// detected but deliberately not parsed into commands.
-class XboxNc500Controller implements Gamepad {
+class XboxNc500Controller implements Gamepad, InputHealthGamepad {
   final String joystickDevice;
   final String nc500HidrawDevice;
   final XboxConfig config;
 
   XboxController? _delegate;
+
+  @override
+  bool get inputHealthy => _delegate?.inputHealthy ?? false;
+
+  @override
+  int get inputHz => _delegate?.inputHz ?? 0;
 
   XboxNc500Controller(
     this.joystickDevice, {

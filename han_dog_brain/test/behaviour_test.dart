@@ -38,6 +38,66 @@ void main() {
     memory.dispose();
   });
 
+  group('deployment action safety', () {
+    test('clamps every leg target and wheel target to the real envelope', () {
+      final extreme = JointsMatrix.fromList(
+        List<double>.generate(16, (i) => i.isEven ? -100.0 : 100.0),
+      );
+
+      final result = clampDeployAction(extreme).values;
+
+      expect(result, [
+        -0.39,
+        -0.02,
+        0.02,
+        0.39,
+        0.02,
+        -0.02,
+        -0.39,
+        3.12,
+        -3.12,
+        0.39,
+        -3.12,
+        3.12,
+        -37.69911184307752,
+        37.69911184307752,
+        -37.69911184307752,
+        37.69911184307752,
+      ]);
+    });
+
+    test('intersects profile action limits with the real envelope', () {
+      final extreme = JointsMatrix.fromList(List.filled(16, 100.0));
+      final lower = JointsMatrix.fromList(List.filled(16, -100.0));
+      final upper = JointsMatrix.fromList([0.2, ...List.filled(15, 100.0)]);
+
+      final result = clampDeployAction(
+        extreme,
+        lowerLimits: lower,
+        upperLimits: upper,
+      ).values;
+
+      expect(result[0], 0.2);
+      expect(result[1], -0.02);
+      expect(result[15], 37.69911184307752);
+    });
+
+    test(
+      'walk entry blend starts at stand action and ends at policy action',
+      () {
+        final entry = JointsMatrix.fromList(List.filled(16, 1.0));
+        final policy = JointsMatrix.fromList(List.filled(16, 3.0));
+
+        expect(blendWalkEntryAction(entry, policy, 0).values, entry.values);
+        expect(blendWalkEntryAction(entry, policy, 25).values, policy.values);
+        expect(
+          blendWalkEntryAction(entry, policy, 12).values[0],
+          closeTo(1.940032, 1e-6),
+        );
+      },
+    );
+  });
+
   group('Idle', () {
     test('emits History with idle command on each clock tick', () async {
       final idle = Idle(clock: clock, imu: imu, joint: joint, memory: memory);
@@ -265,28 +325,6 @@ void main() {
       expect(results[3].nextAction.values[0], closeTo(0.0, 1e-6));
 
       await sub.cancel();
-    });
-  });
-  group('Walk command limits', () {
-    test('clamps every joint using configured physical bounds', () {
-      final walk = Walk(
-        observationBuilder: StandardObservationBuilder(
-          standingPose: .zero(),
-          actionLowerLimits: JointsMatrix.fromList(List.filled(16, -1.0)),
-          actionUpperLimits: JointsMatrix.fromList(List.filled(16, 1.0)),
-        ),
-        clock: clock,
-        imu: imu,
-        joint: joint,
-        memory: memory,
-      );
-
-      final result = walk.clampAction(
-        JointsMatrix.fromList(List.generate(16, (i) => i.isEven ? -2.0 : 2.0)),
-      );
-
-      expect(result.values, List.generate(16, (i) => i.isEven ? -1.0 : 1.0));
-      walk.dispose();
     });
   });
 }

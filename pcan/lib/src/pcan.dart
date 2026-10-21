@@ -1,4 +1,5 @@
 import 'package:ffi/ffi.dart';
+
 import 'dart:ffi';
 import 'dart:io';
 
@@ -19,6 +20,8 @@ class Pcan {
   SocketCanPcan? _socketCan;
 
   Pcan(this.channel);
+
+  int? get lastWriteErrno => _socketCan?.lastWriteErrno;
 
   PcanStatus open([PcanBaudRate baudRate = .baud1M]) {
     if (_usePcanBasic) {

@@ -49,6 +49,36 @@ void main() {
     verify: (m) => expect(m.state, const Zero()),
   );
 
+  for (final startStanding in [false, true]) {
+    blocTest<TestM, S>(
+      'wheel stop marker propagates and clears, startStanding=$startStanding',
+      build: () {
+        final m = TestM();
+        when(() => m.mockBrain.walk).thenReturn(m.mockBrain.mockWalk);
+        when(() => m.mockBrain.memory).thenReturn(m.mockBrain.mockMemory);
+        when(() => m.mockBrain.mockWalk.doing(any()))
+            .thenAnswer((_) => const Stream<History>.empty().asBroadcastStream());
+        // Do not close a Walk stream during this state-propagation check.
+        final ticks = StreamController<History>.broadcast();
+        addTearDown(ticks.close);
+        when(() => m.mockBrain.mockWalk.doing(any())).thenAnswer((_) => ticks.stream);
+        return m;
+      },
+      seed: () => startStanding
+          ? Standing(const Stream<History>.empty().listen((_) {}))
+          : Walking(const Stream<History>.empty().listen((_) {})),
+      act: (m) async {
+        m.add(A.walk(Vector3.zero(), forceWheelStop: true));
+        await Future<void>.delayed(Duration.zero);
+        m.add(A.walk(Vector3.zero()));
+      },
+      verify: (m) => verifyInOrder([
+        () => m.mockBrain.mockWalk.forceWheelStop = true,
+        () => m.mockBrain.mockWalk.forceWheelStop = false,
+      ]),
+    );
+  }
+
   blocTest(
     'init → grounded',
     build: () {

@@ -16,6 +16,8 @@ class _MockM extends Mock implements M {}
 
 class _MockServiceCall extends Mock implements ServiceCall {}
 
+class _MockRealJoint extends Mock implements RealJoint {}
+
 // ─── 测试工具函数 ──────────────────────────────────────────────────────
 
 final _zeros16 = JointsMatrix.fromList(List.filled(16, 0.0));
@@ -65,27 +67,85 @@ void main() {
     when(() => m.state).thenReturn(const Zero());
   });
 
+  test(
+    'disable RPC blocks output immediately and reports missing confirmation',
+    () async {
+      final motor = _MockRealJoint();
+      final stopped = Completer<void>();
+      when(() => motor.disable()).thenAnswer((_) => stopped.future);
+      when(() => motor.lastDisableConfirmed).thenReturn(false);
+      when(() => motor.unconfirmedDisableJoints).thenReturn([15]);
+      final changes = <bool>[];
+      final server = UnifiedCmsServer(
+        brain: brain,
+        m: m,
+        mode: CmsMode.simulation,
+        motor: motor,
+      )..onMotorEnableChanged = changes.add;
+      final result = server.disable(call, proto.Empty());
+      expect(changes, [false]);
+      final assertion = expectLater(
+        result,
+        throwsA(
+          isA<GrpcError>().having(
+            (e) => e.code,
+            'code',
+            StatusCode.unavailable,
+          ),
+        ),
+      );
+      stopped.complete();
+      await assertion;
+    },
+  );
+
+  test('enable refusal never reports motor output enabled', () async {
+    final motor = _MockRealJoint();
+    when(() => motor.enable()).thenThrow(StateError('disable unconfirmed'));
+    final changes = <bool>[];
+    final server = UnifiedCmsServer(
+      brain: brain,
+      m: m,
+      mode: CmsMode.simulation,
+      motor: motor,
+    )..onMotorEnableChanged = changes.add;
+    await expectLater(
+      server.enable(call, proto.Empty()),
+      throwsA(
+        isA<GrpcError>().having(
+          (e) => e.code,
+          'code',
+          StatusCode.failedPrecondition,
+        ),
+      ),
+    );
+    expect(changes, isEmpty);
+  });
+
   // ─── walk 入力バリデーション ──────────────────────────────────────────
 
   group('walk — 输入验证', () {
     test('NaN 方向向量 → 静默忽略', () async {
       final server = _simServer(brain, m);
       final result = await server.walk(
-        call, proto.Vector3(x: double.nan, y: 0, z: 0));
+        call,
+        proto.Vector3(x: double.nan, y: 0, z: 0),
+      );
       expect(result, isA<proto.Empty>());
     });
 
     test('Inf 方向向量 → 静默忽略', () async {
       final server = _simServer(brain, m);
       final result = await server.walk(
-        call, proto.Vector3(x: double.infinity, y: 0, z: 0));
+        call,
+        proto.Vector3(x: double.infinity, y: 0, z: 0),
+      );
       expect(result, isA<proto.Empty>());
     });
 
     test('幅值超过 3.0 → clamp 后执行', () async {
       final server = _simServer(brain, m);
-      final result = await server.walk(
-        call, proto.Vector3(x: 3.1, y: 0, z: 0));
+      final result = await server.walk(call, proto.Vector3(x: 3.1, y: 0, z: 0));
       expect(result, isA<proto.Empty>());
     });
 
@@ -267,8 +327,7 @@ void main() {
       when(() => m.state).thenReturn(Grounded(sub));
 
       final server = _simServer(brain, m);
-      final result = await server.walk(
-        call, proto.Vector3(x: 0.5, y: 0, z: 0));
+      final result = await server.walk(call, proto.Vector3(x: 0.5, y: 0, z: 0));
       expect(result, isA<proto.Empty>());
 
       await sub.cancel();
@@ -278,9 +337,8 @@ void main() {
     test('Transitioning standUp → 静默忽略', () async {
       final historyCtrl = StreamController<History>();
       final sub = historyCtrl.stream.listen((_) {});
-      when(
-        () => m.state,
-      ).thenReturn(Transitioning(const StandUpCommand(), sub, null));
+      when(() => m.state)
+          .thenReturn(Transitioning(const StandUpCommand(), sub, null));
 
       final server = _simServer(brain, m);
       final result = await server.standUp(call, proto.Empty());

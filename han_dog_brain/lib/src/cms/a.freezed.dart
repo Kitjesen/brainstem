@@ -137,13 +137,13 @@ return done(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  init,TResult Function()?  standUp,TResult Function()?  sitDown,TResult Function( Vector3 direction)?  walk,TResult Function()?  idle,TResult Function( String name)?  gesture,TResult Function( String reason)?  fault,TResult Function()?  done,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  init,TResult Function()?  standUp,TResult Function()?  sitDown,TResult Function( Vector3 direction,  bool forceWheelStop)?  walk,TResult Function()?  idle,TResult Function( String name)?  gesture,TResult Function( String reason)?  fault,TResult Function()?  done,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case Init() when init != null:
 return init();case CmdStandUp() when standUp != null:
 return standUp();case CmdSitDown() when sitDown != null:
 return sitDown();case CmdWalk() when walk != null:
-return walk(_that.direction);case CmdIdle() when idle != null:
+return walk(_that.direction,_that.forceWheelStop);case CmdIdle() when idle != null:
 return idle();case CmdGesture() when gesture != null:
 return gesture(_that.name);case Fault() when fault != null:
 return fault(_that.reason);case Done() when done != null:
@@ -165,13 +165,13 @@ return done();case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  init,required TResult Function()  standUp,required TResult Function()  sitDown,required TResult Function( Vector3 direction)  walk,required TResult Function()  idle,required TResult Function( String name)  gesture,required TResult Function( String reason)  fault,required TResult Function()  done,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  init,required TResult Function()  standUp,required TResult Function()  sitDown,required TResult Function( Vector3 direction,  bool forceWheelStop)  walk,required TResult Function()  idle,required TResult Function( String name)  gesture,required TResult Function( String reason)  fault,required TResult Function()  done,}) {final _that = this;
 switch (_that) {
 case Init():
 return init();case CmdStandUp():
 return standUp();case CmdSitDown():
 return sitDown();case CmdWalk():
-return walk(_that.direction);case CmdIdle():
+return walk(_that.direction,_that.forceWheelStop);case CmdIdle():
 return idle();case CmdGesture():
 return gesture(_that.name);case Fault():
 return fault(_that.reason);case Done():
@@ -189,13 +189,13 @@ return done();}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  init,TResult? Function()?  standUp,TResult? Function()?  sitDown,TResult? Function( Vector3 direction)?  walk,TResult? Function()?  idle,TResult? Function( String name)?  gesture,TResult? Function( String reason)?  fault,TResult? Function()?  done,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  init,TResult? Function()?  standUp,TResult? Function()?  sitDown,TResult? Function( Vector3 direction,  bool forceWheelStop)?  walk,TResult? Function()?  idle,TResult? Function( String name)?  gesture,TResult? Function( String reason)?  fault,TResult? Function()?  done,}) {final _that = this;
 switch (_that) {
 case Init() when init != null:
 return init();case CmdStandUp() when standUp != null:
 return standUp();case CmdSitDown() when sitDown != null:
 return sitDown();case CmdWalk() when walk != null:
-return walk(_that.direction);case CmdIdle() when idle != null:
+return walk(_that.direction,_that.forceWheelStop);case CmdIdle() when idle != null:
 return idle();case CmdGesture() when gesture != null:
 return gesture(_that.name);case Fault() when fault != null:
 return fault(_that.reason);case Done() when done != null:
@@ -307,10 +307,11 @@ String toString() {
 
 
 class CmdWalk implements A {
-  const CmdWalk(this.direction);
+  const CmdWalk(this.direction, {this.forceWheelStop = false});
   
 
  final  Vector3 direction;
+@JsonKey() final  bool forceWheelStop;
 
 /// Create a copy of A
 /// with the given fields replaced by the non-null parameter values.
@@ -322,16 +323,16 @@ $CmdWalkCopyWith<CmdWalk> get copyWith => _$CmdWalkCopyWithImpl<CmdWalk>(this, _
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is CmdWalk&&(identical(other.direction, direction) || other.direction == direction));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is CmdWalk&&(identical(other.direction, direction) || other.direction == direction)&&(identical(other.forceWheelStop, forceWheelStop) || other.forceWheelStop == forceWheelStop));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,direction);
+int get hashCode => Object.hash(runtimeType,direction,forceWheelStop);
 
 @override
 String toString() {
-  return 'A.walk(direction: $direction)';
+  return 'A.walk(direction: $direction, forceWheelStop: $forceWheelStop)';
 }
 
 
@@ -342,7 +343,7 @@ abstract mixin class $CmdWalkCopyWith<$Res> implements $ACopyWith<$Res> {
   factory $CmdWalkCopyWith(CmdWalk value, $Res Function(CmdWalk) _then) = _$CmdWalkCopyWithImpl;
 @useResult
 $Res call({
- Vector3 direction
+ Vector3 direction, bool forceWheelStop
 });
 
 
@@ -359,10 +360,11 @@ class _$CmdWalkCopyWithImpl<$Res>
 
 /// Create a copy of A
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') $Res call({Object? direction = null,}) {
+@pragma('vm:prefer-inline') $Res call({Object? direction = null,Object? forceWheelStop = null,}) {
   return _then(CmdWalk(
 null == direction ? _self.direction : direction // ignore: cast_nullable_to_non_nullable
-as Vector3,
+as Vector3,forceWheelStop: null == forceWheelStop ? _self.forceWheelStop : forceWheelStop // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:cms/cms.dart';
 import 'package:logging/logging.dart';
 
+import '../arm_teleop_protocol.dart';
+
 const _defaultProfileDirCandidates = <String>['profiles', 'han_dog/profiles'];
 
 /// 解析策略目录。
@@ -55,8 +57,49 @@ String _joinPath(String base, String child) {
   return '$trimmedBase${Platform.pathSeparator}$normalizedChild';
 }
 
+/// Resolves the arm-teleop HMAC secret without exposing it through systemd's
+/// service environment. A configured file always takes precedence over the
+/// legacy direct environment variable and is never allowed to fall back when
+/// it is missing, unreadable, or empty.
+String resolveArmTeleopSecret({
+  Map<String, String>? environment,
+  String Function(String path)? readTextFile,
+}) {
+  final env = environment ?? Platform.environment;
+  final secretFile = env['HAN_DOG_ARM_TELEOP_SECRET_FILE']?.trim();
+  if (secretFile != null && secretFile.isNotEmpty) {
+    final reader = readTextFile ?? (path) => File(path).readAsStringSync();
+    try {
+      final secret = reader(secretFile).trim();
+      if (secret.isEmpty) {
+        throw StateError('arm-teleop secret file is empty: $secretFile');
+      }
+      return secret;
+    } catch (error) {
+      if (error is StateError) rethrow;
+      throw StateError(
+        'cannot read arm-teleop secret file "$secretFile": $error',
+      );
+    }
+  }
+  return env['HAN_DOG_ARM_TELEOP_SECRET']?.trim() ?? '';
+}
+
 /// 从环境变量读取配置，每个都有合理的默认值。
 class HanDogConfig {
+  final Map<String, String> _armTeleopEnvironment;
+  final String Function(String path)? _armTeleopFileReader;
+  bool _armTeleopSecretResolved = false;
+  String? _resolvedArmTeleopSecret;
+  Object? _armTeleopSecretError;
+  StackTrace? _armTeleopSecretStackTrace;
+
+  HanDogConfig({
+    Map<String, String>? environment,
+    String Function(String path)? readTextFile,
+  }) : _armTeleopEnvironment = environment ?? Platform.environment,
+       _armTeleopFileReader = readTextFile;
+
   int get grpcPort =>
       int.tryParse(Platform.environment['HAN_DOG_PORT'] ?? '') ?? 13145;
   String get imuPort =>
@@ -69,6 +112,50 @@ class HanDogConfig {
       Platform.environment['HAN_DOG_NC500_HIDRAW_DEVICE'] ?? '/dev/hidraw0';
   String get xboxConfigPath =>
       Platform.environment['HAN_DOG_XBOX_CONFIG'] ?? 'han_dog/config/xbox.json';
+
+  /// 机械臂 UDP 桥接默认关闭；必须显式启用并提供受限权限的密钥文件。
+  bool get armTeleopEnabled =>
+      _armTeleopEnvironment['HAN_DOG_ARM_TELEOP_ENABLED'] == 'true';
+  String get armTeleopHost =>
+      _armTeleopEnvironment['HAN_DOG_ARM_TELEOP_HOST'] ?? '192.168.66.65';
+  int get armTeleopControlPort =>
+      int.tryParse(
+        _armTeleopEnvironment['HAN_DOG_ARM_TELEOP_CONTROL_PORT'] ?? '',
+      ) ??
+      14600;
+  int get armTeleopAckPort =>
+      int.tryParse(
+        _armTeleopEnvironment['HAN_DOG_ARM_TELEOP_ACK_PORT'] ?? '',
+      ) ??
+      14601;
+  bool get armTeleopSixAxisOnly =>
+      _armTeleopEnvironment['HAN_DOG_ARM_TELEOP_SIX_AXIS_ONLY']?.trim() ==
+          'true' &&
+      _armTeleopEnvironment['HAN_DOG_ARM_TELEOP_ACKNOWLEDGE_GRIPPER_DISABLED']
+              ?.trim() ==
+          'true';
+  String get armTeleopActiveProfile => armTeleopSixAxisOnly
+      ? armTeleopProfileSixAxisOnly
+      : armTeleopProfileFullGripper;
+  String get armTeleopSecret {
+    if (!_armTeleopSecretResolved) {
+      _armTeleopSecretResolved = true;
+      try {
+        _resolvedArmTeleopSecret = resolveArmTeleopSecret(
+          environment: _armTeleopEnvironment,
+          readTextFile: _armTeleopFileReader,
+        );
+      } catch (error, stackTrace) {
+        _armTeleopSecretError = error;
+        _armTeleopSecretStackTrace = stackTrace;
+      }
+    }
+    final error = _armTeleopSecretError;
+    if (error != null) {
+      Error.throwWithStackTrace(error, _armTeleopSecretStackTrace!);
+    }
+    return _resolvedArmTeleopSecret!;
+  }
 
   /// 默认策略名称（对应 profileDir 中的 JSON 文件 name 字段）。
   /// 未设置时使用加载顺序第一个策略。
@@ -110,13 +197,19 @@ class HanDogConfig {
       errors.add('HAN_DOG_PORT=$grpcPort 超出范围 [1-65535]');
     }
     if (arbiterTimeoutSec < 0 || arbiterTimeoutSec > 3600) {
-      errors.add('HAN_DOG_ARBITER_TIMEOUT=${arbiterTimeoutSec}s 需在 [0, 3600] 范围内（0=永不释放）');
+      errors.add(
+        'HAN_DOG_ARBITER_TIMEOUT=${arbiterTimeoutSec}s 需在 [0, 3600] 范围内（0=永不释放）',
+      );
     }
     if (shutdownTimeoutSec < 1 || shutdownTimeoutSec > 300) {
-      errors.add('HAN_DOG_SHUTDOWN_TIMEOUT=${shutdownTimeoutSec}s 需在 [1, 300] 范围内');
+      errors.add(
+        'HAN_DOG_SHUTDOWN_TIMEOUT=${shutdownTimeoutSec}s 需在 [1, 300] 范围内',
+      );
     }
     if (startupTimeoutSec < 1 || startupTimeoutSec > 300) {
-      errors.add('HAN_DOG_STARTUP_TIMEOUT=${startupTimeoutSec}s 需在 [1, 300] 范围内');
+      errors.add(
+        'HAN_DOG_STARTUP_TIMEOUT=${startupTimeoutSec}s 需在 [1, 300] 范围内',
+      );
     }
     if (jointLimitRad <= 0 || !jointLimitRad.isFinite) {
       errors.add('HAN_DOG_JOINT_LIMIT_RAD=$jointLimitRad 必须为有限正数');
@@ -127,7 +220,35 @@ class HanDogConfig {
     if (!_directoryExists(profileDir)) {
       errors.add('HAN_DOG_PROFILE_DIR="$profileDir" 目录不存在');
     }
+    _validateArmTeleopProfileSwitches(errors);
     return errors;
+  }
+
+  void _validateArmTeleopProfileSwitches(List<String> errors) {
+    const sixAxisKey = 'HAN_DOG_ARM_TELEOP_SIX_AXIS_ONLY';
+    const acknowledgeKey = 'HAN_DOG_ARM_TELEOP_ACKNOWLEDGE_GRIPPER_DISABLED';
+    final sixAxisPresent = _armTeleopEnvironment.containsKey(sixAxisKey);
+    final acknowledgePresent = _armTeleopEnvironment.containsKey(
+      acknowledgeKey,
+    );
+    final sixAxisValue = _armTeleopEnvironment[sixAxisKey]?.trim();
+    final acknowledgeValue = _armTeleopEnvironment[acknowledgeKey]?.trim();
+
+    for (final entry in <MapEntry<String, String?>>[
+      MapEntry(sixAxisKey, sixAxisValue),
+      MapEntry(acknowledgeKey, acknowledgeValue),
+    ]) {
+      if (entry.value != null &&
+          entry.value != 'true' &&
+          entry.value != 'false') {
+        errors.add('${entry.key} must be exactly true or false');
+      }
+    }
+    if (sixAxisPresent != acknowledgePresent) {
+      errors.add('$sixAxisKey and $acknowledgeKey must be configured together');
+    } else if (sixAxisPresent && sixAxisValue != acknowledgeValue) {
+      errors.add('$sixAxisKey and $acknowledgeKey must have the same value');
+    }
   }
 
   /// 配置是否合法。

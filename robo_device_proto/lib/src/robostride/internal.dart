@@ -28,12 +28,17 @@ class RSDataFrame extends Equatable {
   }) : data1 = data1 ?? Uint8List(8) {
     assert(this.data1.length == 8, 'Data length must be 8 bytes');
   }
-  factory RSDataFrame.fromCanFrame(CanFrame frame) => RSDataFrame(
-    mode: (frame.id >> 24) & 0xFF,
-    data2: (frame.id >> 8) & 0xFFFF,
-    canId: frame.id & 0xFF,
-    data1: frame.data,
-  );
+  factory RSDataFrame.fromCanFrame(CanFrame frame) {
+    if (frame.data.length != 8) {
+      throw ArgumentError.value(frame.data.length, 'data length', 'must be 8');
+    }
+    return RSDataFrame(
+      mode: (frame.id >> 24) & 0xFF,
+      data2: (frame.id >> 8) & 0xFFFF,
+      canId: frame.id & 0xFF,
+      data1: frame.data,
+    );
+  }
   CanFrame toCanFrame() => CanFrame(
     id: mode << 24 | data2 << 8 | canId,
     type: CanType.extended,

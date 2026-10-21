@@ -12,6 +12,8 @@ class RobotProfile {
   final String name;
   final String description;
   final String modelPath;
+  final String observationLayout;
+  final bool forceZeroWheelOnStop; // 默认保留旧逻辑；仅已验证模型关闭普通松杆归零。
   final JointsMatrix standingPose;
   final JointsMatrix sittingPose;
   final int standUpCounts;
@@ -25,6 +27,12 @@ class RobotProfile {
   final double imuGyroscopeScale;
   final (double, double, double, double) jointVelocityScale;
   final (double, double, double, double) actionScale;
+  final double commandVxMax;
+  final double commandVyMax;
+  final double commandYawMax;
+  final double forwardMinCommand;
+  final double lateralMinCommand;
+  final double yawMinCommand;
   final JointsMatrix actionLowerLimits;
   final JointsMatrix actionUpperLimits;
 
@@ -70,6 +78,8 @@ class RobotProfile {
     required this.name,
     this.description = '',
     required this.modelPath,
+    this.observationLayout = 'standard57',
+    this.forceZeroWheelOnStop = true,
     required this.standingPose,
     required this.sittingPose,
     this.standUpCounts = 150,
@@ -83,6 +93,12 @@ class RobotProfile {
     this.imuGyroscopeScale = 0.25,
     this.jointVelocityScale = (0.05, 0.05, 0.05, 0.05),
     this.actionScale = (0.125, 0.25, 0.25, 5.0),
+    this.commandVxMax = 1.5,
+    this.commandVyMax = 1.0,
+    this.commandYawMax = 1.0,
+    this.forwardMinCommand = 0.0,
+    this.lateralMinCommand = 0.30,
+    this.yawMinCommand = 0.40,
     JointsMatrix? actionLowerLimits,
     JointsMatrix? actionUpperLimits,
   }) : actionLowerLimits = actionLowerLimits ?? defaultActionLowerLimits,
@@ -93,6 +109,8 @@ class RobotProfile {
       name: _reqString(json, 'name'),
       description: json['description'] as String? ?? '',
       modelPath: _reqString(json, 'modelPath'),
+      observationLayout: _observationLayout(json),
+      forceZeroWheelOnStop: json['forceZeroWheelOnStop'] as bool? ?? true,
       standingPose: _joints16(json, 'standingPose'),
       sittingPose: _joints16(json, 'sittingPose'),
       standUpCounts: (json['standUpCounts'] as num?)?.toInt() ?? 150,
@@ -114,6 +132,12 @@ class RobotProfile {
         'actionScale',
         defaultValue: (0.125, 0.25, 0.25, 5.0),
       ),
+      commandVxMax: _positiveFiniteDouble(json, 'commandVxMax', 1.5),
+      commandVyMax: _positiveFiniteDouble(json, 'commandVyMax', 1.0),
+      commandYawMax: _positiveFiniteDouble(json, 'commandYawMax', 1.0),
+      forwardMinCommand: _unitDouble(json, 'forwardMinCommand', 0.0),
+      lateralMinCommand: _unitDouble(json, 'lateralMinCommand', 0.30),
+      yawMinCommand: _unitDouble(json, 'yawMinCommand', 0.40),
       actionLowerLimits: json['actionLowerLimits'] == null
           ? null
           : _joints16(json, 'actionLowerLimits'),
@@ -149,6 +173,51 @@ class RobotProfile {
     final d = v.toDouble();
     if (!d.isFinite) {
       throw FormatException('Field "$key" must be finite, got $d');
+    }
+    return d;
+  }
+
+  static String _observationLayout(Map<String, dynamic> json) {
+    final layout = json['observationLayout'] ?? 'standard57';
+    if (layout is! String) {
+      throw FormatException(
+        'Field "observationLayout" must be a string, got ${layout.runtimeType}',
+      );
+    }
+    if (layout != 'standard57' &&
+        layout != 'thunderFlat53' &&
+        layout != 'thunderFlat53ZeroWheelHistory' &&
+        layout != 'thunderFlat53Clipped' &&
+        layout != 'thunderCts53') {
+      throw FormatException(
+        'Unsupported observationLayout "$layout"; expected standard57, '
+        'thunderFlat53, thunderFlat53ZeroWheelHistory, '
+        'thunderFlat53Clipped or thunderCts53',
+      );
+    }
+    return layout;
+  }
+
+  static double _positiveFiniteDouble(
+    Map<String, dynamic> json,
+    String key,
+    double defaultValue,
+  ) {
+    final d = _finiteDouble(json, key, defaultValue);
+    if (d <= 0.0) {
+      throw FormatException('Field "$key" must be > 0, got $d');
+    }
+    return d;
+  }
+
+  static double _unitDouble(
+    Map<String, dynamic> json,
+    String key,
+    double defaultValue,
+  ) {
+    final d = _finiteDouble(json, key, defaultValue);
+    if (d < 0.0 || d > 1.0) {
+      throw FormatException('Field "$key" must be in [0, 1], got $d');
     }
     return d;
   }
@@ -221,14 +290,56 @@ class RobotProfile {
   }
 
   /// 从当前 profile 参数创建对应的 [ObservationBuilder]。
-  ObservationBuilder toObservationBuilder() => StandardObservationBuilder(
-    standingPose: standingPose,
-    actionLowerLimits: actionLowerLimits,
-    actionUpperLimits: actionUpperLimits,
-    imuGyroscopeScale: imuGyroscopeScale,
-    jointVelocityScale: jointVelocityScale,
-    actionScale: actionScale,
-  );
+  ObservationBuilder toObservationBuilder() {
+    final arguments = (
+      standingPose: standingPose,
+      actionLowerLimits: actionLowerLimits,
+      actionUpperLimits: actionUpperLimits,
+      imuGyroscopeScale: imuGyroscopeScale,
+      jointVelocityScale: jointVelocityScale,
+      actionScale: actionScale,
+    );
+    return switch (observationLayout) {
+      'standard57' => StandardObservationBuilder(
+        standingPose: arguments.standingPose,
+        actionLowerLimits: arguments.actionLowerLimits,
+        actionUpperLimits: arguments.actionUpperLimits,
+        imuGyroscopeScale: arguments.imuGyroscopeScale,
+        jointVelocityScale: arguments.jointVelocityScale,
+        actionScale: arguments.actionScale,
+      ),
+      'thunderFlat53' ||
+      'thunderFlat53ZeroWheelHistory' => ThunderFlatObservationBuilder(
+        standingPose: arguments.standingPose,
+        actionLowerLimits: arguments.actionLowerLimits,
+        actionUpperLimits: arguments.actionUpperLimits,
+        imuGyroscopeScale: arguments.imuGyroscopeScale,
+        jointVelocityScale: arguments.jointVelocityScale,
+        actionScale: arguments.actionScale,
+        zeroCommandWheelHistory:
+            observationLayout == 'thunderFlat53ZeroWheelHistory',
+      ),
+      'thunderFlat53Clipped' => ThunderFlatClippedObservationBuilder(
+        standingPose: arguments.standingPose,
+        actionLowerLimits: arguments.actionLowerLimits,
+        actionUpperLimits: arguments.actionUpperLimits,
+        imuGyroscopeScale: arguments.imuGyroscopeScale,
+        jointVelocityScale: arguments.jointVelocityScale,
+        actionScale: arguments.actionScale,
+      ),
+      'thunderCts53' => ThunderCtsObservationBuilder(
+        standingPose: arguments.standingPose,
+        actionLowerLimits: arguments.actionLowerLimits,
+        actionUpperLimits: arguments.actionUpperLimits,
+        imuGyroscopeScale: arguments.imuGyroscopeScale,
+        jointVelocityScale: arguments.jointVelocityScale,
+        actionScale: arguments.actionScale,
+      ),
+      _ => throw StateError(
+        'Unsupported observation layout: $observationLayout',
+      ),
+    };
+  }
 
   @override
   String toString() => 'RobotProfile($name, model=$modelPath)';
