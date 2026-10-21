@@ -28,11 +28,16 @@ Future<void> main(List<String> args) async {
       throw Exception('Failed to fetch CSerialPort submodule.');
     }
 
+    await applyPipeLeakPatch(input.packageRoot, cserialPortDir);
+
     // Native-toolchain-cmake does not automatically include every nested
     // submodule source in the hook cache key. Track the Unix implementation
     // explicitly so fixes there always rebuild libcserialport.so.
     output.dependencies.add(
       cserialPortDir.uri.resolve('src/SerialPortUnixBase.cpp'),
+    );
+    output.dependencies.add(
+      input.packageRoot.resolve('patches/close_unix_pipe_fds.patch'),
     );
 
     final dllPath = input.outputDirectory.resolve('bin').toFilePath();
@@ -79,6 +84,25 @@ Future<void> main(List<String> args) async {
       ),
     );
   });
+}
+
+// Preserve the deployed native fix without changing the upstream submodule ref.
+Future<void> applyPipeLeakPatch(Uri packageRoot, Directory source) async {
+  final patch = File.fromUri(
+    packageRoot.resolve('patches/close_unix_pipe_fds.patch'),
+  ).absolute.path;
+  Future<ProcessResult> run(List<String> args) =>
+      Process.run('git', args, workingDirectory: source.path);
+  final applied = await run(['apply', '--reverse', '--check', patch]);
+  if (applied.exitCode == 0) return;
+  final check = await run(['apply', '--check', patch]);
+  if (check.exitCode != 0) {
+    throw StateError('CSerialPort pipe fix does not apply: ${check.stderr}');
+  }
+  final result = await run(['apply', patch]);
+  if (result.exitCode != 0) {
+    throw StateError('Cannot apply CSerialPort pipe fix: ${result.stderr}');
+  }
 }
 
 Future<bool> fetchSubmodule(Uri repoUri) async {
