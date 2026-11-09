@@ -1,0 +1,28 @@
+{
+  "iteration": 6492,
+  "input_shape": [
+    "batch",
+    58
+  ],
+  "output_shape": [
+    "batch",
+    16
+  ],
+  "architecture": [
+    58,
+    512,
+    256,
+    128,
+    16
+  ],
+  "activation": "ELU",
+  "normalization": "none",
+  "test_vectors": 1057,
+  "parity": {
+    "onnx_max_abs": 5.7220458984375e-06,
+    "pt_max_abs": 0.0
+  },
+  "checkpoint_sha256": "529962ba5b569f41c77ca8baf6938d3776aceac2a1e44b87500090bd58827f18",
+  "policy.pt_sha256": "0a6e9548df7a579a39e0c4f718257b333fa2ad58b67e71b5f80738227e2fcdcc",
+  "policy.onnx_sha256": "0d8a2d0a83d895063b78010dff394ce8f4b992afa5119ebd77cb7eba9a5873dc"
+}
