@@ -1,5 +1,7 @@
 # Body-height policy deployment contract
 
+> **TH3F08 / TH3F11 新模型请先阅读[三档策略使用说明](TH3F08_TH3F11.md)。** 本文下方描述的是旧 V2/H15/H18 服务及其历史验证。08/11 的输入名、默认姿态、档位与旧模型不同，不能直接替换 ONNX；新版服务适配尚未完成。
+
 This branch deploys the Thunder V4 single-frame V2 body-height policy. H15 and
 H18 remain available as rollback profiles; the legacy 57-value policy contract
 is unchanged.

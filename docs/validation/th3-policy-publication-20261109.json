@@ -1,0 +1,29 @@
+{
+  "checked_on": "2026-11-09",
+  "kind": "publication_copy_and_documentation_verification",
+  "models": [
+    {
+      "candidate": "TH3F08",
+      "independent_frames": 12,
+      "continuous_frames": 12,
+      "onnx_vs_jit_max_abs": 1.9073486328125e-05,
+      "wheel_targets_vs_golden_max_abs": 0.0,
+      "pass": true
+    },
+    {
+      "candidate": "TH3F11",
+      "independent_frames": 12,
+      "continuous_frames": 12,
+      "onnx_vs_jit_max_abs": 1.9073486328125e-05,
+      "wheel_targets_vs_golden_max_abs": 0.0,
+      "pass": true
+    }
+  ],
+  "documentation_examples": [
+    "TH3F08",
+    "TH3F11"
+  ],
+  "models_reexported": false,
+  "hardware_used": false,
+  "full_1057_export_rerun": false
+}
