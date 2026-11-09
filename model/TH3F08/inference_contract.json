@@ -1,0 +1,173 @@
+{
+  "candidate": "TH3F08",
+  "checkpoint_iteration": 5993,
+  "policy_files": [
+    "policy.onnx",
+    "policy.pt"
+  ],
+  "normalization": "none",
+  "input_dtype": "float32",
+  "input_shape": [
+    "batch",
+    58
+  ],
+  "output_shape": [
+    "batch",
+    16
+  ],
+  "architecture": [
+    58,
+    512,
+    256,
+    128,
+    16
+  ],
+  "activation": "ELU",
+  "policy_dt_s": 0.02,
+  "simulation_dt_s": 0.005,
+  "joint_order": [
+    "FR_hip_joint",
+    "FR_thigh_joint",
+    "FR_calf_joint",
+    "FL_hip_joint",
+    "FL_thigh_joint",
+    "FL_calf_joint",
+    "RR_hip_joint",
+    "RR_thigh_joint",
+    "RR_calf_joint",
+    "RL_hip_joint",
+    "RL_thigh_joint",
+    "RL_calf_joint",
+    "FR_foot_joint",
+    "FL_foot_joint",
+    "RR_foot_joint",
+    "RL_foot_joint"
+  ],
+  "default_joint_position_rad": [
+    -0.12,
+    -0.93,
+    1.96,
+    0.12,
+    0.93,
+    -1.96,
+    0.12,
+    0.93,
+    -1.96,
+    -0.12,
+    -0.93,
+    1.96,
+    0,
+    0,
+    0,
+    0
+  ],
+  "observation_order": [
+    {
+      "slice": [
+        0,
+        3
+      ],
+      "value": "body angular velocity rad/s",
+      "clip_before_scale": [
+        -100,
+        100
+      ],
+      "scale": 0.25
+    },
+    {
+      "slice": [
+        3,
+        6
+      ],
+      "value": "unit gravity vector projected into body coordinates, R_world_from_body.T @ [0,0,-1]",
+      "clip_before_scale": [
+        -100,
+        100
+      ],
+      "scale": 1
+    },
+    {
+      "slice": [
+        6,
+        10
+      ],
+      "value": "command [vx m/s,vy m/s,wz rad/s,height m]",
+      "clip_before_scale": [
+        -100,
+        100
+      ],
+      "scale": 1
+    },
+    {
+      "slice": [
+        10,
+        26
+      ],
+      "value": "joint position minus default; last four wheel position entries forced to zero",
+      "clip_before_scale": [
+        -100,
+        100
+      ],
+      "scale": 1
+    },
+    {
+      "slice": [
+        26,
+        42
+      ],
+      "value": "joint angular velocity rad/s in joint_order",
+      "clip_before_scale": [
+        -100,
+        100
+      ],
+      "scale": 0.05
+    },
+    {
+      "slice": [
+        42,
+        58
+      ],
+      "value": "previous raw policy output, before target scaling",
+      "clip_before_scale": [
+        -100,
+        100
+      ],
+      "scale": 1
+    }
+  ],
+  "action_decode": {
+    "clip_before_scaling": [
+      -100,
+      100
+    ],
+    "leg_position_target": "default_q[:12]+action[:12]*[.125,.25,.25]*4",
+    "wheel_velocity_target_rad_s": "action[12:]*5",
+    "previous_action": "keep raw output for next observation, continuous across height changes"
+  },
+  "height_commands_m": [
+    0.15,
+    0.3,
+    0.4405706826868142
+  ],
+  "height_vy_gate": false,
+  "reset": "Only genuine reset clears previous_action to zeros; changing height is not a reset. DEFAULT_Q remains the W5 offset at all commanded heights.",
+  "nominal_simulated_actuators": {
+    "leg_kp": 100,
+    "leg_kd": 5,
+    "leg_effort_limit_nm": 120,
+    "leg_velocity_limit_rad_s": 17.48,
+    "wheel_effort_limit_nm": 17,
+    "wheel_velocity_limit_rad_s": 42.94,
+    "note": "These describe the trained/simulated controller, not authorization to overwrite hardware settings."
+  },
+  "runtime_adapter": "w5_inference.py: unchanged byte-identical adapter validated in TH3F08 and TH3F11 MuJoCo rollouts; observation/action conversion only.",
+  "hardware_deployed": false,
+  "hardware_target": null,
+  "known_limits": [
+    "No complete TH3F08/TH3F09 306-case multi-load full-motion acceptance.",
+    "Parking has residual drift; TH3F08 mean final displacement0.953m after112s in six paired trials.",
+    "Fast +/-2.5m/s direction changes caused simulated wheel speeds beyond42.94rad/s; TH3F08 maximum67.575rad/s. Do not infer validated hardware high-speed reversal from nominal limit.",
+    "0.15m low-height yaw tracking remains imperfect, e.g. final4s of +0.5rad/s command has0.178rad/s MAE in the available demo."
+  ],
+  "checkpoint_file": "model_5993.pt"
+}
