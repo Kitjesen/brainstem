@@ -8,7 +8,8 @@ workspace:
   - frequency_watch
   - skinny_dog_algebra
   - onnx_runtime
-  - brainstem_api/dart
+  # brainstem_api is a standalone contract package and does not set
+  # `resolution: workspace`. Depend on it by path from each package.
   - han_dog_brain
   - protoframe
   - pcan
@@ -16,6 +17,8 @@ workspace:
   - robo_device_proto
   - robo_device
   - han_dog
+  - thunder_brain
+  - thunder
   # sirius is a Flutter package; keeping it out of the Dart workspace so
   # `dart pub get` works on environments without the Flutter SDK installed
   # (e.g. the S100P robot runtime). For local Flutter development do

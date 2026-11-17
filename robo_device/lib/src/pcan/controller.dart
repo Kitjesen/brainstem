@@ -16,9 +16,11 @@ class PcanController<E, S> {
   final PcanBaudRate baudRate;
   final Duration frequency;
   final int maxWriteRetries;
+  final Duration writeInterval;
+  int _nextWriteUs = 0;
   Timer? _timer;
   Timer? _retryTimer;
-  final _clock = Stopwatch()..start();
+  final Stopwatch _clock;
   final _pending =
       <Object, ({E event, PcanMessage message, int attempt, int deadline})>{};
   final _disabledMotors = <int>{};
@@ -36,16 +38,32 @@ class PcanController<E, S> {
     this.baudRate = .baud1M,
     this.frequency = const .new(milliseconds: 1),
     this.maxWriteRetries = 3,
-  }) : _pcan = Pcan(channel);
+    this.writeInterval = Duration.zero,
+  }) : _pcan = Pcan(channel),
+       _clock = Stopwatch()..start();
 
   PcanController.withPcan(
     this._pcan, {
     this.baudRate = PcanBaudRate.baud1M,
     this.frequency = const Duration(milliseconds: 1),
     this.maxWriteRetries = 3,
-  });
+    this.writeInterval = Duration.zero,
+    Stopwatch? clock,
+  }) : _clock = clock ?? (Stopwatch()..start());
 
   int get pendingWrites => _pending.length;
+
+  bool get canWriteImmediately =>
+      !_closed && writeInterval == Duration.zero && _pending.isEmpty;
+
+  /// Calibration must not be deferred past its stationary admission check.
+  bool tryWriteImmediately(E event) {
+    if (!canWriteImmediately) return false;
+    final result = _write(_eventConverter(event));
+    if (result == PcanStatus.ok) return true;
+    _recordFailure(event, result);
+    return false;
+  }
 
   bool open() {
     if (_timer != null) {
@@ -54,12 +72,13 @@ class PcanController<E, S> {
     }
     final result = _pcan.open(baudRate);
     if (result != .ok) {
-      _logger.severe('open ${_pcan.channel} failed: $result');
+      _logger.severe('open ${_pcan.transportName} failed: $result');
       return false;
     }
-    _logger.info('${_pcan.channel} opened successfully.');
+    _logger.info('${_pcan.transportName} opened successfully.');
     _closed = false;
     _consecutiveErrors = 0;
+    _nextWriteUs = 0;
     _timer = Timer.periodic(frequency, (timer) {
       final (message, timestamp, status) = _pcan.read();
       if (status == .qrcvempty) {
@@ -75,7 +94,7 @@ class PcanController<E, S> {
         );
         if (_consecutiveErrors >= _maxConsecutiveErrors) {
           _logger.severe(
-            'PCAN ${_pcan.channel}: too many consecutive errors, '
+            'PCAN ${_pcan.transportName}: too many consecutive errors, '
             'attempting full reopen...',
           );
           _reopen();
@@ -87,7 +106,7 @@ class PcanController<E, S> {
         _logger.severe('PCAN error: $status');
         if (_consecutiveErrors >= _maxConsecutiveErrors) {
           _logger.severe(
-            'PCAN ${_pcan.channel}: too many consecutive errors, '
+            'PCAN ${_pcan.transportName}: too many consecutive errors, '
             'attempting full reopen...',
           );
           _reopen();
@@ -107,13 +126,14 @@ class PcanController<E, S> {
   }
 
   void _reopen() {
+    clearPendingWrites();
     _timer?.cancel();
     _timer = null;
     _pcan.close();
     _consecutiveErrors = 0;
-    _logger.info('PCAN ${_pcan.channel}: reopening...');
+    _logger.info('PCAN ${_pcan.transportName}: reopening...');
     if (!open()) {
-      _logger.severe('PCAN ${_pcan.channel}: reopen failed');
+      _logger.severe('PCAN ${_pcan.transportName}: reopen failed');
     }
   }
 
@@ -140,20 +160,35 @@ class PcanController<E, S> {
         ? ('control', event.canId)
         : Object();
     _pending.remove(key);
-    final result = _pcan.write(msg);
+    if (writeInterval > Duration.zero &&
+        (_pending.isNotEmpty || _clock.elapsedMicroseconds < _nextWriteUs)) {
+      _enqueue(key, event, msg, 0);
+      return;
+    }
+    final result = _write(msg);
     if (result == .ok) return;
     _recordFailure(event, result);
     if (!_retryable(result) || maxWriteRetries <= 1) return;
+    _enqueue(key, event, msg, 1);
+  }
+
+  PcanStatus _write(PcanMessage message) {
+    final result = _pcan.write(message);
+    _nextWriteUs = _clock.elapsedMicroseconds + writeInterval.inMicroseconds;
+    return result;
+  }
+
+  void _enqueue(Object key, E event, PcanMessage message, int attempt) {
     if (_pending.length >= 64) {
       _logger.severe(
-        'PCAN ${_pcan.channel}: retry capacity reached; dropping $event',
+        'PCAN ${_pcan.transportName}: retry capacity reached; dropping $event',
       );
       return;
     }
     _pending[key] = (
       event: event,
-      message: msg,
-      attempt: 1,
+      message: message,
+      attempt: attempt,
       deadline:
           _clock.elapsedMilliseconds + (event is RSEventControl ? 20 : 100),
     );
@@ -168,14 +203,18 @@ class PcanController<E, S> {
     if (now - _lastFailureLogMs >= 1000) {
       _lastFailureLogMs = now;
       _logger.severe(
-        'PCAN ${_pcan.channel}: send $event failed: $result '
+        'PCAN ${_pcan.transportName}: send $event failed: $result '
         'errno=${_pcan.lastWriteErrno}, totalFailures=$failedWrites',
       );
     }
   }
 
   void _scheduleRetry() {
-    _retryTimer ??= Timer(const Duration(milliseconds: 2), () {
+    final remaining = _nextWriteUs - _clock.elapsedMicroseconds;
+    final delay = writeInterval > Duration.zero
+        ? Duration(microseconds: remaining > 0 ? remaining : 0)
+        : const Duration(milliseconds: 2);
+    _retryTimer ??= Timer(delay, () {
       _retryTimer = null;
       final entries = _pending.entries.toList();
       entries.sort(
@@ -187,9 +226,17 @@ class PcanController<E, S> {
         final p = entry.value;
         if (_closed || _clock.elapsedMilliseconds >= p.deadline) {
           _pending.remove(entry.key);
+          if (!_closed) {
+            failedWrites++;
+            _logger.severe('${_pcan.transportName}: expired send ${p.event}');
+          }
           continue;
         }
-        final result = _pcan.write(p.message);
+        if (writeInterval > Duration.zero &&
+            _clock.elapsedMicroseconds < _nextWriteUs) {
+          break;
+        }
+        final result = _write(p.message);
         if (result == .ok) {
           _pending.remove(entry.key);
         } else {
@@ -205,6 +252,7 @@ class PcanController<E, S> {
             );
           }
         }
+        if (writeInterval > Duration.zero) break;
       }
       if (_pending.isNotEmpty && !_closed) _scheduleRetry();
     });
@@ -224,12 +272,12 @@ class PcanController<E, S> {
     _timer?.cancel();
     _timer = null;
     _pcan.close();
-    _logger.info('Closing ${_pcan.channel}.');
+    _logger.info('Closing ${_pcan.transportName}.');
   }
 
   void dispose() {
     close();
     _controller.close();
-    _logger.info('Disposing ${_pcan.channel}.');
+    _logger.info('Disposing ${_pcan.transportName}.');
   }
 }

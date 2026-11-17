@@ -26,19 +26,19 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Generate code (han_dog_brain)
+      - name: Generate code (thunder_brain)
         run: dart run build_runner build --delete-conflicting-outputs
-        working-directory: han_dog_brain
+        working-directory: thunder_brain
 
       - name: Generate code (robo_device_proto)
         run: dart run build_runner build --delete-conflicting-outputs
         working-directory: robo_device_proto
 
-      - name: Analyze han_dog_brain
-        run: dart analyze --no-fatal-warnings han_dog_brain/
+      - name: Analyze thunder_brain
+        run: dart analyze --no-fatal-warnings thunder_brain/
 
-      - name: Analyze han_dog
-        run: dart analyze --no-fatal-warnings han_dog/
+      - name: Analyze thunder
+        run: dart analyze --no-fatal-warnings thunder/
 
       - name: Analyze frequency_watch
         run: dart analyze --no-fatal-warnings frequency_watch/
@@ -46,17 +46,23 @@ jobs:
       - name: Analyze skinny_dog_algebra
         run: dart analyze --no-fatal-warnings skinny_dog_algebra/
 
-      - name: Test han_dog_brain
-        run: dart test han_dog_brain/
+      # Run inside each package so Dart build hooks (native assets) execute.
+      # `dart test <package>/` from the workspace root skips those hooks.
+      - name: Test thunder_brain
+        run: dart test
+        working-directory: thunder_brain
 
-      - name: Test han_dog
-        run: dart test han_dog/
+      - name: Test thunder
+        run: dart test
+        working-directory: thunder
 
       - name: Test frequency_watch
-        run: dart test frequency_watch/
+        run: dart test
+        working-directory: frequency_watch
 
       - name: Test skinny_dog_algebra
-        run: dart test skinny_dog_algebra/
+        run: dart test
+        working-directory: skinny_dog_algebra
 
   # ── Flutter App：analyze + build ───────────────────────────
   flutter:
@@ -85,7 +91,10 @@ jobs:
         working-directory: robo_device_proto
 
       - name: Analyze sirius
-        run: flutter analyze --no-fatal-warnings lib/
+        # Flutter 3.50 treats info diagnostics as fatal. The sirius UI still
+        # imports package:flutter/material.dart, which that SDK reports as
+        # deprecated_member_use infos. Errors still fail the job.
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings lib/
         working-directory: sirius
 
       - name: Build sirius (Windows)
@@ -95,7 +104,11 @@ jobs:
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sirius-windows-${{ github.ref_name }}
+          # Artifact names cannot contain "/". pull_request ref_name is
+          # "<number>/merge", and branch names can contain slashes too.
+          # replace() is not a valid Actions expression and fails workflow
+          # parsing before any job starts. run_id is unique and always legal.
+          name: sirius-windows-${{ github.run_id }}
           path: sirius/build/windows/x64/runner/Release/
           retention-days: 30
 

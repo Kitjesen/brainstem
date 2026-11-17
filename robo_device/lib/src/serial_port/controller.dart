@@ -12,10 +12,11 @@ final _logger = Logger('SerialPortController');
 class SerialPortController<E, S> {
   final SerialPort _serialPort;
 
-  final _eventConverter = eventConverter[E]! as Uint8List Function(E);
+  late final _eventConverter = eventConverter[E]! as Uint8List Function(E);
   final Stream<Iterable<S>> Function(Stream<Uint8List>) _stateConverter;
 
   final int? _readIntervalTimeoutMs;
+  final bool? _dtr;
 
   SerialPortController(
     String portName, {
@@ -26,13 +27,16 @@ class SerialPortController<E, S> {
     FlowControl flowControl = .FlowNone,
     int readBufferSize = 4096,
     int? readIntervalTimeoutMs,
+    bool? dtr,
+    SerialPort? serialPort,
     Stream<Iterable<S>> Function(Stream<Uint8List>)? stateDecoder,
   }) : _stateConverter =
            stateDecoder ??
            stateConverter[S]!
                as Stream<Iterable<S>> Function(Stream<Uint8List>),
        _readIntervalTimeoutMs = readIntervalTimeoutMs,
-       _serialPort = SerialPort()
+       _dtr = dtr,
+       _serialPort = (serialPort ?? SerialPort())
          ..init(
            portName,
            baudRate,
@@ -53,6 +57,9 @@ class SerialPortController<E, S> {
     }
     if (_readIntervalTimeoutMs != null) {
       _serialPort.readIntervalTimeout = _readIntervalTimeoutMs;
+    }
+    if (_dtr != null) {
+      _serialPort.dtr = _dtr;
     }
     _logger.info('${_serialPort.portName} opened successfully.');
     return true;
