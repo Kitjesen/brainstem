@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'dart:typed_data';
+
 import 'package:ffi/ffi.dart';
 
 import 'ffi/onnx_api.dart';
@@ -166,6 +167,11 @@ class InferenceSession implements Finalizable {
 
     final inputInfos = List.generate(inputLen, (i) => getInputInfo(i));
 
+    // Read every output's declared type info up front. Dynamic dims used
+    // to overflow inside that call; OnnxTensorInfo now returns a safe
+    // element count so a symbolic batch does not fail session setup.
+    // The declared dims are not used to copy outputs — OrtRun's values
+    // carry the concrete shape.
     final outputInfos = List.generate(outputLen, (i) => getOutputInfo(i));
 
     return (Map<String, OnnxValue> inputs, [RunOptions? runOptions]) {
@@ -256,14 +262,26 @@ class InferenceSession implements Finalizable {
       outputValuesPtr,
     ).guard();
 
-    final List<OnnxValue> outputValues = List.generate(
-      outputLen,
-      (i) => OnnxValue.from(
+    if (outputInfos.length != outputLen) {
+      throw StateError(
+        'Expected $outputLen output infos, got ${outputInfos.length}',
+      );
+    }
+    // Declared shapes in outputInfos can stay symbolic ([-1, 16], or a
+    // dim ORT only names, such as Concatfeatures_dim_1). Copy from the
+    // OrtValue's actual shape so the buffer length matches OrtRun.
+    final List<OnnxValue> outputValues = List<OnnxValue>.generate(outputLen, (
+      int i,
+    ) {
+      final OnnxTensorInfo actual = OnnxTensorInfo.fromOrtValue(
         outputValuesPtr[i],
-        outputInfos[i].info.tensorElementType,
-        outputInfos[i].info.dimensions,
-      ),
-    );
+      );
+      return OnnxValue.from(
+        outputValuesPtr[i],
+        actual.tensorElementType,
+        actual.dimensions,
+      );
+    });
 
     ortApi.ReleaseRunOptions(runOptionsPtr);
     {

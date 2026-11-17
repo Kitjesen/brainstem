@@ -57,6 +57,27 @@ class OnnxTensorInfo {
     }
   }
 
+  /// Concrete type and shape of a tensor OrtValue produced by OrtRun.
+  ///
+  /// Session input/output info keeps symbolic dims such as `[-1, 16]`.
+  /// The value itself has the shape that was actually computed, for
+  /// example `[1, 16]`. The caller still releases the OrtValue; the type
+  /// info allocated here is released before this returns.
+  static OnnxTensorInfo fromOrtValue(Pointer<OrtValue> value) {
+    final infoPtr = calloc<Pointer<OrtTensorTypeAndShapeInfo>>();
+    try {
+      ortApi.GetTensorTypeAndShape(value, infoPtr).guard();
+      final Pointer<OrtTensorTypeAndShapeInfo> typeInfo = infoPtr.value;
+      try {
+        return from(typeInfo);
+      } finally {
+        ortApi.ReleaseTensorTypeAndShapeInfo(typeInfo);
+      }
+    } finally {
+      calloc.free(infoPtr);
+    }
+  }
+
   static OnnxTensorInfo from(Pointer<OrtTensorTypeAndShapeInfo> typeInfoPtr) {
     // 获取张量元素类型
     final tensorType = () {
@@ -122,16 +143,26 @@ class OnnxTensorInfo {
           }()
         : [];
 
-    // 获取张量形状元素总数
-    final totalElementCount = () {
-      final elementCountPtr = calloc<Size>();
-      try {
-        ortApi.GetTensorShapeElementCount(typeInfoPtr, elementCountPtr).guard();
-        return elementCountPtr.value;
-      } finally {
-        calloc.free(elementCountPtr);
-      }
-    }();
+    // Dynamic dims are reported as <= 0 (a symbolic batch is -1).
+    // GetTensorShapeElementCount multiplies those with SafeInt<size_t>
+    // and fails with ORT_FAIL / SafeIntOnOverflow instead of the
+    // documented -1, which aborts the whole session. Skip the call and
+    // return a safe count: -1 if any dim is symbolic, otherwise the
+    // product (0 when a dim is empty).
+    final int totalElementCount = dimensions.any((int dim) => dim <= 0)
+        ? _safeElementCount(dimensions)
+        : () {
+            final elementCountPtr = calloc<Size>();
+            try {
+              ortApi.GetTensorShapeElementCount(
+                typeInfoPtr,
+                elementCountPtr,
+              ).guard();
+              return elementCountPtr.value;
+            } finally {
+              calloc.free(elementCountPtr);
+            }
+          }();
 
     return OnnxTensorInfo(
       tensorElementType: tensorType,
@@ -156,4 +187,19 @@ class OnnxTensorInfo {
         ', symbolicDimensions: $symbolicDimensions'
         ')';
   }
+}
+
+/// Element count for a shape that must not be passed to
+/// GetTensorShapeElementCount.
+///
+/// A negative dimension is symbolic, so the count is unknown (`-1`).
+/// Zero dimensions are an empty tensor and the product is 0. A scalar
+/// (no dimensions) is 1.
+int _safeElementCount(List<int> dimensions) {
+  var count = 1;
+  for (final int dim in dimensions) {
+    if (dim < 0) return -1;
+    count *= dim;
+  }
+  return count;
 }
