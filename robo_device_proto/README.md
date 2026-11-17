@@ -16,11 +16,11 @@
 
 硬件型号的唯一配置入口是：
 [`lib/src/robostride/motor_config.dart`](lib/src/robostride/motor_config.dart) 中的
-`hanDogMotorLayout`。启动日志 `MOTOR_CODEC` 也由这张表自动生成，不再手写另一份参数。
+`thunderMotorLayout`。启动日志 `MOTOR_CODEC` 也由这张表自动生成，不再手写另一份参数。
 
 更换电机时：
 
-1. 如果换成代码已支持的型号，只修改 `hanDogMotorLayout` 对应 CAN ID 的 `model`。
+1. 如果换成代码已支持的型号，只修改 `thunderMotorLayout` 对应 CAN ID 的 `model`。
 2. 如果是新型号，先在 `RSMotorModel` 添加型号及厂家协议规定的四个映射量程，再加入穷尽式 `limits` 分支。
 3. 运行 `dart test robo_device_proto`；未知 CAN ID 会直接报错，不再静默套用 RS04。
 4. 上实机前核对启动日志中的每个 CAN ID、关节角色、型号和量程。

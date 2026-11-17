@@ -1,0 +1,85 @@
+{
+  "name": "rough_v5e_36400_zero_obstacle",
+  "description": "PoseRoughV4HimRoughV5EProgressGatedFrontThighBalance model_36400 compatibility profile. The original 10x60 policy requires a 3-value height-scanner obstacle profile; this 10x57 deployment wrapper inserts zeros because the current robot runtime has no height scanner integration. Flat/clear-ground validation only; not equivalent to the trained stair-aware policy.",
+  "_jointLayout": "FR hip/thigh/calf, FL hip/thigh/calf, RR hip/thigh/calf, RL hip/thigh/calf, FR/FL/RR/RL wheels",
+  "modelPath": "model/pose_rough_v4_him_rough_v5e_model36400_zero_obstacle_policy.onnx",
+  "standingPose": [
+    -0.1, -0.8, 1.8,
+    0.1, 0.8, -1.8,
+    0.1, 0.8, -1.8,
+    -0.1, -0.8, 1.8,
+    0.0, 0.0, 0.0, 0.0
+  ],
+  "sittingPose": [
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 0.0, 0.0
+  ],
+  "inferKp": [
+    70.0, 90.0, 110.0,
+    70.0, 90.0, 110.0,
+    70.0, 90.0, 110.0,
+    70.0, 90.0, 110.0,
+    0.0, 0.0, 0.0, 0.0
+  ],
+  "inferKd": [
+    10.5, 13.5, 18.0,
+    10.5, 13.5, 18.0,
+    10.5, 13.5, 18.0,
+    10.5, 13.5, 18.0,
+    1.0, 1.0, 1.0, 1.0
+  ],
+  "standUpKp": [
+    200.0, 200.0, 200.0, 200.0,
+    200.0, 200.0, 200.0, 200.0,
+    200.0, 200.0, 200.0, 200.0,
+    200.0, 200.0, 200.0, 200.0
+  ],
+  "standUpKd": [
+    8.0, 8.0, 8.0, 8.0,
+    8.0, 8.0, 8.0, 8.0,
+    8.0, 8.0, 8.0, 8.0,
+    8.0, 8.0, 8.0, 8.0
+  ],
+  "sitDownKp": [
+    200.0, 200.0, 200.0, 200.0,
+    200.0, 200.0, 200.0, 200.0,
+    200.0, 200.0, 200.0, 200.0,
+    200.0, 200.0, 200.0, 200.0
+  ],
+  "sitDownKd": [
+    8.0, 8.0, 8.0, 8.0,
+    8.0, 8.0, 8.0, 8.0,
+    8.0, 8.0, 8.0, 8.0,
+    8.0, 8.0, 8.0, 8.0
+  ],
+  "standUpCounts": 150,
+  "sitDownCounts": 150,
+  "imuGyroscopeScale": 0.25,
+  "jointVelocityScale": [0.05, 0.05, 0.05, 0.05],
+  "actionScale": [0.125, 0.33, 0.36, 5.0],
+  "commandVxMax": 1.55,
+  "commandVyMax": 1.0,
+  "commandYawMax": 1.0,
+  "forwardMinCommand": 0.0,
+  "lateralMinCommand": 0.0,
+  "yawMinCommand": 0.0,
+  "actionLowerLimits": [
+    -0.39, -3.12, 0.02,
+    -0.39, 0.02, -3.12,
+    -0.39, 0.02, -3.12,
+    -0.39, -3.12, -3.12,
+    -37.69911184307752, -37.69911184307752,
+    -37.69911184307752, -37.69911184307752
+  ],
+  "actionUpperLimits": [
+    0.39, -0.02, 3.12,
+    0.39, 3.12, -0.02,
+    0.39, 3.12, 3.12,
+    0.39, -0.02, 3.12,
+    37.69911184307752, 37.69911184307752,
+    37.69911184307752, 37.69911184307752
+  ]
+}

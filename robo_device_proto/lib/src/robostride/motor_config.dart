@@ -52,7 +52,7 @@ extension RSMotorModelProtocol on RSMotorModel {
   };
 }
 
-enum HanDogMotorRole {
+enum ThunderMotorRole {
   hip('hip'),
   thigh('thigh'),
   calf('calf'),
@@ -60,15 +60,15 @@ enum HanDogMotorRole {
 
   final String label;
 
-  const HanDogMotorRole(this.label);
+  const ThunderMotorRole(this.label);
 }
 
-class HanDogMotorSlot {
+class ThunderMotorSlot {
   final int canId;
-  final HanDogMotorRole role;
+  final ThunderMotorRole role;
   final RSMotorModel model;
 
-  const HanDogMotorSlot({
+  const ThunderMotorSlot({
     required this.canId,
     required this.role,
     required this.model,
@@ -94,36 +94,36 @@ class HanDogMotorSlot {
 /// Do not infer a motor model from its mechanical role or reuse another
 /// model's values. A frame encoded with the wrong ranges remains syntactically
 /// valid, so the error otherwise appears as bad tracking or unstable control.
-const hanDogMotorLayout = <int, HanDogMotorSlot>{
-  1: HanDogMotorSlot(
+const thunderMotorLayout = <int, ThunderMotorSlot>{
+  1: ThunderMotorSlot(
     canId: 1,
-    role: HanDogMotorRole.hip,
+    role: ThunderMotorRole.hip,
     model: RSMotorModel.rs04,
   ),
-  2: HanDogMotorSlot(
+  2: ThunderMotorSlot(
     canId: 2,
-    role: HanDogMotorRole.thigh,
+    role: ThunderMotorRole.thigh,
     model: RSMotorModel.rs04,
   ),
-  3: HanDogMotorSlot(
+  3: ThunderMotorSlot(
     canId: 3,
-    role: HanDogMotorRole.calf,
+    role: ThunderMotorRole.calf,
     model: RSMotorModel.rs04,
   ),
-  4: HanDogMotorSlot(
+  4: ThunderMotorSlot(
     canId: 4,
-    role: HanDogMotorRole.wheel,
+    role: ThunderMotorRole.wheel,
     model: RSMotorModel.rs02,
   ),
 };
 
-HanDogMotorSlot rsMotorSlotForCanId(int canId) {
-  final slot = hanDogMotorLayout[canId];
+ThunderMotorSlot rsMotorSlotForCanId(int canId) {
+  final slot = thunderMotorLayout[canId];
   if (slot == null) {
     throw ArgumentError.value(
       canId,
       'canId',
-      'No motor model configured. Update hanDogMotorLayout before using this '
+      'No motor model configured. Update thunderMotorLayout before using this '
           'CAN ID.',
     );
   }
@@ -135,23 +135,23 @@ RSMotorLimits rsMotorLimitsForCanId(int canId) =>
 
 /// Fails fast if the four expected joint roles are missing or assigned to the
 /// wrong CAN IDs. Motor model changes remain allowed through the table above.
-void validateHanDogMotorLayout() {
-  const expectedRoles = <int, HanDogMotorRole>{
-    1: HanDogMotorRole.hip,
-    2: HanDogMotorRole.thigh,
-    3: HanDogMotorRole.calf,
-    4: HanDogMotorRole.wheel,
+void validateThunderMotorLayout() {
+  const expectedRoles = <int, ThunderMotorRole>{
+    1: ThunderMotorRole.hip,
+    2: ThunderMotorRole.thigh,
+    3: ThunderMotorRole.calf,
+    4: ThunderMotorRole.wheel,
   };
 
-  if (hanDogMotorLayout.length != expectedRoles.length) {
+  if (thunderMotorLayout.length != expectedRoles.length) {
     throw StateError(
-      'hanDogMotorLayout must contain exactly CAN IDs 1-4; found '
-      '${hanDogMotorLayout.keys.toList()}.',
+      'thunderMotorLayout must contain exactly CAN IDs 1-4; found '
+      '${thunderMotorLayout.keys.toList()}.',
     );
   }
 
   for (final entry in expectedRoles.entries) {
-    final slot = hanDogMotorLayout[entry.key];
+    final slot = thunderMotorLayout[entry.key];
     if (slot == null || slot.canId != entry.key || slot.role != entry.value) {
       throw StateError(
         'CAN ID ${entry.key} must be ${entry.value.label}; found $slot.',
@@ -160,7 +160,7 @@ void validateHanDogMotorLayout() {
   }
 }
 
-String get hanDogMotorCodecSummary => hanDogMotorLayout.values
+String get thunderMotorCodecSummary => thunderMotorLayout.values
     .map((slot) {
       final limits = slot.limits;
       return 'CAN${slot.canId} ${slot.role.label}=${slot.model.label}'

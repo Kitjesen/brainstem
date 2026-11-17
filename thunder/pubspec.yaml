@@ -1,0 +1,34 @@
+name: thunder
+description: Main runner for Han Dog quadruped robot (real hardware).
+version: 2.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.10.0
+
+resolution: workspace
+
+dependencies:
+  # ── Workspace 内部包（workspace 自动解析为本地版本）──────────
+  skinny_dog_algebra: ^1.0.0
+  frequency_watch: ^1.0.0
+  thunder_brain: ^1.0.0
+  brainstem_api: ^2.0.0
+  robo_device: ^1.0.0
+  robo_device_proto: ^1.0.0
+
+  # ── 第三方包 ──────────────────────────────────────────────────
+  grpc: ^5.1.0
+  rxdart: ^0.28.0
+  vector_math: ^2.2.0
+  cms: ^1.4.3
+  logging: ^1.3.0
+  ffi: ^2.1.0
+  crypto: ^3.0.7
+  onnx_runtime: ^0.3.1
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6
+  fake_async: ^1.3.3
+  mocktail: ^1.0.4

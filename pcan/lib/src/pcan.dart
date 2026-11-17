@@ -17,14 +17,21 @@ bool get _usePcanBasic =>
 
 class Pcan {
   final PcanChannel channel;
+  final bool _forceSocketCan;
   SocketCanPcan? _socketCan;
 
-  Pcan(this.channel);
+  Pcan(this.channel) : _forceSocketCan = false;
+
+  Pcan.socketCan(this.channel) : _forceSocketCan = true {
+    _socketCan = SocketCanPcan(channel);
+  }
+
+  String get transportName => channel.toString();
 
   int? get lastWriteErrno => _socketCan?.lastWriteErrno;
 
   PcanStatus open([PcanBaudRate baudRate = .baud1M]) {
-    if (_usePcanBasic) {
+    if (!_forceSocketCan && _usePcanBasic) {
       return canInitialize(channel, baudRate, 0, 0, 0);
     }
     // SocketCAN fallback

@@ -124,16 +124,16 @@ void main() {
 
   group('Han Dog motor layout', () {
     test('CAN IDs map explicitly to the installed hardware', () {
-      expect(hanDogMotorLayout.keys, orderedEquals([1, 2, 3, 4]));
-      expect(rsMotorSlotForCanId(1).role, HanDogMotorRole.hip);
+      expect(thunderMotorLayout.keys, orderedEquals([1, 2, 3, 4]));
+      expect(rsMotorSlotForCanId(1).role, ThunderMotorRole.hip);
       expect(rsMotorSlotForCanId(1).model, RSMotorModel.rs04);
-      expect(rsMotorSlotForCanId(2).role, HanDogMotorRole.thigh);
+      expect(rsMotorSlotForCanId(2).role, ThunderMotorRole.thigh);
       expect(rsMotorSlotForCanId(2).model, RSMotorModel.rs04);
-      expect(rsMotorSlotForCanId(3).role, HanDogMotorRole.calf);
+      expect(rsMotorSlotForCanId(3).role, ThunderMotorRole.calf);
       expect(rsMotorSlotForCanId(3).model, RSMotorModel.rs04);
-      expect(rsMotorSlotForCanId(4).role, HanDogMotorRole.wheel);
+      expect(rsMotorSlotForCanId(4).role, ThunderMotorRole.wheel);
       expect(rsMotorSlotForCanId(4).model, RSMotorModel.rs02);
-      expect(validateHanDogMotorLayout, returnsNormally);
+      expect(validateThunderMotorLayout, returnsNormally);
     });
 
     test('unknown CAN IDs fail instead of silently using RS04', () {
@@ -142,10 +142,10 @@ void main() {
     });
 
     test('startup summary is generated from the same source of truth', () {
-      expect(hanDogMotorCodecSummary, contains('CAN1 hip=RS04'));
-      expect(hanDogMotorCodecSummary, contains('CAN4 wheel=RS02'));
-      expect(hanDogMotorCodecSummary, contains('v=±44'));
-      expect(hanDogMotorCodecSummary, contains('t=±17'));
+      expect(thunderMotorCodecSummary, contains('CAN1 hip=RS04'));
+      expect(thunderMotorCodecSummary, contains('CAN4 wheel=RS02'));
+      expect(thunderMotorCodecSummary, contains('v=±44'));
+      expect(thunderMotorCodecSummary, contains('t=±17'));
     });
 
     test('documents the RS02/RS04 velocity scaling mismatch', () {
