@@ -104,7 +104,8 @@ jobs:
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sirius-windows-${{ github.ref_name }}
+          # pull_request ref_name is "<number>/merge"; artifact names cannot contain "/".
+          name: sirius-windows-${{ replace(github.ref_name, '/', '-') }}
           path: sirius/build/windows/x64/runner/Release/
           retention-days: 30
 
