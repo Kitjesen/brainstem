@@ -8,7 +8,8 @@ workspace:
   - frequency_watch
   - skinny_dog_algebra
   - onnx_runtime
-  - brainstem_api/dart
+  # brainstem_api is a standalone contract package and does not set
+  # `resolution: workspace`. Depend on it by path from each package.
   - han_dog_brain
   - protoframe
   - pcan
