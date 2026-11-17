@@ -133,6 +133,20 @@ void main() {
         expect(catalog.currentDescription, 'w5');
         expect(catalog.available, expectedNames);
         expect(catalog.descriptions, expectedDescriptions);
+        expect(catalog.activeModeId, 'flat');
+        final locomotion = catalog.modeCapabilities
+            .where(
+              (mode) =>
+                  mode.kind ==
+                  proto.RobotModeKind.ROBOT_MODE_KIND_LOCOMOTION_PROFILE,
+            )
+            .toList();
+        expect(locomotion.map((mode) => mode.id), [
+          'flat',
+          'stairs',
+          if (configured) 'high_platform',
+        ]);
+        expect(locomotion.map((mode) => mode.profileId), expectedNames);
         expect(runtime.snapshot()['slots'], {
           'flat': 'w5',
           'stairs': 'cts',
@@ -146,6 +160,7 @@ void main() {
             proto.ProfileRequest(name: 'high_platform'),
           );
           expect(selected.current, 'platform_model');
+          expect(selected.activeModeId, 'high_platform');
           expect(selected.currentDescription, 'platform_model');
           expect(selected.available, expectedNames);
           expect(selected.descriptions, expectedDescriptions);
