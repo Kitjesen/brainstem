@@ -634,17 +634,17 @@ void main() {
             : File('thunder/bin/thunder.dart');
         final source = file.readAsStringSync();
         final webAssignment = source.indexOf('controller = webController;');
-        final normalWiring = source.indexOf(
-          'if (controller != null) {',
+        // Shared startup path after the web/local controller choice, not the
+        // local-open branch that only logs which device opened.
+        final sharedWiring = source.indexOf(
+          'if (controller != null &&',
           webAssignment,
         );
-        final fallback = source.indexOf(
-          "_log.info('No controller",
-          normalWiring,
-        );
+        final sharedEnd = source.indexOf('} else {', sharedWiring);
         expect(webAssignment, greaterThan(0));
-        expect(normalWiring, greaterThan(webAssignment));
-        final wiring = source.substring(normalWiring, fallback);
+        expect(sharedWiring, greaterThan(webAssignment));
+        expect(sharedEnd, greaterThan(sharedWiring));
+        final wiring = source.substring(sharedWiring, sharedEnd);
         expect(wiring, contains('controlDog = RealControlDog('));
         expect(wiring, contains('controller: controller,'));
         expect(wiring, contains('inferKp: defaultProfile.inferKp,'));
@@ -652,16 +652,21 @@ void main() {
         expect(wiring, contains('sitDownKp: defaultProfile.sitDownKp,'));
         expect(wiring, contains('profileManager = ProfileManager('));
         expect(wiring, contains('operatorSlots: operatorSlots,'));
+        final runtime = source.indexOf(
+          'webRuntime = WebControlRuntime(',
+          sharedEnd,
+        );
+        final runtimeEnd = source.indexOf(');', runtime);
+        expect(runtime, greaterThan(sharedEnd));
+        expect(runtimeEnd, greaterThan(runtime));
+        final runtimeBlock = source.substring(runtime, runtimeEnd);
+        expect(runtimeBlock, contains('controlDog: controlDog!'));
+        expect(runtimeBlock, contains('profileManager: profileManager!'));
         expect(
           source.indexOf('WebControlConfig.fromEnvironment'),
           lessThan(source.indexOf('createHardwareJoint()')),
         );
-        expect(
-          RegExp(
-            r'_startGrpc\(\s*cmsService,\s*webEnabled: webConfig != null,?\s*\)',
-          ).hasMatch(source),
-          true,
-        );
+        expect(source, contains('_startGrpc(cmsService, _cfg)'));
       },
     );
   });
