@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:brainstem_api/brainstem_api.dart' as proto;
 import 'package:grpc/grpc.dart';
 import 'package:thunder/thunder.dart';
+import 'package:thunder/src/recovery/normal_recovery_runtime.dart';
 import 'package:thunder_brain/thunder_brain.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
@@ -17,6 +18,8 @@ class MockM extends Mock implements M {}
 class MockCall extends Mock implements ServiceCall {}
 
 class MockArbiter extends Mock implements ControlArbiter {}
+
+class MockRecovery extends Mock implements NormalRecoveryRuntime {}
 
 RobotProfile profile(String name, double walkKp) => RobotProfile(
   name: name,
@@ -173,6 +176,107 @@ void main() {
       expect(manager.controlDog, isNull);
     },
   );
+  test(
+    'catalog advertises stable slots alongside legacy profile IDs',
+    () async {
+      final info = await server.getProfile(call, proto.Empty());
+      final modes = info.modeCapabilities
+          .where(
+            (mode) =>
+                mode.kind ==
+                proto.RobotModeKind.ROBOT_MODE_KIND_LOCOMOTION_PROFILE,
+          )
+          .toList();
+      expect(modes.map((mode) => mode.id), ['flat', 'stairs']);
+      expect(modes.map((mode) => mode.profileId), ['w5', 'cts']);
+      expect(
+        modes.map((mode) => mode.availability),
+        everyElement(
+          proto.RobotModeAvailability.ROBOT_MODE_AVAILABILITY_AVAILABLE,
+        ),
+      );
+      expect(info.activeModeId, 'flat');
+      expect(info.available, ['w5', 'cts']);
+      final recovery = info.modeCapabilities.singleWhere(
+        (mode) => mode.id == 'recovery',
+      );
+      expect(
+        recovery.kind,
+        proto.RobotModeKind.ROBOT_MODE_KIND_RECOVERY_ACTION,
+      );
+      expect(
+        recovery.availability,
+        proto.RobotModeAvailability.ROBOT_MODE_AVAILABILITY_UNAVAILABLE,
+      );
+      expect(recovery.profileId, isEmpty);
+    },
+  );
+
+  test(
+    'same slot request follows replacement models configured on robot',
+    () async {
+      server.profileManager = ProfileManager(
+        profiles: {
+          'new_flat_model': profile('new_flat_model', 70),
+          'new_stair_model': profile('new_stair_model', 100),
+        },
+        brain: brain,
+        initial: 'new_flat_model',
+        operatorSlots: OperatorModeSlots.fromJson({
+          'flat': 'new_flat_model',
+          'stairs': 'new_stair_model',
+        }),
+      );
+      final stairs = await switchTo('stairs');
+      expect(stairs.current, 'new_stair_model');
+      expect(stairs.activeModeId, 'stairs');
+      final flat = await switchTo('flat');
+      expect(flat.current, 'new_flat_model');
+      expect(flat.activeModeId, 'flat');
+      expect(prepared, ['new_stair_model', 'new_flat_model']);
+      verifyNever(() => m.add(any()));
+    },
+  );
+
+  test('administrative catalog does not invent locomotion slots', () async {
+    final administrative = UnifiedCmsServer(
+      brain: brain,
+      m: m,
+      mode: CmsMode.simulation,
+    )..profileManager = manager;
+    try {
+      final info = await administrative.getProfile(call, proto.Empty());
+      expect(info.available, ['w5', 'cts', 'history']);
+      expect(info.activeModeId, isEmpty);
+      expect(
+        info.modeCapabilities.where(
+          (mode) =>
+              mode.kind ==
+              proto.RobotModeKind.ROBOT_MODE_KIND_LOCOMOTION_PROFILE,
+        ),
+        isEmpty,
+      );
+    } finally {
+      await administrative.dispose();
+    }
+  });
+  test(
+    'selected recovery remains active and refuses locomotion switching',
+    () async {
+      final recovery = MockRecovery();
+      when(() => recovery.selected).thenReturn(true);
+      when(() => recovery.available).thenReturn(false);
+      server.recovery = recovery;
+      final info = await server.getProfile(call, proto.Empty());
+      expect(info.activeModeId, 'recovery');
+      expect(info.current, 'w5');
+      await expectLater(
+        switchTo('stairs'),
+        rejected(StatusCode.failedPrecondition),
+      );
+      expect(prepared, isEmpty);
+    },
+  );
   for (final standing in [false, true]) {
     test(
       'no gamepad: ${standing ? "Standing" : "Grounded"} switches cached slots without posture commands',
@@ -230,6 +334,12 @@ void main() {
         final client = proto.RobotControlClient(channel);
         final catalog = await client.getProfile(proto.Empty());
         expect(catalog.available, ['w5', 'cts']);
+        expect(catalog.activeModeId, 'flat');
+        expect(catalog.modeCapabilities.map((mode) => mode.id), [
+          'flat',
+          'stairs',
+          'recovery',
+        ]);
         expect(
           (await client.switchProfile(
             proto.ProfileRequest(name: 'stairs'),
@@ -237,12 +347,14 @@ void main() {
           'cts',
         );
         state = Standing(sub);
+        expect((await client.getProfile(proto.Empty())).activeModeId, 'stairs');
         expect(
           (await client.switchProfile(
             proto.ProfileRequest(name: 'flat'),
           )).current,
           'w5',
         );
+        expect((await client.getProfile(proto.Empty())).activeModeId, 'flat');
         state = Walking(sub);
         await expectLater(
           client.switchProfile(proto.ProfileRequest(name: 'stairs')),
@@ -360,6 +472,10 @@ void main() {
       );
       expect(manager.currentName, 'w5');
       expect(prepared, ['cts']);
+      expect(
+        (await server.getProfile(call, proto.Empty())).activeModeId,
+        'flat',
+      );
       expect(busy, isFalse);
     },
   );

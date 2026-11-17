@@ -1021,13 +1021,26 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
 
   proto.ProfileInfo _profileInfo(ProfileManager pm) {
     final slots = mode == CmsMode.hardware && pm.operatorSlots != null;
+    final motionSlots = <String, String>{
+      if (slots) ...{
+        'flat': pm.operatorSlots!.flat,
+        'stairs': pm.operatorSlots!.stairs,
+        if (pm.operatorSlots!.highPlatform != null)
+          'high_platform': pm.operatorSlots!.highPlatform!,
+      },
+    };
+    final activeSlot = motionSlots.entries
+        .where((slot) => slot.value == pm.currentName)
+        .firstOrNull
+        ?.key;
     final recoveryUnavailable = switch (recovery?.available) {
       true => '',
       false when recovery?.selected == true =>
         'Recovery session is already selected',
-      _ => recovery == null
-          ? 'Recovery model is not configured'
-          : 'Recovery is not available in the current state',
+      _ =>
+        recovery == null
+            ? 'Recovery model is not configured'
+            : 'Recovery is not available in the current state',
     };
     return proto.ProfileInfo(
       current: pm.currentName,
@@ -1035,22 +1048,27 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
       descriptions: slots ? pm.operatorDescriptions : pm.descriptions,
       currentDescription: pm.currentDescription,
       modeCapabilities: [
+        // Configured capabilities; switchProfile still checks live state/ownership.
+        for (final slot in motionSlots.entries)
+          proto.RobotModeCapability(
+            id: slot.key,
+            kind: proto.RobotModeKind.ROBOT_MODE_KIND_LOCOMOTION_PROFILE,
+            availability:
+                proto.RobotModeAvailability.ROBOT_MODE_AVAILABILITY_AVAILABLE,
+            profileId: slot.value,
+          ),
         proto.RobotModeCapability(
           id: 'recovery',
           kind: proto.RobotModeKind.ROBOT_MODE_KIND_RECOVERY_ACTION,
           availability: recovery?.available == true
-              ? proto
-                    .RobotModeAvailability
-                    .ROBOT_MODE_AVAILABILITY_AVAILABLE
-              : proto
-                    .RobotModeAvailability
-                    .ROBOT_MODE_AVAILABILITY_UNAVAILABLE,
+              ? proto.RobotModeAvailability.ROBOT_MODE_AVAILABILITY_AVAILABLE
+              : proto.RobotModeAvailability.ROBOT_MODE_AVAILABILITY_UNAVAILABLE,
           unavailableReason: recovery?.available == true
               ? ''
               : recoveryUnavailable,
         ),
       ],
-      activeModeId: recovery?.selected == true ? 'recovery' : '',
+      activeModeId: recovery?.selected == true ? 'recovery' : activeSlot ?? '',
     );
   }
 
