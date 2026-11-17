@@ -104,8 +104,11 @@ jobs:
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
-          # pull_request ref_name is "<number>/merge"; artifact names cannot contain "/".
-          name: sirius-windows-${{ replace(github.ref_name, '/', '-') }}
+          # Artifact names cannot contain "/". pull_request ref_name is
+          # "<number>/merge", and branch names can contain slashes too.
+          # replace() is not a valid Actions expression and fails workflow
+          # parsing before any job starts. run_id is unique and always legal.
+          name: sirius-windows-${{ github.run_id }}
           path: sirius/build/windows/x64/runner/Release/
           retention-days: 30
 
