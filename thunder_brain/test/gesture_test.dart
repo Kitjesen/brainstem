@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:bloc_test/bloc_test.dart';
 import 'package:thunder_brain/thunder_brain.dart';
@@ -43,24 +44,24 @@ class TestM extends M {
 }
 
 History fakeGesture(JointsMatrix nextAction) => History(
-      gyroscope: Vector3.zero(),
-      projectedGravity: Vector3(0, 0, -1),
-      command: const Command.gesture('test'),
-      jointPosition: .zero(),
-      jointVelocity: .zero(),
-      action: .zero(),
-      nextAction: nextAction,
-    );
+  gyroscope: Vector3.zero(),
+  projectedGravity: Vector3(0, 0, -1),
+  command: const Command.gesture('test'),
+  jointPosition: .zero(),
+  jointVelocity: .zero(),
+  action: .zero(),
+  nextAction: nextAction,
+);
 
 History fakeIdle(JointsMatrix nextAction) => History(
-      gyroscope: Vector3.zero(),
-      projectedGravity: Vector3(0, 0, -1),
-      command: const Command.idle(),
-      jointPosition: .zero(),
-      jointVelocity: .zero(),
-      action: .zero(),
-      nextAction: nextAction,
-    );
+  gyroscope: Vector3.zero(),
+  projectedGravity: Vector3(0, 0, -1),
+  command: const Command.idle(),
+  jointPosition: .zero(),
+  jointVelocity: .zero(),
+  action: .zero(),
+  nextAction: nextAction,
+);
 
 void main() {
   setUpAll(() {
@@ -121,7 +122,7 @@ void main() {
         await Future<void>.delayed(Duration.zero);
       }
 
-      expect(results, hasLength(4)); // counts=3 → frames at t=0, 1/3, 2/3, 1.0
+      expect(results, hasLength(3)); // counts=3 → t=1/3, 2/3, 1
       expect(completed, isTrue);
 
       for (final h in results) {
@@ -138,6 +139,7 @@ void main() {
       final target = JointsMatrix.fromList(List.filled(16, 3.0));
       final definition = GestureDefinition(
         name: 'interp',
+        keepsWheels: false,
         keyframes: [Keyframe(targetPose: target, counts: 3)],
       );
 
@@ -157,12 +159,11 @@ void main() {
         await Future<void>.delayed(Duration.zero);
       }
 
-      expect(results, hasLength(4));
-      // lerp(0, 3, t): t=0→0, t=1/3→1, t=2/3→2, t=1→3
-      expect(results[0].nextAction.values[0], closeTo(0.0, 1e-6));
-      expect(results[1].nextAction.values[0], closeTo(1.0, 1e-6));
-      expect(results[2].nextAction.values[0], closeTo(2.0, 1e-6));
-      expect(results[3].nextAction.values[0], closeTo(3.0, 1e-6));
+      expect(results, hasLength(3));
+      // lerp(0, 3, t): t=1/3→1, t=2/3→2, t=1→3. No t=0 hold.
+      expect(results[0].nextAction.values[0], closeTo(1.0, 1e-6));
+      expect(results[1].nextAction.values[0], closeTo(2.0, 1e-6));
+      expect(results[2].nextAction.values[0], closeTo(3.0, 1e-6));
 
       // foot values zeroed by discardFoot
       for (final h in results) {
@@ -181,8 +182,8 @@ void main() {
       final definition = GestureDefinition(
         name: 'chain',
         keyframes: [
-          Keyframe(targetPose: pose1, counts: 1), // 2 frames: t=0, t=1
-          Keyframe(targetPose: pose2, counts: 1), // 2 frames: t=0, t=1
+          Keyframe(targetPose: pose1, counts: 1), // 1 frame at t=1
+          Keyframe(targetPose: pose2, counts: 1), // 1 frame at t=1
         ],
       );
 
@@ -206,15 +207,13 @@ void main() {
         await Future<void>.delayed(Duration.zero);
       }
 
-      // Keyframe 1: 2 frames (t=0→0.0, t=1→1.0)
-      // Keyframe 2: 2 frames (from 1.0, t=0→1.0, t=1→3.0)
-      expect(results, hasLength(4));
+      // Keyframe 1: 1 frame (t=1 → 1.0)
+      // Keyframe 2: 1 frame (t=1 → 3.0)
+      expect(results, hasLength(2));
       expect(completed, isTrue);
 
-      expect(results[0].nextAction.values[0], closeTo(0.0, 1e-6));
-      expect(results[1].nextAction.values[0], closeTo(1.0, 1e-6));
-      expect(results[2].nextAction.values[0], closeTo(1.0, 1e-6)); // start of keyframe 2
-      expect(results[3].nextAction.values[0], closeTo(3.0, 1e-6)); // end of keyframe 2
+      expect(results[0].nextAction.values[0], closeTo(1.0, 1e-6));
+      expect(results[1].nextAction.values[0], closeTo(3.0, 1e-6));
 
       await sub.cancel();
     });
@@ -227,8 +226,8 @@ void main() {
       final definition = GestureDefinition(
         name: 'instant',
         keyframes: [
-          Keyframe(targetPose: pose1, counts: 0), // instant: 1 frame
-          Keyframe(targetPose: pose2, counts: 1), // 2 frames
+          Keyframe(targetPose: pose1, counts: 0), // snap: 1 frame
+          Keyframe(targetPose: pose2, counts: 1), // 1 frame at t=1
         ],
       );
 
@@ -252,18 +251,61 @@ void main() {
         await Future<void>.delayed(Duration.zero);
       }
 
-      // counts=0: steps==0 → t=1.0，立即到达 pose1，发出 1 帧后结束
-      // counts=1: i=0(t=0) + i=1(t=1) → 2 帧，共 3 帧
-      expect(results.length, 3);
+      // counts=0 snaps to pose1 in one tick.
+      // counts=1 emits one tick at t=1, so the pose moves straight to pose2.
+      expect(results.length, 2);
       expect(completed, isTrue);
-      // 第 1 帧：counts=0 → t=1.0 → nextAction = pose1（全 5.0），无 NaN
       expect(results[0].nextAction.values[0], closeTo(5.0, 1e-6));
       expect(results[0].nextAction.values.any((v) => v.isNaN), isFalse);
-      // 第 2 帧：counts=1，i=0 → t=0.0 → nextAction = pose1（上一关键帧终点）
-      expect(results[1].nextAction.values[0], closeTo(5.0, 1e-6));
-      // 第 3 帧：counts=1，i=1 → t=1.0 → nextAction = pose2（全 10.0）
-      expect(results[2].nextAction.values[0], closeTo(10.0, 1e-6));
+      expect(results[1].nextAction.values[0], closeTo(10.0, 1e-6));
 
+      await sub.cancel();
+    });
+
+    test('keep-wheels playback does not zero wheel targets', () async {
+      when(() => joint.position).thenReturn(.zero());
+      final target = JointsMatrix.fromList([
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1.5,
+        0.5,
+        -0.25,
+        0.0,
+      ]);
+      final gesture = Gesture(
+        clock: clock,
+        imu: imu,
+        joint: joint,
+        memory: memory,
+        definition: GestureDefinition(
+          name: 'step_back',
+          keepsWheels: true,
+          keyframes: [Keyframe(targetPose: target, counts: 2)],
+        ),
+      );
+
+      final results = <History>[];
+      final sub = gesture.doing.listen(results.add);
+      for (var i = 0; i < 4; i++) {
+        clock.add(null);
+        await Future<void>.delayed(Duration.zero);
+      }
+
+      expect(results, hasLength(2));
+      expect(results[0].nextAction.values[12], closeTo(0.75, 1e-6));
+      expect(results[1].nextAction.values[12], closeTo(1.5, 1e-6));
+      expect(results[1].nextAction.values[13], closeTo(0.5, 1e-6));
+      expect(results[1].nextAction.values[14], closeTo(-0.25, 1e-6));
       await sub.cancel();
     });
   });
@@ -283,9 +325,7 @@ void main() {
     test('register and get', () {
       final def = GestureDefinition(
         name: 'hello',
-        keyframes: [
-          Keyframe(targetPose: .zero(), counts: 10),
-        ],
+        keyframes: [Keyframe(targetPose: .zero(), counts: 10)],
       );
       library.register(def);
 
@@ -299,8 +339,10 @@ void main() {
     test('registerDefaults creates 5 gestures', () {
       library.registerDefaults();
 
-      expect(library.names,
-          containsAll(['bow', 'nod', 'wiggle', 'stretch', 'dance']));
+      expect(
+        library.names,
+        containsAll(['bow', 'nod', 'wiggle', 'stretch', 'dance']),
+      );
       expect(library.names, hasLength(5));
     });
 
@@ -361,7 +403,10 @@ void main() {
       expect(restored.keyframes, hasLength(2));
       expect(restored.keyframes[0].counts, 30);
       expect(restored.keyframes[1].counts, 20);
-      expect(restored.keyframes[1].targetPose.values, JointsMatrix.zero().values);
+      expect(
+        restored.keyframes[1].targetPose.values,
+        JointsMatrix.zero().values,
+      );
     });
 
     test('loadFromJson with multiple gestures', () {
@@ -387,6 +432,67 @@ void main() {
       expect(library.get('g1')!.keyframes[0].counts, 10);
       expect(library.get('g2')!.keyframes[0].counts, 20);
     });
+
+    test('catalog lists index entries and keeps wheel playback', () {
+      final libraryJson = _fixture('gesture_library.json').readAsStringSync();
+      final indexJson = _fixture('gesture_index.json').readAsStringSync();
+      library.registerDefaults();
+      library.loadFromJson(libraryJson);
+      library.applyIndex(indexJson);
+
+      expect(library.listedGestures.map((g) => g.name).toList(), [
+        'nod_yes',
+        'step_back',
+        'wake_stand',
+        'stand_up',
+      ]);
+      expect(library.listedGestures.map((g) => g.name), isNot(contains('bow')));
+      expect(library.names, contains('bow'));
+
+      final nod = library.get('nod_yes')!;
+      expect(nod.description, '点头同意');
+      expect(nod.playbackDurationMs, 60);
+      expect(nod.startPose, GesturePose.standing);
+      expect(nod.endPose, GesturePose.standing);
+      expect(nod.keepsWheels, isFalse);
+      expect(nod.tickCount, 3);
+
+      final step = library.get('step_back')!;
+      expect(step.keepsWheels, isTrue);
+      expect(step.description, '后退两步');
+
+      final wake = library.get('wake_stand')!;
+      expect(wake.startPose, GesturePose.lying);
+      expect(wake.endPose, GesturePose.standing);
+      expect(libraryStandClipNames, contains(wake.name));
+      expect(library.get('stand_up')!.startPose, GesturePose.sitting);
+
+      expect(
+        library.listedGestures.map((g) => g.name),
+        isNot(containsAll(['StandUp', 'SitDown'])),
+      );
+    });
+
+    test('tryLoadOnboard reads the fixture paths', () {
+      library.registerDefaults();
+      library.tryLoadOnboard(
+        catalogPath: _fixture('gesture_index.json').path,
+        libraryPath: _fixture('gesture_library.json').path,
+      );
+      expect(library.hasOnboardCatalog, isTrue);
+      expect(library.get('step_back')!.keepsWheels, isTrue);
+      expect(library.listedGestures, hasLength(4));
+    });
+
+    test('missing onboard files keep built-in clips', () {
+      library.registerDefaults();
+      library.tryLoadOnboard(
+        catalogPath: 'thunder_brain/test/fixtures/missing-index.json',
+        libraryPath: 'thunder_brain/test/fixtures/missing-library.json',
+      );
+      expect(library.hasOnboardCatalog, isFalse);
+      expect(library.listedGestures.map((g) => g.name), contains('bow'));
+    });
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -399,14 +505,8 @@ void main() {
     });
 
     test('equality', () {
-      expect(
-        const Command.gesture('bow'),
-        const Command.gesture('bow'),
-      );
-      expect(
-        const Command.gesture('bow'),
-        isNot(const Command.gesture('nod')),
-      );
+      expect(const Command.gesture('bow'), const Command.gesture('bow'));
+      expect(const Command.gesture('bow'), isNot(const Command.gesture('nod')));
     });
 
     test('pattern matching', () {
@@ -431,15 +531,17 @@ void main() {
       final gestureLib = GestureLibrary(
         standingPose: JointsMatrix.fromList(List.filled(16, 0.5)),
       );
-      gestureLib.register(GestureDefinition(
-        name: 'bow',
-        keyframes: [
-          Keyframe(
-            targetPose: JointsMatrix.fromList(List.filled(16, 1.0)),
-            counts: 2,
-          ),
-        ],
-      ));
+      gestureLib.register(
+        GestureDefinition(
+          name: 'bow',
+          keyframes: [
+            Keyframe(
+              targetPose: JointsMatrix.fromList(List.filled(16, 1.0)),
+              counts: 2,
+            ),
+          ],
+        ),
+      );
 
       when(() => mockBrain.idle).thenReturn(mockBrain.mockIdle);
       when(() => mockBrain.standUp).thenReturn(mockBrain.mockStandUp);
@@ -460,11 +562,9 @@ void main() {
         final mockBrain = m.mockBrain;
 
         // StandUp stream for init→grounded→standing
-        when(() => mockBrain.mockStandUp.doing).thenAnswer(
-          (_) => Stream.fromIterable([
-            fakeIdle(.zero()),
-          ]),
-        );
+        when(
+          () => mockBrain.mockStandUp.doing,
+        ).thenAnswer((_) => Stream.fromIterable([fakeIdle(.zero())]));
 
         // Gesture stream for the actual gesture
         final gestureSequence = [
@@ -480,7 +580,7 @@ void main() {
             ..stubPosition()
             ..stubVelocity(),
           memory: Memory<History>(historySize: 1, initial: History.zero()),
-              definition: GestureDefinition(
+          definition: GestureDefinition(
             name: 'bow',
             keyframes: [
               Keyframe(
@@ -493,16 +593,17 @@ void main() {
         when(() => mockBrain.createGesture('bow')).thenReturn(mockGesture);
 
         // Return a finite stream for gesture doing
-        when(() => mockBrain.createGesture('bow'))
-            .thenAnswer((_) => null);
+        when(() => mockBrain.createGesture('bow')).thenAnswer((_) => null);
 
         // Instead, mock the _listenTransition behavior:
         // createGesture returns a mock Gesture whose .doing is a finite stream
         final mockGestureBehaviour = MockGestureBehaviour();
-        when(() => mockGestureBehaviour.doing)
-            .thenAnswer((_) => Stream.fromIterable(gestureSequence));
-        when(() => mockBrain.createGesture('bow'))
-            .thenReturn(mockGestureBehaviour);
+        when(
+          () => mockGestureBehaviour.doing,
+        ).thenAnswer((_) => Stream.fromIterable(gestureSequence));
+        when(
+          () => mockBrain.createGesture('bow'),
+        ).thenReturn(mockGestureBehaviour);
 
         return m;
       },
@@ -517,11 +618,9 @@ void main() {
       },
       expect: () => [
         predicate((S s) => s is Grounded),
-        predicate((S s) =>
-            s is Transitioning && s.target is StandUpCommand),
+        predicate((S s) => s is Transitioning && s.target is StandUpCommand),
         predicate((S s) => s is Standing),
-        predicate((S s) =>
-            s is Transitioning && s.target is GestureCommand),
+        predicate((S s) => s is Transitioning && s.target is GestureCommand),
         predicate((S s) => s is Standing), // gesture done → standing
       ],
     );
@@ -532,9 +631,9 @@ void main() {
         final m = buildGestureM();
         final mockBrain = m.mockBrain;
 
-        when(() => mockBrain.mockStandUp.doing).thenAnswer(
-          (_) => Stream.fromIterable([fakeIdle(.zero())]),
-        );
+        when(
+          () => mockBrain.mockStandUp.doing,
+        ).thenAnswer((_) => Stream.fromIterable([fakeIdle(.zero())]));
 
         return m;
       },
@@ -554,7 +653,210 @@ void main() {
         // No state change for unknown gesture
       ],
     );
+
+    blocTest(
+      'grounded + standing gesture stands with official StandUp then plays',
+      build: () {
+        final m = _gestureMachine();
+        final gesture = _finiteGesture();
+        when(
+          () => m.mockBrain.mockStandUp.doing,
+        ).thenAnswer((_) => Stream.fromIterable([fakeIdle(.zero())]));
+        when(() => m.mockBrain.createGesture('nod_yes')).thenReturn(gesture);
+        return m;
+      },
+      seed: () => Grounded(Stream<History>.empty().listen((_) {})),
+      act: (m) => m.add(const CmdGesture('nod_yes')),
+      expect: () => [
+        predicate(
+          (S s) =>
+              s is Transitioning &&
+              s.target is StandUpCommand &&
+              s.pending == const A.gesture('nod_yes'),
+        ),
+        predicate(
+          (S s) =>
+              s is Transitioning &&
+              s.target == const Command.gesture('nod_yes'),
+        ),
+        isA<Standing>(),
+      ],
+      verify: (m) {
+        verifyNever(() => m.mockBrain.createGesture('wake_stand'));
+        verifyNever(() => m.mockBrain.createGesture('stand_up'));
+      },
+    );
+
+    blocTest(
+      'lying + wake_stand plays that clip and does not call official StandUp',
+      build: () {
+        final m = _gestureMachine();
+        final gesture = _finiteGesture();
+        when(() => m.mockBrain.createGesture('wake_stand')).thenReturn(gesture);
+        return m;
+      },
+      seed: () => Grounded(Stream<History>.empty().listen((_) {})),
+      act: (m) => m.add(const CmdGesture('wake_stand')),
+      expect: () => [
+        predicate(
+          (S s) =>
+              s is Transitioning &&
+              s.target == const Command.gesture('wake_stand'),
+        ),
+        isA<Standing>(),
+      ],
+      verify: (m) {
+        verifyNever(() => m.mockBrain.mockStandUp.doing);
+      },
+    );
+
+    blocTest(
+      'sitting + stand_up clip is ordinary playback, not official StandUp',
+      build: () {
+        final m = _gestureMachine()..groundedPose = GesturePose.sitting;
+        final gesture = _finiteGesture();
+        when(() => m.mockBrain.createGesture('stand_up')).thenReturn(gesture);
+        return m;
+      },
+      seed: () => Grounded(Stream<History>.empty().listen((_) {})),
+      act: (m) => m.add(const CmdGesture('stand_up')),
+      expect: () => [
+        predicate(
+          (S s) =>
+              s is Transitioning &&
+              s.target == const Command.gesture('stand_up'),
+        ),
+        isA<Standing>(),
+      ],
+      verify: (m) {
+        verifyNever(() => m.mockBrain.mockStandUp.doing);
+      },
+    );
+
+    blocTest(
+      'lying + stand_up clip is rejected',
+      build: _gestureMachine,
+      seed: () => Grounded(Stream<History>.empty().listen((_) {})),
+      act: (m) => m.add(const CmdGesture('stand_up')),
+      expect: () => <S>[],
+    );
+
+    blocTest(
+      'gesture that ends lying settles in Grounded',
+      build: () {
+        final m = _gestureMachine();
+        final gesture = _finiteGesture();
+        when(() => m.mockBrain.createGesture('lie_down')).thenReturn(gesture);
+        return m;
+      },
+      seed: () => Standing(Stream<History>.empty().listen((_) {})),
+      act: (m) => m.add(const CmdGesture('lie_down')),
+      expect: () => [
+        predicate(
+          (S s) =>
+              s is Transitioning &&
+              s.target == const Command.gesture('lie_down'),
+        ),
+        isA<Grounded>(),
+      ],
+      verify: (m) {
+        expect(m.groundedPose, GesturePose.lying);
+      },
+    );
+
+    blocTest(
+      'gesture that ends sitting settles in Grounded as sitting',
+      build: () {
+        final m = _gestureMachine();
+        final gesture = _finiteGesture();
+        when(() => m.mockBrain.createGesture('sit')).thenReturn(gesture);
+        return m;
+      },
+      seed: () => Standing(Stream<History>.empty().listen((_) {})),
+      act: (m) => m.add(const CmdGesture('sit')),
+      expect: () => [isA<Transitioning>(), isA<Grounded>()],
+      verify: (m) {
+        expect(m.groundedPose, GesturePose.sitting);
+      },
+    );
   });
+}
+
+TestM _gestureMachine() {
+  final m = TestM();
+  final mockBrain = m.mockBrain;
+  final standing = JointsMatrix.fromList(List.filled(16, 0.5));
+  final library = GestureLibrary(standingPose: standing)
+    ..register(
+      GestureDefinition(
+        name: 'nod_yes',
+        keyframes: [Keyframe(targetPose: standing, counts: 1)],
+      ),
+    )
+    ..register(
+      GestureDefinition(
+        name: 'wake_stand',
+        startPose: GesturePose.lying,
+        endPose: GesturePose.standing,
+        keepsWheels: true,
+        keyframes: [Keyframe(targetPose: standing, counts: 1)],
+      ),
+    )
+    ..register(
+      GestureDefinition(
+        name: 'stand_up',
+        startPose: GesturePose.sitting,
+        endPose: GesturePose.standing,
+        keepsWheels: true,
+        keyframes: [Keyframe(targetPose: standing, counts: 1)],
+      ),
+    )
+    ..register(
+      GestureDefinition(
+        name: 'lie_down',
+        endPose: GesturePose.lying,
+        keepsWheels: true,
+        keyframes: [Keyframe(targetPose: .zero(), counts: 1)],
+      ),
+    )
+    ..register(
+      GestureDefinition(
+        name: 'sit',
+        endPose: GesturePose.sitting,
+        keepsWheels: true,
+        keyframes: [Keyframe(targetPose: .zero(), counts: 1)],
+      ),
+    );
+  when(() => mockBrain.gestureLibrary).thenReturn(library);
+  when(() => mockBrain.idle).thenReturn(mockBrain.mockIdle);
+  when(() => mockBrain.standUp).thenReturn(mockBrain.mockStandUp);
+  when(() => mockBrain.memory).thenReturn(mockBrain.mockMemory);
+  when(
+    () => mockBrain.mockIdle.doing,
+  ).thenAnswer((_) => Stream<History>.empty());
+  return m;
+}
+
+MockGestureBehaviour _finiteGesture() {
+  final gesture = MockGestureBehaviour();
+  when(() => gesture.doing).thenAnswer(
+    (_) => Stream.fromIterable([
+      fakeGesture(JointsMatrix.fromList(List.filled(16, 0.5))),
+    ]),
+  );
+  return gesture;
+}
+
+File _fixture(String name) {
+  final candidates = <String>[
+    'thunder_brain/test/fixtures/$name',
+    'test/fixtures/$name',
+  ];
+  for (final path in candidates) {
+    final file = File(path);
+    if (file.existsSync()) return file;
+  }
+  throw StateError('Missing gesture fixture $name');
 }
 
 // ─── Mock helpers ────────────────────────────────────────────
@@ -562,8 +864,7 @@ void main() {
 class MockGestureBehaviour extends Mock implements Gesture {}
 
 extension on MockImu {
-  void stubGyroscope() =>
-      when(() => gyroscope).thenReturn(Vector3.zero());
+  void stubGyroscope() => when(() => gyroscope).thenReturn(Vector3.zero());
   void stubProjectedGravity() =>
       when(() => projectedGravity).thenReturn(Vector3(0, 0, -1));
 }

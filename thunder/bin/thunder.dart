@@ -252,6 +252,11 @@ Future<void> _run() async {
   }
 
   brain.retainCurrentProfile(defaultProfile.name);
+  brain.gestureLibrary = installOnboardGestures(defaultProfile.standingPose);
+  _log.info(
+    'Gesture catalog: '
+    '${brain.gestureLibrary!.listedGestures.map((g) => g.name).join(', ')}',
+  );
   try {
     for (final name in operatorSlots.profileNames) {
       if (name == defaultProfile.name) continue;
