@@ -93,6 +93,12 @@ dart run thunder/bin/server.dart
 | `THUNDER_SENSOR_LOW_THRESHOLD` | `3` | 传感器降频容忍次数 |
 | `THUNDER_LOG_DIR` | `logs` | 日志目录（空字符串禁用） |
 | `THUNDER_DEBUG_TUI` | `false` | 启用 ANSI 调试 TUI |
+| `THUNDER_GESTURE_CATALOG` | `/home/sunrise/gesture-library/gestures/index.json` | `ListGestures` 目录 |
+| `THUNDER_GESTURE_LIBRARY` | `/home/sunrise/gesture-library/gestures/library.json` | `GestureLibrary.loadFromJson` 动作包 |
+
+## 动作库（ListGestures / PlayGesture）
+
+`RobotControl.ListGestures` 返回机上 `index.json` 的 `name`、`description`、`duration_ms`。`PlayGesture` 只收动作名，在狗上按关键帧本地播放（`counts = 0` 一拍到位，`counts = N` 用 N 拍插到目标，一拍 20 ms）。官方 `StandUp` / `SitDown` 不在动作列表里。趴下时如果动作要求站立起步，先走官方 `StandUp`，不用库里的 `wake_stand` 或 `stand_up` 代替。带轮轨迹（例如 `step_back`）保留轮子目标。文件不在默认路径上时服务仍能启动，列表退回内置鞠躬/点头等动作。
 
 ### server.dart 使用
 

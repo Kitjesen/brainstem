@@ -1,15 +1,24 @@
 import 'dart:async';
 
-import 'package:thunder_brain/thunder_brain.dart';
 import 'package:logging/logging.dart';
+import 'package:skinny_dog_algebra/skinny_dog_algebra.dart';
+import 'package:thunder_brain/thunder_brain.dart';
 
 import '../real_control_dog.dart';
 import '../server/gain_manager.dart';
-import 'robot_profile.dart';
 import 'operator_mode_slots.dart';
+import 'robot_profile.dart';
 import 'voice_announcer.dart';
 
 final _log = Logger('thunder.profile.manager');
+
+/// Built-in clips plus the onboard Thunder V4 library when those files exist.
+GestureLibrary installOnboardGestures(JointsMatrix standingPose) {
+  final library = GestureLibrary(standingPose: standingPose)
+    ..registerDefaults();
+  library.tryLoadOnboard();
+  return library;
+}
 
 // TODO(phase2): Evaluate moving ProfileManager to a shared library —
 // currently in thunder but also needed by thunder_brain's server.dart.
@@ -146,8 +155,7 @@ class ProfileManager {
       }
 
       // 2. GestureLibrary（保存旧值以便回滚）
-      brain.gestureLibrary = GestureLibrary(standingPose: p.standingPose)
-        ..registerDefaults();
+      brain.gestureLibrary = installOnboardGestures(p.standingPose);
 
       // 3. GainManager + 实机命令包络
       try {

@@ -112,6 +112,12 @@ Future<void> main() async {
     observationBuilder: defaultProfile.toObservationBuilder(),
   );
 
+  brain.gestureLibrary = installOnboardGestures(defaultProfile.standingPose);
+  _log.info(
+    'Gesture catalog: '
+    '${brain.gestureLibrary!.listedGestures.map((g) => g.name).join(', ')}',
+  );
+
   try {
     await brain.loadModel(defaultProfile.modelPath, inputName: modelInputName);
     _log.info('ONNX model loaded from ${defaultProfile.modelPath}');

@@ -1,0 +1,41 @@
+{
+  "model": "thunder_v4",
+  "gestures": [
+    {
+      "name": "nod_yes",
+      "description": "点头同意",
+      "duration_ms": 60,
+      "start_pose": "standing",
+      "end_pose": "standing",
+      "uses_wheels": false,
+      "playback": "joint_lerp"
+    },
+    {
+      "name": "step_back",
+      "description": "后退两步",
+      "duration_ms": 60,
+      "start_pose": "standing",
+      "end_pose": "standing",
+      "uses_wheels": true,
+      "playback": "joint_lerp_keep_wheels"
+    },
+    {
+      "name": "wake_stand",
+      "description": "醒来站起",
+      "duration_ms": 20,
+      "start_pose": "lying",
+      "end_pose": "standing",
+      "uses_wheels": true,
+      "playback": "joint_lerp_keep_wheels"
+    },
+    {
+      "name": "stand_up",
+      "description": "站起来",
+      "duration_ms": 20,
+      "start_pose": "sitting",
+      "end_pose": "standing",
+      "uses_wheels": true,
+      "playback": "joint_lerp_keep_wheels"
+    }
+  ]
+}

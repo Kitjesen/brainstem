@@ -990,20 +990,115 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
   //  动作 SDK（Gesture）
   // ═══════════════════════════════════════════════════════════
 
-  /// 触发一个命名动作（鞠躬、点头、扭动等）。
-  /// 机器人必须处于 Standing 状态。
-  /// 暂无对应 proto RPC，通过 Dart SDK 直接调用。
+  /// 触发一个命名动作。检查与 [playGesture] 相同，供进程内调用。
   void gesture(String name) {
-    final library = _brain.gestureLibrary;
-    if (library == null || !library.contains(name)) {
-      throw GrpcError.notFound('Unknown gesture: $name');
-    }
-    _dispatch(A.gesture(name));
-    _log.info('Gesture command received: $name');
+    _startGesture(name);
   }
 
-  /// 获取可用动作列表。
-  List<String> get gestureNames => _brain.gestureLibrary?.names ?? const [];
+  /// 获取可用动作列表。有机上目录时只返回目录，不含官方 StandUp/SitDown。
+  List<String> get gestureNames =>
+      _brain.gestureLibrary?.listedGestures.map((g) => g.name).toList() ??
+      const <String>[];
+
+  void _startGesture(String name) {
+    final failure = _gestureRejection(name);
+    if (failure != null) throw failure;
+    if (!_dispatch(A.gesture(name))) {
+      throw GrpcError.aborted('PlayGesture rejected by control arbiter');
+    }
+    final definition = _brain.gestureLibrary!.get(name)!;
+    if (definition.startPose == GesturePose.standing && _m.state is Grounded) {
+      _log.info(
+        'PlayGesture "$name" accepted from grounded; '
+        'official StandUp runs before the clip',
+      );
+    } else {
+      _log.info('PlayGesture "$name" accepted');
+    }
+  }
+
+  GrpcError? _gestureRejection(String name) {
+    if (name.isEmpty) {
+      return GrpcError.invalidArgument('Gesture name is empty');
+    }
+    final library = _brain.gestureLibrary;
+    final definition = library?.get(name);
+    if (definition == null) {
+      return GrpcError.notFound('Unknown gesture: $name');
+    }
+    if (profileManager?.hasFault == true) {
+      return GrpcError.failedPrecondition('Profile state is inconsistent');
+    }
+    if (!_motorOutputEnabled) {
+      return GrpcError.failedPrecondition('Motors are disabled');
+    }
+    if (_criticalMotorFault) {
+      return GrpcError.failedPrecondition('Critical motor fault');
+    }
+    if (recovery?.selected == true) {
+      return GrpcError.failedPrecondition(
+        'Exit recovery before playing a gesture',
+      );
+    }
+    if (mode == CmsMode.hardware &&
+        (_m.isHandlingEvent ||
+            _m.profileSwitchInProgress ||
+            _zeroing ||
+            motorEnablePending ||
+            externalMotorEnablePendingProvider?.call() == true)) {
+      return GrpcError.failedPrecondition('Body control is busy');
+    }
+    if (_m.profileSwitchInProgress) {
+      return GrpcError.failedPrecondition('Profile switch is in progress');
+    }
+    final joints = _enableBlockReason();
+    if (joints != null) {
+      return GrpcError.failedPrecondition('Joints are not ready: $joints');
+    }
+    if (_m.state is Walking) {
+      return GrpcError.failedPrecondition('Robot is walking');
+    }
+    if (_m.state case Transitioning(:final target, :final pending)) {
+      if (target is GestureCommand || pending is CmdGesture) {
+        return GrpcError.failedPrecondition('A gesture is already playing');
+      }
+      return GrpcError.failedPrecondition('Body posture is transitioning');
+    }
+    if (definition.startPose == GesturePose.standing &&
+        libraryStandClipNames.contains(definition.name) &&
+        _m.state is Grounded) {
+      return GrpcError.failedPrecondition(
+        'Gesture "$name" cannot replace official StandUp',
+      );
+    }
+    final pose = _poseRejection(definition);
+    if (pose != null) return GrpcError.failedPrecondition(pose);
+    return null;
+  }
+
+  String? _poseRejection(GestureDefinition definition) {
+    final state = _m.state;
+    switch (definition.startPose) {
+      case GesturePose.standing:
+        if (state is Standing || state is Grounded) return null;
+        return 'Gesture "${definition.name}" requires standing; robot is not ready';
+      case GesturePose.sitting:
+      case GesturePose.lying:
+        final required = definition.startPose.name;
+        if (state is Walking) {
+          return 'Gesture "${definition.name}" requires $required; robot is walking';
+        }
+        if (state is Standing) {
+          return 'Gesture "${definition.name}" requires $required; robot is standing';
+        }
+        if (state is Grounded) {
+          if (_m.groundedPose == definition.startPose) return null;
+          return 'Gesture "${definition.name}" requires $required; '
+              'robot is ${_m.groundedPose.name}';
+        }
+        return 'Gesture "${definition.name}" requires $required; robot is not ready';
+    }
+  }
 
   // ═══════════════════════════════════════════════════════════
   //  策略切换
@@ -1084,6 +1179,12 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     final slotMode = hardware && pm.operatorSlots != null;
     final wasStanding = _m.state is Standing;
     void validateState({bool ownLock = false}) {
+      if (_m.state case Transitioning(
+        :final target,
+        :final pending,
+      ) when target is GestureCommand || pending is CmdGesture) {
+        throw StateError('Cannot switch profile while a gesture is playing');
+      }
       if (_disposed || _m.isClosed) {
         throw StateError('Control server is closed');
       }
@@ -1429,13 +1530,8 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     return proto.Empty();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  未实现的 RPC — pre-existing gap
-  //  cms.proto 里声明了这些 RPC 但 server 一直没实现。
-  //  Stub 返回 UNIMPLEMENTED 错误，让 dart analyze 通过且客户端能拿到
-  //  明确的"未支持"信号，不是静默的 abstract error。
-  //  TODO: 实现实际业务逻辑或从 proto 里移除这些 RPC。
-  // ═══════════════════════════════════════════════════════════
+  // Speed mode is declared in cms.proto and still unimplemented.
+  // ListGestures and PlayGesture are implemented in this class.
 
   @override
   Future<proto.Empty> setSpeedMode(
@@ -1458,7 +1554,14 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     ServiceCall call,
     proto.GestureRequest request,
   ) async {
-    throw GrpcError.unimplemented('PlayGesture not yet implemented');
+    _requireMotionPrincipal(call);
+    if (_disposed || call.isCanceled || call.isTimedOut) {
+      throw GrpcError.failedPrecondition(
+        'PlayGesture request is no longer active',
+      );
+    }
+    _startGesture(request.name);
+    return proto.Empty();
   }
 
   @override
@@ -1466,6 +1569,17 @@ class UnifiedCmsServer extends proto.RobotControlServiceBase {
     ServiceCall call,
     proto.Empty request,
   ) async {
-    throw GrpcError.unimplemented('ListGestures not yet implemented');
+    final library = _brain.gestureLibrary;
+    if (library == null) return proto.GestureList();
+    return proto.GestureList(
+      gestures: [
+        for (final gesture in library.listedGestures)
+          proto.GestureInfo(
+            name: gesture.name,
+            description: gesture.description ?? '',
+            durationMs: gesture.playbackDurationMs,
+          ),
+      ],
+    );
   }
 }

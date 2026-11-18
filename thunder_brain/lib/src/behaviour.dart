@@ -219,17 +219,19 @@ class Gesture extends Behaviour {
   });
 
   Stream<History> get doing async* {
-    JointsMatrix currentPose = joint.position;
+    var currentPose = joint.position;
     for (final keyframe in definition.keyframes) {
       final steps = keyframe.counts;
-      int i = 0;
+      // counts == 0 snaps on the next tick. counts == N emits N ticks at
+      // t = 1/N .. N/N. The old t = i/steps loop started at 0 and held the
+      // previous pose for an extra 20 ms; library timing does not include it.
+      var i = steps == 0 ? 0 : 1;
       await for (final _ in ts) {
         final t = steps == 0 ? 1.0 : (i / steps).clamp(0.0, 1.0);
-        final nextAction = JointsMatrix.lerp(
-          currentPose,
-          keyframe.targetPose,
-          t,
-        ).discardFoot();
+        final blended = JointsMatrix.lerp(currentPose, keyframe.targetPose, t);
+        final nextAction = definition.keepsWheels
+            ? blended
+            : blended.discardFoot();
         yield next(
           command: Command.gesture(definition.name),
           nextAction: nextAction,

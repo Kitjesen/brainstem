@@ -4,6 +4,7 @@ import 'package:cms/cms.dart';
 import 'package:logging/logging.dart';
 import 'package:thunder_brain/src/brain.dart';
 import 'package:thunder_brain/src/common.dart';
+import 'package:thunder_brain/src/gesture.dart';
 import 'package:vector_math/vector_math.dart';
 
 import 's.dart';
@@ -31,6 +32,10 @@ class M extends Cms<S, A> {
   bool profileSwitchInProgress = false;
   bool _handlingEvent = false;
   S? _pendingState;
+
+  /// Grounded is either the boot lie-down pose or the official sitting pose.
+  /// Standing and Walking are standing; this field is only read while grounded.
+  GesturePose groundedPose = GesturePose.lying;
 
   bool get isHandlingEvent =>
       _closing ||
@@ -184,7 +189,10 @@ class M extends Cms<S, A> {
 
   Future<S?> _kernelImpl(S s, A a) async => switch ((s, a)) {
     // ── Zero ────────────────────────────────────────────────
-    (Zero(), Init()) => Grounded(_listenIdle()),
+    (Zero(), Init()) => () {
+      groundedPose = GesturePose.lying;
+      return Grounded(_listenIdle());
+    }(),
     (Zero(), _) => () {
       _log.warning(
         '${a.runtimeType} ignored: FSM not initialized (call Init first)',
@@ -211,6 +219,42 @@ class M extends Cms<S, A> {
       _log.fine('Fault: $reason — already grounded, safe');
       return null;
     }(),
+    (Grounded(:final sub), CmdGesture(:final name)) => () async {
+      final definition = _brain.gestureLibrary?.get(name);
+      if (definition == null) {
+        _log.warning('Unknown gesture: $name — ignored');
+        return null;
+      }
+      if (definition.startPose == GesturePose.standing) {
+        if (libraryStandClipNames.contains(name)) {
+          _log.warning(
+            'Refusing to stand with library clip "$name"; '
+            'use official StandUp',
+          );
+          return null;
+        }
+        _log.info('Official StandUp before gesture "$name"');
+        await sub.cancel();
+        return Transitioning(
+          const Command.standUp(),
+          _listenTransition(const Command.standUp()),
+          A.gesture(name),
+        );
+      }
+      if (definition.startPose != groundedPose) {
+        _log.warning(
+          'Gesture "$name" requires ${definition.startPose.name} '
+          'but grounded pose is ${groundedPose.name}',
+        );
+        return null;
+      }
+      await sub.cancel();
+      return Transitioning(
+        Command.gesture(name),
+        _listenTransition(Command.gesture(name)),
+        null,
+      );
+    }(),
     (Grounded(), _) => null,
 
     // ── Standing (idle, upright) ────────────────────────────
@@ -228,8 +272,16 @@ class M extends Cms<S, A> {
       );
     }(),
     (Standing(:final sub), CmdGesture(:final name)) => () async {
-      if (_brain.gestureLibrary?.contains(name) != true) {
+      final definition = _brain.gestureLibrary?.get(name);
+      if (definition == null) {
         _log.warning('Unknown gesture: $name — ignored');
+        return null;
+      }
+      if (definition.startPose != GesturePose.standing) {
+        _log.warning(
+          'Gesture "$name" requires ${definition.startPose.name}; '
+          'robot is standing',
+        );
         return null;
       }
       await sub.cancel();
@@ -339,15 +391,53 @@ class M extends Cms<S, A> {
         );
       }(),
 
-    // Gesture 完成 → Standing
-    (Transitioning(target: GestureCommand(), :final sub), Done()) => () async {
-      await sub.cancel();
-      return Standing(_listenIdle());
-    }(),
+    // Official StandUp finished; play the clip that was waiting.
+    // The pending name is the requested clip, never wake_stand/stand_up
+    // substituted in as the stand itself.
+    (
+      Transitioning(
+        target: StandUpCommand(),
+        :final sub,
+        pending: CmdGesture(:final name),
+      ),
+      Done(),
+    ) =>
+      () async {
+        await sub.cancel();
+        if (libraryStandClipNames.contains(name)) {
+          _log.warning(
+            'Dropping pending library stand clip "$name" after official StandUp',
+          );
+          return Standing(_listenIdle());
+        }
+        if (_brain.gestureLibrary?.contains(name) != true) {
+          _log.warning('Pending gesture "$name" missing after StandUp');
+          return Standing(_listenIdle());
+        }
+        return Transitioning(
+          Command.gesture(name),
+          _listenTransition(Command.gesture(name)),
+          null,
+        );
+      }(),
 
-    // SitDown 完成 → Grounded
+    // Gesture 完成 → 停在该动作的 end_pose。
+    (Transitioning(target: GestureCommand(:final name), :final sub), Done()) =>
+      () async {
+        await sub.cancel();
+        final end =
+            _brain.gestureLibrary?.get(name)?.endPose ?? GesturePose.standing;
+        if (end == GesturePose.standing) {
+          return Standing(_listenIdle());
+        }
+        groundedPose = end;
+        return Grounded(_listenIdle());
+      }(),
+
+    // SitDown 完成 → Grounded（官方坐姿）
     (Transitioning(target: SitDownCommand(), :final sub), Done()) => () async {
       await sub.cancel();
+      groundedPose = GesturePose.sitting;
       return Grounded(_listenIdle());
     }(),
 

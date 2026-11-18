@@ -405,17 +405,18 @@ RealJoint(fr: .usbbus3, fl: .usbbus1, rr: .usbbus4, rl: .usbbus2)
 
 ## 动作 SDK（Gesture）
 
-```dart
-// 创建动作库
-final gestureLib = GestureLibrary(standingPose: standingPose)
-  ..registerDefaults();  // bow, nod, wiggle, stretch
-brain.gestureLibrary = gestureLib;
+Thunder V4 的机上动作库不进这个仓库。`thunder` 启动时从
+`THUNDER_GESTURE_CATALOG` / `THUNDER_GESTURE_LIBRARY` 加载（默认
+`/home/sunrise/gesture-library/gestures/index.json` 和 `library.json`），
+并保留内置 `bow` / `nod` / `wiggle` / `stretch` / `dance`。
 
-// 触发动作（Standing 状态）
-m.add(A.gesture('bow'));
-```
+客户端只调用已有的 `RobotControl.ListGestures` 和 `PlayGesture(name)`。
+列表字段是 proto 里的 `name`、`description`、`duration_ms`。官方 `StandUp`
+和 `SitDown` 仍是姿态 RPC。狗还在 `GROUNDED` 且动作要求站立时，先走官方
+`StandUp`，再播被点名的那条；`wake_stand` 和 `stand_up` 只是普通片段。
 
-支持 JSON 自定义动作、关键帧插值、余弦缓入缓出。
+关键帧：`counts = 0` 下一拍到位，`counts = N` 按 `t = 1/N … 1` 插值 N 拍
+（20 ms / 拍）。`playback = joint_lerp_keep_wheels` 的片段保留轮子目标。
 
 ---
 
