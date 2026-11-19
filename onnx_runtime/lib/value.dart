@@ -1,9 +1,11 @@
 import 'dart:ffi';
+
 import 'package:ffi/ffi.dart';
 
 import 'status.dart';
 import 'ffi/onnx_api.dart';
 import 'ffi/bindings.g.dart';
+import 'info.dart';
 
 sealed class OnnxValue {
   final List<int> shape;
@@ -15,16 +17,26 @@ sealed class OnnxValue {
     ONNXTensorElementDataType type,
   );
 
-  int get elementCount {
-    return shape.fold(1, (a, b) => a * b);
-  }
+  int get elementCount => _elementCount(shape);
 
   factory OnnxValue.from(
     Pointer<OrtValue> valuePtr,
     ONNXTensorElementDataType type,
     List<int> shape,
   ) {
-    final length = shape.fold(1, (a, b) => a * b);
+    // Callers historically passed the model's declared shape. That is
+    // still symbolic ([-1, 16]) for a dynamic batch, and folding it
+    // produces a negative length. Read the OrtValue when any dim is
+    // not a concrete positive size.
+    final List<int> resolved = shape.any((int dim) => dim <= 0)
+        ? OnnxTensorInfo.fromOrtValue(valuePtr).dimensions
+        : shape;
+    final int length = _elementCount(resolved);
+    if (length < 0) {
+      throw ArgumentError(
+        'Cannot copy tensor data with a dynamic shape $resolved',
+      );
+    }
     switch (type) {
       case ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64:
       case ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32:
@@ -34,10 +46,10 @@ sealed class OnnxValue {
       case ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32:
       case ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16:
       case ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8:
-        return OnnxInt.from(valuePtr, type, shape, length);
+        return OnnxInt.from(valuePtr, type, resolved, length);
       case ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT:
       case ONNXTensorElementDataType.ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE:
-        return OnnxFloat.from(valuePtr, type, shape, length);
+        return OnnxFloat.from(valuePtr, type, resolved, length);
       default:
         throw ArgumentError('Unsupported type: $type');
     }
@@ -100,6 +112,15 @@ class OnnxFloat extends OnnxValue {
 
   @override
   String toString() => 'OnnxFloat(value: $value, shape: $shape)';
+}
+
+int _elementCount(List<int> shape) {
+  var count = 1;
+  for (final int dim in shape) {
+    if (dim < 0) return -1;
+    count *= dim;
+  }
+  return count;
 }
 
 extension on Pointer<OrtValue> {

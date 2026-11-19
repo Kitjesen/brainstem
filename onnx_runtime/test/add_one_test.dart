@@ -1,4 +1,5 @@
 import 'dart:io';
+
 import 'package:test/test.dart';
 import 'package:onnx_runtime/onnx_runtime.dart';
 
@@ -26,6 +27,12 @@ void main() {
     });
     // You may want to adjust the expected value based on your model
     final result = outputValues[0] as OnnxFloat;
+    expect(result.shape, [1]);
+    expect(result.value, hasLength(1));
     expect(result.value[0], closeTo(2.0, 1e-5));
+    expect(session.getInputInfo(0).info.dimensions, [1]);
+    expect(session.getInputInfo(0).info.totalElementCount, 1);
+    expect(session.getOutputInfo(0).info.dimensions, [1]);
+    expect(session.getOutputInfo(0).info.totalElementCount, 1);
   });
 }
